@@ -177,7 +177,7 @@
         }
 
         .table-compact tbody td {
-            padding: 2px 20px !important;
+            padding: 2px 0px !important;
             white-space: nowrap;
             text-align: center;
             vertical-align: middle;
@@ -198,13 +198,6 @@
 
         .table-compact tbody td strong {
             font-weight: 700;
-        }
-
-        .action-buttons-compact {
-            display: flex;
-            gap: 4px;
-            justify-content: center;
-            align-items: center;
         }
 
         /* Pagination Wrapper untuk Preparation */

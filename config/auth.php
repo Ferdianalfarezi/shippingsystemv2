@@ -41,7 +41,8 @@ return [
             'provider' => 'users',
         ],
     ],
-
+    
+    'remember' => env('AUTH_REMEMBER_DURATION', 10080),
     /*
     |--------------------------------------------------------------------------
     | User Providers

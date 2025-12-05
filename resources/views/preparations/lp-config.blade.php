@@ -50,6 +50,7 @@
 <script>
 $(document).ready(function() {
     let lpConfigs = [];
+    let originalConfigs = []; // Simpan data original
     let deletedIds = [];
     let newConfigIndex = 0;
 
@@ -66,6 +67,8 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 lpConfigs = response.data || [];
+                // Deep copy untuk menyimpan data original
+                originalConfigs = JSON.parse(JSON.stringify(lpConfigs));
                 deletedIds = [];
                 renderLpConfigs();
             },
@@ -191,6 +194,22 @@ $(document).ready(function() {
         }
     });
 
+    // Function to check if config has changed
+    function hasChanged(config) {
+        // Jika ID baru, pasti berubah
+        if (!config.id || String(config.id).startsWith('new_')) {
+            return true;
+        }
+        
+        // Cari data original
+        const original = originalConfigs.find(c => c.id === config.id);
+        if (!original) return true;
+        
+        // Bandingkan field
+        return original.route !== config.route || 
+               original.logistic_partner !== config.logistic_partner;
+    }
+
     // Save all configs
     $('#saveAllLpConfig').on('click', function() {
         // Validate
@@ -215,6 +234,20 @@ $(document).ready(function() {
             return;
         }
 
+        // Filter hanya data yang berubah atau baru
+        const changedConfigs = lpConfigs.filter(config => hasChanged(config));
+
+        // Jika tidak ada perubahan
+        if (changedConfigs.length === 0 && deletedIds.length === 0) {
+            Swal.fire({
+                title: 'Info',
+                text: 'Tidak ada perubahan untuk disimpan',
+                icon: 'info',
+                confirmButtonColor: '#6c757d'
+            });
+            return;
+        }
+
         // Show loading
         Swal.fire({
             title: 'Menyimpan...',
@@ -226,9 +259,9 @@ $(document).ready(function() {
             }
         });
 
-        // Prepare data for batch save
+        // Prepare data for batch save - HANYA KIRIM YANG BERUBAH
         const dataToSave = {
-            configs: lpConfigs.map(c => ({
+            configs: changedConfigs.map(c => ({
                 id: String(c.id).startsWith('new_') ? null : c.id,
                 route: c.route,
                 logistic_partner: c.logistic_partner
@@ -279,6 +312,7 @@ $(document).ready(function() {
     // Reset when modal is closed
     $('#lpConfigModal').on('hidden.bs.modal', function() {
         lpConfigs = [];
+        originalConfigs = [];
         deletedIds = [];
         newConfigIndex = 0;
     });

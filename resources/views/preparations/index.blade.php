@@ -32,7 +32,7 @@
         <!-- Search Bar -->
         <div class="input-group" style="width: 300px;">
             <input type="text" class="form-control" id="searchInput" placeholder="Cari Route, LP, DN, Customer..." value="{{ request('search') }}">
-            <button class="btn btn-primary" type="button" id="searchButton">
+            <button class="btn btn-secondary" type="button" id="searchButton">
                 <i class="bi bi-search"></i>
             </button>
         </div>
@@ -64,7 +64,10 @@
                                     <i class="bi bi-upload me-2"></i> Import Options :
                                 </a>
                                 <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
-                                    <i class="bi bi-file-earmark-excel text-success me-2"></i> Excel
+                                    <i class="bi bi-file-earmark-excel text-success me-1 ms-4"></i> Excel
+                                </a>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importTmminModal">
+                                    <i class="bi bi-file-earmark-text text-dark me-1 ms-4"></i> TMMIN
                                 </a>
                             </li>
                         </ul>
@@ -125,7 +128,7 @@
             </thead>
             <tbody>
                 @forelse($preparations as $index => $prep)
-                    <tr class="fs-5 {{ $prep->status === 'delay' ? 'table-danger-subtle' : '' }}">
+                    <tr class="fs-4 {{ $prep->status === 'delay' ? 'table-danger-subtle' : '' }}">
                         <td><strong>{{ $prep->route }}</strong></td>
                         <td>{{ $prep->logistic_partners }}</td>
                         <td>{{ $prep->no_dn }}</td>
@@ -187,7 +190,9 @@
     @include('preparations.create')
     @include('preparations.edit')
     @include('preparations.import')
+    @include('preparations.import-tmmin')
     @include('preparations.lp-config')
+
     
 @endsection
 
@@ -520,5 +525,130 @@ $('.delete-form').on('submit', function(e) {
             window.location.href = url.toString();
         }
     });
+
+    // Handle Import TMMIN TXT Form
+        $('#importTmminForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const fileInput = $('#tmminFile')[0];
+            
+            if (!fileInput.files.length) {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Silakan pilih file TXT terlebih dahulu',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+                return;
+            }
+            
+            // Show progress
+            $('#importTmminProgress').removeClass('d-none');
+            $('#importTmminButton').prop('disabled', true);
+            
+            $.ajax({
+                url: '{{ route("preparations.import-tmmin") }}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    $('#importTmminProgress').addClass('d-none');
+                    $('#importTmminButton').prop('disabled', false);
+                    
+                    if (response.status === 'duplicates_found') {
+                        // Tampilkan konfirmasi untuk duplikat
+                        let duplicateList = '<ul class="text-start">';
+                        response.duplicates.forEach(function(dup) {
+                            duplicateList += `<li>${dup.table}: ${dup.count} data</li>`;
+                        });
+                        duplicateList += '</ul>';
+                        
+                        Swal.fire({
+                            title: 'Data Duplikat Ditemukan!',
+                            html: response.message + duplicateList + '<br><strong>Apakah Anda ingin melanjutkan import tanpa data duplikat?</strong>',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#059669',
+                            cancelButtonColor: '#6c757d',
+                            confirmButtonText: 'Ya, Lanjutkan!',
+                            cancelButtonText: 'Batal'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Import ulang dengan force_import flag
+                                formData.append('force_import', '1');
+                                
+                                $('#importTmminProgress').removeClass('d-none');
+                                $('#importTmminButton').prop('disabled', true);
+                                
+                                $.ajax({
+                                    url: '{{ route("preparations.import-tmmin") }}',
+                                    type: 'POST',
+                                    data: formData,
+                                    processData: false,
+                                    contentType: false,
+                                    success: function(response) {
+                                        $('#importTmminProgress').addClass('d-none');
+                                        $('#importTmminButton').prop('disabled', false);
+                                        
+                                        if (response.status === 'success') {
+                                            Swal.fire({
+                                                title: 'Berhasil!',
+                                                text: response.message,
+                                                icon: 'success',
+                                                confirmButtonColor: '#059669'
+                                            }).then(() => {
+                                                $('#importTmminModal').modal('hide');
+                                                window.location.reload();
+                                            });
+                                        }
+                                    },
+                                    error: function(xhr) {
+                                        $('#importTmminProgress').addClass('d-none');
+                                        $('#importTmminButton').prop('disabled', false);
+                                        
+                                        Swal.fire({
+                                            title: 'Gagal!',
+                                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
+                                            icon: 'error',
+                                            confirmButtonColor: '#dc2626'
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    } else if (response.status === 'success') {
+                        Swal.fire({
+                            title: 'Berhasil!',
+                            text: response.message,
+                            icon: 'success',
+                            confirmButtonColor: '#059669'
+                        }).then(() => {
+                            $('#importTmminModal').modal('hide');
+                            window.location.reload();
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    $('#importTmminProgress').addClass('d-none');
+                    $('#importTmminButton').prop('disabled', false);
+                    
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626'
+                    });
+                }
+            });
+        });
+
+        // Reset form when modal is closed
+        $('#importTmminModal').on('hidden.bs.modal', function () {
+            $('#importTmminForm')[0].reset();
+            $('#importTmminProgress').addClass('d-none');
+            $('#importTmminButton').prop('disabled', false);
+        });
 </script>
 @endpush

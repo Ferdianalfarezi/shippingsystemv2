@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PreparationController;
 use App\Http\Controllers\ImportExcelController;
 use App\Http\Controllers\LpConfigController;
+use App\Http\Controllers\ImportTmminController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -20,12 +21,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/preparations/delete-all', [PreparationController::class, 'deleteAll'])->name('preparations.deleteAll');
     Route::post('/preparations/import', [ImportExcelController::class, 'import'])->name('preparations.import');
     Route::get('/import-excel/download-template', [ImportExcelController::class, 'downloadTemplate'])->name('import-excel.download-template');
+    Route::post('/preparations/import-tmmin', [ImportTmminController::class, 'import'])
+    ->name('preparations.import-tmmin');
+    
     // Preparations CRUD
     Route::resource('preparations', PreparationController::class);
 
     Route::resource('lp-configs', LpConfigController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('lp-configs/batch-save', [LpConfigController::class, 'batchSave'])->name('lp-configs.batch-save');
-    
+
     // Profile Routes (Breeze default)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
