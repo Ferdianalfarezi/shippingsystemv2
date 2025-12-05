@@ -89,7 +89,7 @@
 
         .page-title {
             font-weight: bold;
-            font-size: 48px;
+            font-size: 55px;
             text-align: center;
             margin: 0;
             color: #ffffff;
@@ -229,6 +229,55 @@
             50% {
                 opacity: 0.5;
             }
+        }
+
+        /* Custom CSS untuk nested dropdown */
+        .dropdown-menu .dropend .dropdown-toggle::after {
+            display: inline-block;
+            margin-left: 0.5em;
+            vertical-align: 0.255em;
+            content: "";
+            border-top: 0.3em solid transparent;
+            border-right: 0;
+            border-bottom: 0.3em solid transparent;
+            border-left: 0.3em solid;
+        }
+
+        .dropdown-menu .dropend > .dropdown-menu {
+            top: 0;
+            left: 100%;
+            margin-top: -1px;
+        }
+
+        .dropend:hover > .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* Prevent horizontal scrollbar dengan word wrap */
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        #preparationsTable {
+            width: 100%;
+        }
+
+        #preparationsTable th,
+        #preparationsTable td {
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: break-word;
+            vertical-align: middle;
+        }
+
+        /* Kolom actions tetap nowrap biar button ga kebawah */
+        #preparationsTable th:nth-child(12),
+        #preparationsTable td:nth-child(12) {
+            white-space: nowrap;
         }
     </style>
 

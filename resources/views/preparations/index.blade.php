@@ -52,6 +52,15 @@
                                     <i class="bi bi-plus-circle me-2"></i> Tambah Data
                                 </a>
                             </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li >
+                                <a class="dropdown-item">
+                                    <i class="bi bi-upload me-2"></i> Import Options :
+                                </a>
+                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                                        <i class="bi bi-file-earmark-excel text-success me-2"></i> Excel
+                                    </a>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -110,7 +119,7 @@
             </thead>
             <tbody>
                 @forelse($preparations as $index => $prep)
-                    <tr class="fs-4 {{ $prep->status === 'delay' ? 'table-danger-subtle' : '' }}">
+                    <tr class="fs-5 {{ $prep->status === 'delay' ? 'table-danger-subtle' : '' }}">
                         <td><strong>{{ $prep->route }}</strong></td>
                         <td>{{ $prep->logistic_partners }}</td>
                         <td>{{ $prep->no_dn }}</td>
@@ -122,7 +131,7 @@
                         <td>{{ $prep->pulling_date->format('d-m-y') }}</td>
                         <td>{{ date('H:i:s', strtotime($prep->pulling_time)) }}</td>
                         <td>
-                            <span class="badge {{ $prep->status_badge }} fw-bold px-3 py-2 mb-1" 
+                            <span class="badge {{ $prep->status_badge }} fw-bold px-3 py-2 mb-1 mt-1" 
                                   title="{{ $prep->status === 'delay' ? 'Terlambat ' . $prep->delay_duration : 'On Time' }}">
                                 {{ $prep->status_label }}
                             </span>
@@ -173,12 +182,36 @@
     <!-- Include Modal Edit -->
     @include('preparations.edit')
     
+    <!-- Include Modal Import Excel -->
+    @include('preparations.import')
+    
 @endsection
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
 @push('scripts')
 <script>
     $(document).ready(function() {
+        
+        // Handle nested dropdown for Import Options
+        $('.dropend').on('mouseenter', function() {
+            $(this).find('.dropdown-menu').addClass('show');
+        }).on('mouseleave', function() {
+            $(this).find('.dropdown-menu').removeClass('show');
+        });
+
+        // Handle click on Import Options
+        $('#importOptionsDropdown').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).next('.dropdown-menu').toggleClass('show');
+        });
+
+        // Prevent parent dropdown from closing when clicking submenu
+        $('.dropend .dropdown-menu').on('click', function(e) {
+            e.stopPropagation();
+        });
+
         // Delete confirmation dengan SweetAlert
         $('.delete-form').on('submit', function(e) {
             e.preventDefault();
@@ -274,6 +307,131 @@
                     });
                 }
             });
+        });
+
+        // Handle Import Excel Form
+        $('#importExcelForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const fileInput = $('#excelFile')[0];
+            
+            if (!fileInput.files.length) {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Silakan pilih file Excel terlebih dahulu',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+                return;
+            }
+            
+            // Show progress
+            $('#importProgress').removeClass('d-none');
+            $('#importButton').prop('disabled', true);
+            
+            $.ajax({
+                url: '{{ route("preparations.import") }}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    $('#importProgress').addClass('d-none');
+                    $('#importButton').prop('disabled', false);
+                    
+                    if (response.status === 'duplicates_found') {
+                        // Tampilkan konfirmasi untuk duplikat
+                        let duplicateList = '<ul class="text-start">';
+                        response.duplicates.forEach(function(dup) {
+                            duplicateList += `<li>${dup.table}: ${dup.count} data</li>`;
+                        });
+                        duplicateList += '</ul>';
+                        
+                        Swal.fire({
+                            title: 'Data Duplikat Ditemukan!',
+                            html: response.message + duplicateList + '<br><strong>Apakah Anda ingin melanjutkan import tanpa data duplikat?</strong>',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#059669',
+                            cancelButtonColor: '#6c757d',
+                            confirmButtonText: 'Ya, Lanjutkan!',
+                            cancelButtonText: 'Batal'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Import ulang dengan force_import flag
+                                formData.append('force_import', '1');
+                                
+                                $('#importProgress').removeClass('d-none');
+                                $('#importButton').prop('disabled', true);
+                                
+                                $.ajax({
+                                    url: '{{ route("preparations.import") }}',
+                                    type: 'POST',
+                                    data: formData,
+                                    processData: false,
+                                    contentType: false,
+                                    success: function(response) {
+                                        $('#importProgress').addClass('d-none');
+                                        $('#importButton').prop('disabled', false);
+                                        
+                                        if (response.status === 'success') {
+                                            Swal.fire({
+                                                title: 'Berhasil!',
+                                                text: response.message,
+                                                icon: 'success',
+                                                confirmButtonColor: '#059669'
+                                            }).then(() => {
+                                                $('#importExcelModal').modal('hide');
+                                                window.location.reload();
+                                            });
+                                        }
+                                    },
+                                    error: function(xhr) {
+                                        $('#importProgress').addClass('d-none');
+                                        $('#importButton').prop('disabled', false);
+                                        
+                                        Swal.fire({
+                                            title: 'Gagal!',
+                                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
+                                            icon: 'error',
+                                            confirmButtonColor: '#dc2626'
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    } else if (response.status === 'success') {
+                        Swal.fire({
+                            title: 'Berhasil!',
+                            text: response.message,
+                            icon: 'success',
+                            confirmButtonColor: '#059669'
+                        }).then(() => {
+                            $('#importExcelModal').modal('hide');
+                            window.location.reload();
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    $('#importProgress').addClass('d-none');
+                    $('#importButton').prop('disabled', false);
+                    
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626'
+                    });
+                }
+            });
+        });
+
+        // Reset form when modal is closed
+        $('#importExcelModal').on('hidden.bs.modal', function () {
+            $('#importExcelForm')[0].reset();
+            $('#importProgress').addClass('d-none');
+            $('#importButton').prop('disabled', false);
         });
 
         // Handle Search Button Click

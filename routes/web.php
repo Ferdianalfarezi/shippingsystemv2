@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PreparationController;
+use App\Http\Controllers\ImportExcelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -16,7 +17,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Route Delete All Preparations (HARUS SEBELUM RESOURCE!)
     Route::delete('/preparations/delete-all', [PreparationController::class, 'deleteAll'])->name('preparations.deleteAll');
-    
+    Route::post('/preparations/import', [ImportExcelController::class, 'import'])->name('preparations.import');
+    Route::get('/import-excel/download-template', [ImportExcelController::class, 'downloadTemplate'])->name('import-excel.download-template');
     // Preparations CRUD
     Route::resource('preparations', PreparationController::class);
 
