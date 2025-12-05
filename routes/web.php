@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PreparationController;
 use App\Http\Controllers\ImportExcelController;
+use App\Http\Controllers\LpConfigController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -22,6 +23,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Preparations CRUD
     Route::resource('preparations', PreparationController::class);
 
+    Route::resource('lp-configs', LpConfigController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::post('lp-configs/batch-save', [LpConfigController::class, 'batchSave'])->name('lp-configs.batch-save');
+    
     // Profile Routes (Breeze default)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

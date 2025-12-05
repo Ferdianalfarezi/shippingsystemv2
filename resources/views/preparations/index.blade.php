@@ -53,13 +53,19 @@
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
-                            <li >
+                            <li>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#lpConfigModal">
+                                    <i class="bi bi-gear-fill me-2"></i> Konfigurasi LP
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
                                 <a class="dropdown-item">
                                     <i class="bi bi-upload me-2"></i> Import Options :
                                 </a>
-                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
-                                        <i class="bi bi-file-earmark-excel text-success me-2"></i> Excel
-                                    </a>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                                    <i class="bi bi-file-earmark-excel text-success me-2"></i> Excel
+                                </a>
                             </li>
                         </ul>
                     </div>
@@ -74,7 +80,7 @@
                             <i class="bi bi-check-circle text-white  fs-5"></i>
                         </div>
                         <div>
-                            <small class="text-white d-block me-3" style="font-size: 0.7rem;">Open</small>
+                            <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Open</small>
                             <h5 class="mb-0 fw-bold text-white">{{ $totalOnTime }}</h5>
                         </div>
                     </div>
@@ -89,7 +95,7 @@
                             <i class="bi bi-exclamation-triangle text-white fs-5"></i>
                         </div>
                         <div>
-                            <small class="text-white d-block me-3" style="font-size: 0.7rem;">Delay</small>
+                            <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Delay</small>
                             <h5 class="mb-0 fw-bold text-white">{{ $totalDelay }}</h5>
                         </div>
                     </div>
@@ -131,8 +137,9 @@
                         <td>{{ $prep->pulling_date->format('d-m-y') }}</td>
                         <td>{{ date('H:i:s', strtotime($prep->pulling_time)) }}</td>
                         <td>
-                            <span class="badge {{ $prep->status_badge }} fw-bold px-3 py-2 mb-1 mt-1" 
-                                  title="{{ $prep->status === 'delay' ? 'Terlambat ' . $prep->delay_duration : 'On Time' }}">
+                            <span class="badge {{ $prep->status_badge }} fw-bold px-3 py-2 mb-1 mt-1 
+                                {{ $prep->status === 'delay' ? 'badge-delay' : '' }}"
+                                title="{{ $prep->status === 'delay' ? 'Terlambat ' . $prep->delay_duration : 'On Time' }}">
                                 {{ $prep->status_label }}
                             </span>
                         </td>
@@ -141,13 +148,14 @@
                                 <button onclick="openEditModal({{ $prep->id }})" class="btn btn-warning btn-sm" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
-                                <form action="{{ route('preparations.destroy', $prep) }}" method="POST" class="d-inline delete-form">
+                                <form action="{{ route('preparations.destroy', $prep->id) }}" method="POST" class="d-inline delete-form">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm" title="Hapus">
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </form>
+
                                 <a href="{{ route('preparations.show', $prep) }}" class="btn btn-secondary btn-sm" title="Detail">
                                     <i class="bi bi-grid-3x3-gap-fill"></i>
                                 </a>
@@ -175,15 +183,11 @@
     <div class="pagination-wrapper">
         {{ $preparations->links() }}
     </div>
-    
-    <!-- Include Modal Create -->
+
     @include('preparations.create')
-    
-    <!-- Include Modal Edit -->
     @include('preparations.edit')
-    
-    <!-- Include Modal Import Excel -->
     @include('preparations.import')
+    @include('preparations.lp-config')
     
 @endsection
 
@@ -213,39 +217,76 @@
         });
 
         // Delete confirmation dengan SweetAlert
-        $('.delete-form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const form = this;
-            
+$('.delete-form').on('submit', function(e) {
+    e.preventDefault();
+    
+    const form = $(this);
+    const url = form.attr('action');
+    
+    console.log('Form URL:', url); // DEBUG
+    console.log('CSRF Token:', '{{ csrf_token() }}'); // DEBUG
+    
+    Swal.fire({
+        title: 'Apakah Anda yakin?',
+        text: "Data ini akan dihapus permanen!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Tampilkan loading
             Swal.fire({
-                title: 'Apakah Anda yakin?',
-                text: "Data ini akan dihapus permanen!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc2626',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Hapus!',
-                cancelButtonText: 'Batal',
-                reverseButtons: true
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Tampilkan loading
-                    Swal.fire({
-                        title: 'Menghapus...',
-                        text: 'Mohon tunggu sebentar',
-                        allowOutsideClick: false,
-                        allowEscapeKey: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
-                    
-                    // Submit form
-                    form.submit();
+                title: 'Menghapus...',
+                text: 'Mohon tunggu sebentar',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
                 }
             });
-        });
+            
+            console.log('Sending DELETE request...'); // DEBUG
+            
+            // AJAX Request untuk delete
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    _method: 'DELETE'
+                },
+                success: function(response) {
+                    console.log('Success response:', response); // DEBUG
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: response.message || 'Data berhasil dihapus',
+                        icon: 'success',
+                        confirmButtonColor: '#059669'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.log('Error status:', status); // DEBUG
+                    console.log('Error detail:', error); // DEBUG
+                    console.log('XHR response:', xhr.responseText); // DEBUG
+                    console.log('XHR status code:', xhr.status); // DEBUG
+                    
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat menghapus data',
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626'
+                    });
+                }
+            });
+        }
+    });
+});
 
         // Delete All Button
         $('#deleteAllButton').on('click', function() {

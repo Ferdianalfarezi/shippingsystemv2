@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Preparation;
+use App\Models\LpConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
@@ -32,26 +33,24 @@ class ImportExcelController extends Controller
             $noDnList = [];
 
             // Kumpulkan no_dn unik dari file dan tracking duplikat internal
-            $seenNoDn = []; // Track no_dn yang sudah ditemukan dalam file
-            $internalDuplicates = []; // Track duplikat dalam file
+            $seenNoDn = [];
+            $internalDuplicates = [];
             
             foreach ($collection->skip(1) as $rowIndex => $row) {
-                // Mapping: order_no di Excel = no_dn di database (index 1)
                 if (!isset($row[1]) || empty($row[1])) {
-                    continue; // Skip baris kosong, ga usah ditrack
+                    continue;
                 }
                 
                 $noDn = $row[1];
                 
-                // Cek apakah no_dn sudah ada dalam file
                 if (in_array($noDn, $seenNoDn)) {
                     $internalDuplicates[] = $noDn;
                     Log::info("Duplikat internal ditemukan pada baris " . ($rowIndex + 2) . ": " . $noDn);
-                    continue; // Skip duplikat internal
+                    continue;
                 }
                 
                 $seenNoDn[] = $noDn;
-                $noDnList[] = $noDn; // Hanya tambahkan yang unik
+                $noDnList[] = $noDn;
             }
 
             if (empty($noDnList)) {
@@ -61,7 +60,6 @@ class ImportExcelController extends Controller
                 ], 400);
             }
 
-            // Log info tentang duplikat internal
             if (!empty($internalDuplicates)) {
                 $uniqueInternalDuplicates = array_unique($internalDuplicates);
                 Log::info('Duplikat internal dalam file ditemukan: ' . count($uniqueInternalDuplicates) . ' no_dn unik dengan total ' . count($internalDuplicates) . ' baris duplikat');
@@ -70,7 +68,6 @@ class ImportExcelController extends Controller
             // Check for duplicates in Preparations table
             $existingPreparations = Preparation::whereIn('no_dn', $noDnList)->pluck('no_dn')->toArray();
 
-            // If duplicates are found and force_import is not set, return JSON response
             if (!empty($existingPreparations) && !$request->has('force_import')) {
                 $message = 'Terdapat ' . count($existingPreparations) . ' data duplikat ditemukan di database.';
                 if (!empty($internalDuplicates)) {
@@ -91,31 +88,21 @@ class ImportExcelController extends Controller
                 ], 200);
             }
 
+            // Load semua konfigurasi LP ke dalam array untuk performa
+            $lpConfigs = LpConfig::pluck('logistic_partner', 'route')->toArray();
+
             // Import dengan filter duplikat
             $savedCount = 0;
             $skippedCount = 0;
-            $processedNoDn = []; // Track no_dn yang sudah diproses
+            $processedNoDn = [];
 
             foreach ($collection->skip(1) as $row) {
-                // Mapping kolom sesuai struktur Excel:
-                // Index 0: route
-                // Index 1: order_no (jadi no_dn)
-                // Index 2: customer (jadi customers)
-                // Index 3: dock
-                // Index 4: delivery_date
-                // Index 5: delivery_time
-                // Index 6: cycle
-                // Index 7: pulling_date (bisa formula Excel)
-                // Index 8: pulling_time
-                
                 $noDn = $row[1] ?? null;
                 
-                // Skip baris kosong tanpa menambah skippedCount
                 if (!$noDn || empty($noDn)) {
                     continue;
                 }
                 
-                // Skip jika duplikat dengan database atau sudah diproses sebelumnya
                 if (in_array($noDn, $existingPreparations) || 
                     in_array($noDn, $processedNoDn)) {
                     
@@ -130,7 +117,6 @@ class ImportExcelController extends Controller
                     continue;
                 }
 
-                // Tandai no_dn sebagai sudah diproses
                 $processedNoDn[] = $noDn;
 
                 // Parse dates and times
@@ -170,12 +156,10 @@ class ImportExcelController extends Controller
                     }
                 }
 
-                // Handle pulling_date (index 7) - bisa berupa formula Excel
+                // Handle pulling_date (index 7)
                 if (isset($row[7]) && !empty($row[7])) {
                     try {
-                        // Kalau formula Excel (contoh: =E2-1), skip dan hitung manual
                         if (is_string($row[7]) && strpos($row[7], '=') === 0) {
-                            // Hitung pulling_date dari delivery_date - 1 hari
                             if ($deliveryDate) {
                                 $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
                             }
@@ -188,7 +172,6 @@ class ImportExcelController extends Controller
                         }
                     } catch (\Exception $e) {
                         Log::warning('Invalid pulling date format for no_dn ' . $noDn . ': ' . $row[7]);
-                        // Fallback: pulling_date = delivery_date - 1 hari
                         if ($deliveryDate) {
                             $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
                         }
@@ -211,12 +194,22 @@ class ImportExcelController extends Controller
                     }
                 }
 
+                // Ambil route dari Excel
+                $route = $row[0] ?? '';
+                
+                // Cari logistic_partner berdasarkan route dari konfigurasi
+                $logisticPartner = $lpConfigs[$route] ?? '';
+                
+                if (empty($logisticPartner)) {
+                    Log::warning('Logistic Partner tidak ditemukan untuk route: ' . $route);
+                }
+
                 try {
                     Preparation::create([
-                        'route' => $row[0] ?? '',
-                        'logistic_partners' => '', // Kosongkan dulu sesuai permintaan
+                        'route' => $route,
+                        'logistic_partners' => $logisticPartner, // Auto-filled dari konfigurasi
                         'no_dn' => $noDn,
-                        'customers' => $row[2] ?? '', // customer di Excel jadi customers
+                        'customers' => $row[2] ?? '',
                         'dock' => $row[3] ?? '',
                         'delivery_date' => $deliveryDate,
                         'delivery_time' => $deliveryTime ?? '00:00:00',
@@ -226,14 +219,13 @@ class ImportExcelController extends Controller
                     ]);
 
                     $savedCount++;
-                    Log::info('Saving Preparation:', ['no_dn' => $noDn]);
+                    Log::info('Saving Preparation:', ['no_dn' => $noDn, 'route' => $route, 'lp' => $logisticPartner]);
                 } catch (\Exception $e) {
                     Log::error('Failed to save preparation:', ['no_dn' => $noDn, 'error' => $e->getMessage()]);
                     $skippedCount++;
                 }
             }
 
-            // Update success message dengan info duplikat internal
             $successMessage = "Data berhasil diimpor. {$savedCount} data berhasil disimpan";
             if ($skippedCount > 0) {
                 $successMessage .= ", {$skippedCount} data duplikat dilewati";

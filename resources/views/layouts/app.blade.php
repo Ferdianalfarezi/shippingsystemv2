@@ -214,23 +214,6 @@
             background-color: #000000;
         }
 
-        @keyframes blink-hard {
-            0%, 50%, 100% { opacity: 1; }
-            25%, 75% { opacity: 0; }
-        }
-
-        
-        
-        /* Pulse animation untuk status delay - lebih cepat */
-        @keyframes pulse-red {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-        }
-
         /* Custom CSS untuk nested dropdown */
         .dropdown-menu .dropend .dropdown-toggle::after {
             display: inline-block;
@@ -279,6 +262,16 @@
         #preparationsTable td:nth-child(12) {
             white-space: nowrap;
         }
+        
+        .badge-delay {
+            animation: hard-blink 0.8s infinite;
+        }
+
+        @keyframes hard-blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
     </style>
 
     @stack('styles')

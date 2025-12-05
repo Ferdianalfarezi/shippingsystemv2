@@ -184,13 +184,34 @@ class PreparationController extends Controller
 
     public function destroy(Preparation $preparation)
     {
+        \Log::info('Delete request received for ID: ' . $preparation->id);
+        
         try {
-            $preparation->delete();
+            // GANTI delete() dengan forceDelete() untuk hapus permanen
+            $deleted = $preparation->forceDelete();
+            
+            \Log::info('Force delete result: ' . ($deleted ? 'success' : 'failed'));
+            
+            if (request()->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data preparation berhasil dihapus!'
+                ]);
+            }
             
             return redirect()
                 ->route('preparations.index')
                 ->with('success', 'Data preparation berhasil dihapus!');
         } catch (\Exception $e) {
+            \Log::error('Delete error: ' . $e->getMessage());
+            
+            if (request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal menghapus data: ' . $e->getMessage()
+                ], 500);
+            }
+            
             return redirect()
                 ->back()
                 ->with('error', 'Gagal menghapus data: ' . $e->getMessage());
@@ -200,8 +221,12 @@ class PreparationController extends Controller
     public function deleteAll()
     {
         try {
+            // Hitung hanya data yang belum di-soft delete
             $count = Preparation::count();
-            Preparation::truncate();
+            
+            // GANTI truncate() dengan withTrashed()->forceDelete()
+            // karena truncate() tidak bisa dipakai dengan soft deletes
+            Preparation::withTrashed()->forceDelete();
             
             return response()->json([
                 'success' => true,
