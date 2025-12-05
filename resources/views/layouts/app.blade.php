@@ -219,20 +219,7 @@
             25%, 75% { opacity: 0; }
         }
 
-        .badge.bg-danger {
-            background-color: #dc2626 !important;
-            animation: blink-hard 1.5s infinite;
-        }
-
         
-        .badge.bg-success {
-            background-color: #16a34a !important;
-        }
-        
-        /* Highlight row yang delay */
-        .table-danger-subtle {
-            background-color: rgba(220, 38, 38, 0.05) !important;
-        }
         
         /* Pulse animation untuk status delay - lebih cepat */
         @keyframes pulse-red {

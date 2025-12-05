@@ -8,10 +8,54 @@ use Illuminate\Support\Facades\DB;
 
 class PreparationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $preparations = Preparation::latest()->paginate(20);
-        return view('preparations.index', compact('preparations'));
+        $perPage = $request->get('per_page', 50);
+        $search = $request->get('search');
+        
+        // Query dasar
+        $query = Preparation::query();
+        
+        // Jika ada pencarian
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('route', 'like', "%{$search}%")
+                  ->orWhere('logistic_partners', 'like', "%{$search}%")
+                  ->orWhere('no_dn', 'like', "%{$search}%")
+                  ->orWhere('customers', 'like', "%{$search}%")
+                  ->orWhere('dock', 'like', "%{$search}%")
+                  ->orWhere('cycle', 'like', "%{$search}%");
+            });
+        }
+        
+        // Latest order
+        $query->latest();
+        
+        // Pagination atau all
+        if ($perPage === 'all') {
+            $preparations = $query->get();
+            // Buat koleksi yang mirip dengan paginator untuk view
+            $preparations = new \Illuminate\Pagination\LengthAwarePaginator(
+                $preparations,
+                $preparations->count(),
+                $preparations->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $preparations = $query->paginate((int)$perPage)->withQueryString();
+        }
+        
+        // Hitung statistik dengan raw query (lebih efisien)
+        $totalAll = Preparation::count();
+        
+        $totalDelay = Preparation::whereRaw(
+            "CONCAT(pulling_date, ' ', pulling_time) > CONCAT(delivery_date, ' ', delivery_time)"
+        )->count();
+        
+        $totalOnTime = $totalAll - $totalDelay;
+        
+        return view('preparations.index', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll'));
     }
 
     public function create()
@@ -150,6 +194,24 @@ class PreparationController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+        }
+    }
+
+    public function deleteAll()
+    {
+        try {
+            $count = Preparation::count();
+            Preparation::truncate();
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Berhasil menghapus {$count} data preparation"
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus data: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

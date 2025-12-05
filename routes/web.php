@@ -14,6 +14,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return view('dashboard');
     })->name('dashboard');
 
+    // Route Delete All Preparations (HARUS SEBELUM RESOURCE!)
+    Route::delete('/preparations/delete-all', [PreparationController::class, 'deleteAll'])->name('preparations.deleteAll');
+    
     // Preparations CRUD
     Route::resource('preparations', PreparationController::class);
 
