@@ -28,8 +28,8 @@ class PreparationController extends Controller
             });
         }
         
-        // Latest order
-        $query->latest();
+        // Order by pulling datetime (yang paling dekat/lewat dulu di atas)
+        $query->orderByRaw("CONCAT(pulling_date, ' ', pulling_time) ASC");
         
         // Pagination atau all
         if ($perPage === 'all') {
@@ -49,10 +49,11 @@ class PreparationController extends Controller
         // Hitung statistik dengan raw query (lebih efisien)
         $totalAll = Preparation::count();
         
+        // Di PreparationController@index
         $totalDelay = Preparation::whereRaw(
-            "CONCAT(pulling_date, ' ', pulling_time) > CONCAT(delivery_date, ' ', delivery_time)"
+            "CONCAT(delivery_date, ' ', delivery_time) < NOW() OR CONCAT(pulling_date, ' ', pulling_time) < NOW()"
         )->count();
-        
+
         $totalOnTime = $totalAll - $totalDelay;
         
         return view('preparations.index', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll'));

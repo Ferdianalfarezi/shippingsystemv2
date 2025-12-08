@@ -37,21 +37,21 @@ class Preparation extends Model
     public function getStatusAttribute()
     {
         try {
-            // Gabungkan date dengan time untuk perbandingan yang akurat
             $deliveryDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
             $pullingDateTime = Carbon::parse($this->pulling_date->format('Y-m-d') . ' ' . $this->pulling_time);
+            $now = Carbon::now();
             
-            // Jika pulling time melebihi delivery time = DELAY
-            if ($pullingDateTime->greaterThan($deliveryDateTime)) {
+            // Jika waktu sekarang sudah melewati delivery time ATAU pulling time = DELAY
+            if ($now->greaterThan($deliveryDateTime) || $now->greaterThan($pullingDateTime)) {
                 return 'delay';
             }
             
-            // Jika pulling time belum melebihi delivery time = NORMAL
             return 'normal';
         } catch (\Exception $e) {
             return 'unknown';
         }
     }
+
 
     /**
      * Get status badge class untuk styling
@@ -95,8 +95,12 @@ class Preparation extends Model
         try {
             $deliveryDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
             $pullingDateTime = Carbon::parse($this->pulling_date->format('Y-m-d') . ' ' . $this->pulling_time);
+            $now = Carbon::now();
             
-            return $pullingDateTime->diffForHumans($deliveryDateTime, true);
+            // Ambil yang paling awal terlambat
+            $earliestDelay = $pullingDateTime->lessThan($deliveryDateTime) ? $pullingDateTime : $deliveryDateTime;
+            
+            return $now->diffForHumans($earliestDelay, true);
         } catch (\Exception $e) {
             return null;
         }

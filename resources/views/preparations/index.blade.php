@@ -9,14 +9,12 @@
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
         <!-- Delete All Button -->
+        <div class="card border-4 bg-danger">
+            <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
+                <i class="bi bi-trash-fill"></i>
+            </button>
+        </div>
         
-            <div class="card border-4 bg-danger">
-                <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
-                    <i class="bi bi-trash-fill"></i>
-                </button>
-            </div>
-        
-
         <!-- Show By Dropdown -->
         <div class="card border-0 shadow-sm">
             <div class="card-body p-1">
@@ -57,18 +55,25 @@
                                 <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#lpConfigModal">
                                     <i class="bi bi-gear-fill me-2"></i> Konfigurasi LP
                                 </a>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#admLeadTimeModal">
+                                    <i class="bi bi-clock-history me-2"></i> Konfigurasi Lead Time ADM
+                                </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item">
-                                    <i class="bi bi-upload me-2"></i> Import Options :
-                                </a>
-                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
-                                    <i class="bi bi-file-earmark-excel text-success me-1 ms-4"></i> Excel
-                                </a>
-                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importTmminModal">
-                                    <i class="bi bi-file-earmark-text text-dark me-1 ms-4"></i> TMMIN
-                                </a>
+                                <li>
+                                    <a class="dropdown-item">
+                                        <i class="bi bi-upload me-2"></i> Import Options :
+                                    </a>
+                                    <a class="dropdown-item text-success" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                                        <i class="bi bi-file-earmark-excel text-success me-1 ms-4"></i> Excel
+                                    </a>
+                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importTmminModal">
+                                        <i class="bi bi-file-earmark-text text-dark me-1 ms-4"></i> TMMIN
+                                    </a>
+                                    <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#importAdmModal">
+                                        <i class="bi bi-file-earmark-spreadsheet text-danger me-1 ms-4"></i> ADM
+                                    </a>
+                                </li>
                             </li>
                         </ul>
                     </div>
@@ -147,22 +152,24 @@
                             </span>
                         </td>
                         <td>
-                            <div>
-                                <button onclick="openEditModal({{ $prep->id }})" class="btn btn-warning btn-sm" title="Edit">
+                            <div class="d-flex justify-content-center" style="gap: 0;">
+                                <button onclick="openEditModal({{ $prep->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
-                                <form action="{{ route('preparations.destroy', $prep->id) }}" method="POST" class="d-inline delete-form">
+                                
+                                <form action="{{ route('preparations.destroy', $prep->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm" title="Hapus">
+                                    <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </form>
 
-                                <a href="{{ route('preparations.show', $prep) }}" class="btn btn-secondary btn-sm" title="Detail">
-                                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                                <a href="javascript:void(0)" onclick="showQrCode('{{ $prep->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="QR Code">
+                                    <i class="bi bi-qr-code"></i>
                                 </a>
-                                <a href="#" class="btn btn-primary btn-sm" title="Next">
+                                
+                                <a href="#" class="btn btn-primary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Next">
                                     <i class="bi bi-arrow-right"></i>
                                 </a>
                             </div>
@@ -192,12 +199,14 @@
     @include('preparations.import')
     @include('preparations.import-tmmin')
     @include('preparations.lp-config')
+    @include('preparations.import-adm')
+    @include('preparations.adm-lead-time-config')
 
     
 @endsection
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 @push('scripts')
 <script>
     $(document).ready(function() {
@@ -650,5 +659,174 @@ $('.delete-form').on('submit', function(e) {
             $('#importTmminProgress').addClass('d-none');
             $('#importTmminButton').prop('disabled', false);
         });
+
+
+        $('#importAdmForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const fileInput = $('#admFile')[0];
+        
+        if (!fileInput.files.length) {
+            Swal.fire({
+                title: 'Error!',
+                text: 'Silakan pilih file Excel terlebih dahulu',
+                icon: 'error',
+                confirmButtonColor: '#dc2626'
+            });
+            return;
+        }
+        
+        // Show progress
+        $('#importAdmProgress').removeClass('d-none');
+        $('#importAdmButton').prop('disabled', true);
+        
+        $.ajax({
+            url: '{{ route("preparations.import-adm") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $('#importAdmProgress').addClass('d-none');
+                $('#importAdmButton').prop('disabled', false);
+                
+                if (response.status === 'duplicates_found') {
+                    // Tampilkan konfirmasi untuk duplikat
+                    let duplicateList = '<ul class="text-start">';
+                    response.duplicates.forEach(function(dup) {
+                        
+                    });
+                    duplicateList += '</ul>';
+                    
+                    Swal.fire({
+                        title: 'Data Duplikat Ditemukan!',
+                        html: response.message + duplicateList + '<br><strong>Jika lanjut data yang duplikat akan di abaikan</strong>',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#059669',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Ya, Lanjutkan!',
+                        cancelButtonText: 'Batal'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // Import ulang dengan force_import flag
+                            formData.append('force_import', '1');
+                            
+                            $('#importAdmProgress').removeClass('d-none');
+                            $('#importAdmButton').prop('disabled', true);
+                            
+                            $.ajax({
+                                url: '{{ route("preparations.import-adm") }}',
+                                type: 'POST',
+                                data: formData,
+                                processData: false,
+                                contentType: false,
+                                success: function(response) {
+                                    $('#importAdmProgress').addClass('d-none');
+                                    $('#importAdmButton').prop('disabled', false);
+                                    
+                                    if (response.status === 'success') {
+                                        Swal.fire({
+                                            title: 'Berhasil!',
+                                            text: response.message,
+                                            icon: 'success',
+                                            confirmButtonColor: '#059669'
+                                        }).then(() => {
+                                            $('#importAdmModal').modal('hide');
+                                            window.location.reload();
+                                        });
+                                    }
+                                },
+                                error: function(xhr) {
+                                    $('#importAdmProgress').addClass('d-none');
+                                    $('#importAdmButton').prop('disabled', false);
+                                    
+                                    Swal.fire({
+                                        title: 'Gagal!',
+                                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
+                                        icon: 'error',
+                                        confirmButtonColor: '#dc2626'
+                                    });
+                                }
+                            });
+                        }
+                    });
+                } else if (response.status === 'success') {
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: response.message,
+                        icon: 'success',
+                        confirmButtonColor: '#059669'
+                    }).then(() => {
+                        $('#importAdmModal').modal('hide');
+                        window.location.reload();
+                    });
+                }
+            },
+            error: function(xhr) {
+                $('#importAdmProgress').addClass('d-none');
+                $('#importAdmButton').prop('disabled', false);
+                
+                Swal.fire({
+                    title: 'Gagal!',
+                    text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+            }
+        });
+    });
+
+    // Reset form when modal is closed
+    $('#importAdmModal').on('hidden.bs.modal', function () {
+        $('#importAdmForm')[0].reset();
+        $('#importAdmProgress').addClass('d-none');
+        $('#importAdmButton').prop('disabled', false);
+    });
+
+    // QR Code Generator
+    function showQrCode(noDn) {
+        Swal.fire({
+            title: 'QR Code DN',
+            html: `
+                <div class="text-center">
+                    <div id="qrcode" class="d-flex justify-content-center mb-3"></div>
+                    <p class="fw-bold fs-4 mb-0 mt-3">${noDn}</p>
+                </div>
+            `,
+            showCloseButton: true,
+            showConfirmButton: true,
+            confirmButtonText: '<i class="bi bi-printer"></i> Print',
+            confirmButtonColor: '#6c757d',
+            width: 350,
+            didOpen: () => {
+                new QRCode(document.getElementById("qrcode"), {
+                    text: noDn,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                });
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Print QR Code
+                const printWindow = window.open('', '_blank');
+                const qrImage = document.querySelector('#qrcode img').src;
+                printWindow.document.write(`
+                    <html>
+                    <head><title>QR Code - ${noDn}</title></head>
+                    <body style="text-align: center; padding: 20px;">
+                        <img src="${qrImage}" style="width: 200px; height: 200px;">
+                        <p style="font-size: 24px; font-weight: bold; margin-top: 15px;">${noDn}</p>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.print();
+            }
+        });
+    }
 </script>
 @endpush

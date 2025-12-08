@@ -192,7 +192,7 @@
         }
 
         .table-compact tbody tr:hover td {
-            background-color: #1a1a1a;
+            background-color: #505050;
             transition: background 0.2s ease;
         }
 
