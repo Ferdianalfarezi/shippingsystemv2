@@ -265,6 +265,72 @@
             51%, 100% { opacity: 0.3; }
         }
 
+        /* Menu styles */
+        .menu-container {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: -1px;
+        }
+
+        .menu-item {
+            display: table-cell;
+            text-align: center;
+            padding: 10px;
+            border-top: 3px solid #fff;
+            border-left: 3px solid #fff;
+            background-color: #000000;
+            transition: background-color 0.3s;
+            position: relative;
+        }
+        
+        .menu-item:first-child {
+            border-left: none;
+        }
+
+        .menu-item:hover {
+            background-color: #555;
+        }
+
+        .menu-item a {
+            color: #fff;
+            font-weight: 500;
+            font-size: 18px;
+            text-decoration: none;
+        }
+
+        .menu-item a:hover {
+            color: #dfe6e9;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            padding: 0.5rem 1rem;
+            min-width: 150px;
+        }
+
+        .dropdown-menu a {
+            display: block;
+            padding: 0.5rem 0;
+            text-decoration: none;
+            color: #333;
+        }
+
+        .dropdown-menu a:hover {
+            background-color: #f1f1f1;
+        }
+
+        .menu-item:hover .dropdown-menu {
+            display: block;
+        }
+
     </style>
 
     @stack('styles')
@@ -295,7 +361,37 @@
                     </div>
                 </div>
             </div>
+
+            
         </div>
+
+        <!-- Menu below Navbar -->
+            <div class="menu-container">
+                <div class="menu-item">
+                    <a href="{{ route('preparations.index') }}">Preparation</a>
+                </div>
+                <div class="menu-item">
+                    <a href="#">Shipping</a>
+                </div>
+                <div class="menu-item">
+                    <a href="#">Delivery</a>
+                </div>
+                <div class="menu-item">
+                    <a href="#">Receipt DN</a>
+                </div>
+                <div class="menu-item">
+                    <a href="#">Kanban</a>
+                </div>
+                <div class="menu-item">
+                    <a href="#">Settings</a>
+                </div>
+                <div class="menu-item">
+                    <a href="#" onclick="confirmLogout(event);">Logout</a>
+                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                        @csrf
+                    </form>
+                </div>
+            </div>
     </nav>
 
     <!-- Main Content -->
@@ -369,6 +465,25 @@
                 confirmButtonColor: '#dc2626'
             });
         @endif
+
+        function confirmLogout(event) {
+            event.preventDefault();
+            
+            Swal.fire({
+                title: 'Konfirmasi Logout',
+                text: 'Apakah Anda yakin ingin keluar?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Ya, Logout',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('logout-form').submit();
+                }
+            });
+        }
     </script>
 
     @stack('scripts')
