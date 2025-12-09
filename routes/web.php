@@ -16,7 +16,7 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     // Dashboard
     Route::get('/dashboard', function () {
         return view('dashboard');
@@ -33,7 +33,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     ->name('preparations.import-tmmin');
 
     Route::post('/preparations/import-adm', [App\Http\Controllers\ImportAdmController::class, 'import'])->name('preparations.import-adm');
-
+    Route::get('/preparations/find-by-dn', [App\Http\Controllers\PreparationController::class, 'findByDn'])
+    ->name('preparations.findByDn');
+    
     // Preparations CRUD
     Route::resource('preparations', PreparationController::class);
 

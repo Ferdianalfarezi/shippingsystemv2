@@ -250,4 +250,47 @@ class PreparationController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Find preparation by DN number (untuk fitur scan)
+     */
+    public function findByDn(Request $request)
+    {
+        $noDn = $request->get('no_dn');
+        
+        if (!$noDn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No DN tidak boleh kosong'
+            ], 400);
+        }
+        
+        $preparation = Preparation::where('no_dn', $noDn)->first();
+        
+        if (!$preparation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data preparation dengan DN ' . $noDn . ' tidak ditemukan',
+                'data' => null
+            ]);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Data ditemukan',
+            'data' => [
+                'id' => $preparation->id,
+                'no_dn' => $preparation->no_dn,
+                'route' => $preparation->route,
+                'logistic_partners' => $preparation->logistic_partners,
+                'customers' => $preparation->customers,
+                'dock' => $preparation->dock,
+                'cycle' => $preparation->cycle,
+                'delivery_date' => $preparation->delivery_date->format('Y-m-d'),
+                'delivery_time' => $preparation->delivery_time,
+                'pulling_date' => $preparation->pulling_date->format('Y-m-d'),
+                'pulling_time' => $preparation->pulling_time,
+            ]
+        ]);
+    }
 }

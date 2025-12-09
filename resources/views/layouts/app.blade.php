@@ -356,6 +356,76 @@
         background: #f5f5f5;
     }
 
+    /* Floating User Info */
+    .floating-user-info {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #333;
+        border-radius: 12px;
+        padding: 12px 16px;
+        z-index: 9999;
+        min-width: 160px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .floating-user-info:hover {
+        border-color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(251, 191, 36, 0.2);
+    }
+
+    .floating-user-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .floating-user-avatar {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #ffffff, #7c7c7c);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .floating-user-avatar i {
+        color: #000000;
+        font-size: 18px;
+    }
+
+    .floating-user-details {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .floating-user-name {
+        font-weight: 700;
+        font-size: 17px;
+        color: #ffffff;
+        line-height: 1.2;
+    }
+
+    .floating-user-role {
+        font-size: 10px;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+        width: fit-content;
+    }
+
+    
+
     </style>
 
     @stack('styles')
@@ -432,6 +502,30 @@
     <main class="main-content">
         @yield('content')
     </main>
+
+    <!-- Floating User Info -->
+    @auth
+    <div class="floating-user-info">
+        <div class="floating-user-content">
+            <div class="floating-user-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="floating-user-details">
+                <div class="floating-user-name">{{ auth()->user()->name }}</div>
+                @php
+                    $role = auth()->user()->role ?? 'user';
+                    $roleClass = match($role) {
+                        'admin' => 'role-admin',
+                        'operator' => 'role-operator',
+                        'lp' => 'role-lp',
+                        default => 'role-default'
+                    };
+                @endphp
+                <span class="text-start {{ $roleClass }}">{{ $role }}</span>
+            </div>
+        </div>
+    </div>
+    @endauth
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

@@ -8,6 +8,14 @@
     <!-- Stats Badges dan Dropdown di kanan -->
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
+        <!-- Scan DN Input -->
+        <div class="input-group" style="width: 280px;">
+            <span class="input-group-text bg-white text-white">
+                <i class="bi bi-qr-code-scan text-dark"></i>
+            </span>
+            <input type="text" class="form-control" id="scanDnInput" placeholder="Scan DN disini..." autofocus>
+        </div>
+
         <!-- Delete All Button -->
         <div class="card border-4 bg-danger">
             <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
@@ -294,6 +302,164 @@
 <script>
     $(document).ready(function() {
         
+        // ==================== SCAN DN TO SHIPPING ====================
+        let scanTimeout;
+        $('#scanDnInput').on('input', function() {
+            clearTimeout(scanTimeout);
+            const noDn = $(this).val().trim();
+            
+            if (noDn.length > 0) {
+                // Delay 500ms untuk menunggu scanner selesai input
+                scanTimeout = setTimeout(function() {
+                    processScanDn(noDn);
+                }, 500);
+            }
+        });
+
+        // Handle Enter key pada scan input
+        $('#scanDnInput').on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                clearTimeout(scanTimeout);
+                const noDn = $(this).val().trim();
+                if (noDn.length > 0) {
+                    processScanDn(noDn);
+                }
+            }
+        });
+
+        // Function untuk proses scan DN
+        function processScanDn(noDn) {
+            // Cari preparation berdasarkan no_dn
+            $.ajax({
+                url: '{{ route("preparations.findByDn") }}',
+                type: 'GET',
+                data: { no_dn: noDn },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        // Clear input
+                        $('#scanDnInput').val('');
+                        
+                        // Tampilkan modal pilih address
+                        showScanAddressModal(response.data);
+                    } else {
+                        // DN tidak ditemukan
+                        Swal.fire({
+                            title: 'DN Tidak Ditemukan!',
+                            html: `No DN <strong>${noDn}</strong> tidak ditemukan di tabel preparation`,
+                            icon: 'error',
+                            confirmButtonColor: '#dc2626',
+                            timer: 3000,
+                            timerProgressBar: true
+                        });
+                        $('#scanDnInput').val('').focus();
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mencari DN',
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626'
+                    });
+                    $('#scanDnInput').val('').focus();
+                }
+            });
+        }
+
+        // Function untuk menampilkan modal pilih address setelah scan
+        function showScanAddressModal(preparation) {
+            Swal.fire({
+                title: 'Move to Shipping',
+                html: `
+                    <div class="mb-3 text-center">
+                        <div class=" py-2">
+                            <small><strong>DN:</strong> ${preparation.no_dn}</small><br>
+                            <small><strong>Route:</strong> ${preparation.route} | <strong>Dock:</strong> ${preparation.dock} | <strong>Cycle:</strong> ${preparation.cycle}</small>
+                        </div>
+                    </div>
+                    <div class="container">
+                        <div class="row g-2 mb-2">
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 1">1</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 2">2</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 3">3</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 4">4</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 5">5</button></div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 6">6</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 7">7</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 8">8</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 9">9</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 10">10</button></div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 1">Ex 1</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 2">Ex 2</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 3">Ex 3</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 4">Ex 4</button></div>
+                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 5">Ex 5</button></div>
+                        </div>
+                    </div>
+                `,
+                showConfirmButton: false,
+                showCancelButton: true,
+                cancelButtonText: 'Cancel',
+                cancelButtonColor: '#6c757d',
+                width: 500,
+                didOpen: () => {
+                    // Handle address button click
+                    document.querySelectorAll('.scan-address-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const address = this.getAttribute('data-address');
+                            Swal.close();
+                            executeMoveToShipping(preparation.id, address, preparation.no_dn);
+                        });
+                    });
+                },
+                didClose: () => {
+                    // Focus kembali ke input scan
+                    $('#scanDnInput').focus();
+                }
+            });
+        }
+
+        // Function untuk eksekusi move to shipping dari scan
+        function executeMoveToShipping(preparationId, address, noDn) {
+            $.ajax({
+                url: '{{ route("shippings.moveFromPreparation") }}',
+                type: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    preparation_id: preparationId,
+                    address: address
+                },
+                success: function(response) {
+                    // Toast notification sukses
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        html: `DN <strong>${noDn}</strong> dipindahkan ke <strong>${address}</strong>`,
+                        icon: 'success',
+                        confirmButtonColor: '#059669',
+                        timer: 2000,
+                        timerProgressBar: true
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat memindahkan data',
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626'
+                    });
+                    $('#scanDnInput').focus();
+                }
+            });
+        }
+        // ==================== END SCAN DN TO SHIPPING ====================
+
         // Handle nested dropdown for Import Options
         $('.dropend').on('mouseenter', function() {
             $(this).find('.dropdown-menu').addClass('show');
@@ -914,46 +1080,67 @@ $('.delete-form').on('submit', function(e) {
 
     // Open Move to Shipping SweetAlert
     function openMoveToShippingModal(preparationId) {
-        Swal.fire({
-            title: 'Move to Shipping',
-            html: `
-                <div class="container">
-                    <div class="row g-2 mb-2">
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 1">1</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 2">2</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 3">3</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 4">4</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 5">5</button></div>
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 6">6</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 7">7</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 8">8</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 9">9</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 10">10</button></div>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 1">Ex 1</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 2">Ex 2</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 3">Ex 3</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 4">Ex 4</button></div>
-                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 5">Ex 5</button></div>
-                    </div>
-                </div>
-            `,
-            showConfirmButton: false,
-            showCancelButton: true,
-            cancelButtonText: 'Cancel',
-            cancelButtonColor: '#6c757d',
-            width: 450,
-            didOpen: () => {
-                // Handle address button click
-                document.querySelectorAll('.address-select-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const address = this.getAttribute('data-address');
-                        Swal.close();
-                        confirmMoveToShipping(preparationId, address);
-                    });
+        // Fetch data preparation dulu
+        $.ajax({
+            url: `/preparations/${preparationId}/edit`,
+            type: 'GET',
+            success: function(preparation) {
+                Swal.fire({
+                    title: 'Move to Shipping',
+                    html: `
+                        <div class="mb-3 text-center">
+                            <div class="py-2">
+                                <small><strong>DN:</strong> ${preparation.no_dn}</small><br>
+                                <small><strong>Route:</strong> ${preparation.route} | <strong>Dock:</strong> ${preparation.dock} | <strong>Cycle:</strong> ${preparation.cycle}</small>
+                            </div>
+                        </div>
+                        <div class="container">
+                            <div class="row g-2 mb-2">
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 1">1</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 2">2</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 3">3</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 4">4</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 5">5</button></div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 6">6</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 7">7</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 8">8</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 9">9</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 10">10</button></div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 1">Ex 1</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 2">Ex 2</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 3">Ex 3</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 4">Ex 4</button></div>
+                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 5">Ex 5</button></div>
+                            </div>
+                        </div>
+                    `,
+                    showConfirmButton: false,
+                    showCancelButton: true,
+                    cancelButtonText: 'Cancel',
+                    cancelButtonColor: '#6c757d',
+                    width: 500,
+                    didOpen: () => {
+                        // Handle address button click
+                        document.querySelectorAll('.address-select-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                const address = this.getAttribute('data-address');
+                                Swal.close();
+                                confirmMoveToShipping(preparationId, address);
+                            });
+                        });
+                    }
+                });
+            },
+            error: function() {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Gagal mengambil data preparation',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
                 });
             }
         });
