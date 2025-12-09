@@ -169,7 +169,7 @@
                                     <i class="bi bi-qr-code"></i>
                                 </a>
                                 
-                                <a href="#" class="btn btn-primary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Next">
+                                <a href="javascript:void(0)" onclick="openMoveToShippingModal({{ $prep->id }})" class="btn btn-primary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Move to Shipping">
                                     <i class="bi bi-arrow-right"></i>
                                 </a>
                             </div>
@@ -825,6 +825,110 @@ $('.delete-form').on('submit', function(e) {
                 `);
                 printWindow.document.close();
                 printWindow.print();
+            }
+        });
+    }
+
+    // Open Move to Shipping SweetAlert
+    function openMoveToShippingModal(preparationId) {
+        Swal.fire({
+            title: 'Move to Shipping',
+            html: `
+                <div class="container">
+                    <div class="row g-2 mb-2">
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 1">1</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 2">2</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 3">3</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 4">4</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 5">5</button></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 6">6</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 7">7</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 8">8</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 9">9</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 10">10</button></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 1">Ex 1</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 2">Ex 2</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 3">Ex 3</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 4">Ex 4</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 5">Ex 5</button></div>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancel',
+            cancelButtonColor: '#6c757d',
+            width: 450,
+            didOpen: () => {
+                // Handle address button click
+                document.querySelectorAll('.address-select-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const address = this.getAttribute('data-address');
+                        Swal.close();
+                        confirmMoveToShipping(preparationId, address);
+                    });
+                });
+            }
+        });
+    }
+
+    // Confirm and process move to shipping
+    function confirmMoveToShipping(preparationId, address) {
+        Swal.fire({
+            title: 'Konfirmasi',
+            html: `Pindahkan data ke <strong>${address}</strong>?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Pindahkan!',
+            cancelButtonText: 'Batal',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+              
+                // Swal.fire({
+                //     title: 'Memindahkan...',
+                //     text: 'Mohon tunggu sebentar',
+                //     allowOutsideClick: false,
+                //     allowEscapeKey: false,
+                //     didOpen: () => {
+                //         Swal.showLoading();
+                //     }
+                // });
+                
+                // Send request
+                $.ajax({
+                    url: '{{ route("shippings.moveFromPreparation") }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        preparation_id: preparationId,
+                        address: address
+                    },
+                    success: function(response) {
+                        Swal.fire({
+                            title: 'Berhasil!',
+                            text: response.message,
+                            icon: 'success',
+                            confirmButtonColor: '#059669'
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    },
+                    error: function(xhr) {
+                        Swal.fire({
+                            title: 'Gagal!',
+                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat memindahkan data',
+                            icon: 'error',
+                            confirmButtonColor: '#dc2626'
+                        });
+                    }
+                });
             }
         });
     }

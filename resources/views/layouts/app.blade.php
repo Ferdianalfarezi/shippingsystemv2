@@ -371,7 +371,7 @@
                     <a href="{{ route('preparations.index') }}">Preparation</a>
                 </div>
                 <div class="menu-item">
-                    <a href="#">Shipping</a>
+                    <a href="{{ route('shippings.index') }}">Shipping</a>
                 </div>
                 <div class="menu-item">
                     <a href="#">Delivery</a>

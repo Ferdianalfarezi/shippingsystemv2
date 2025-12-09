@@ -7,6 +7,8 @@ use App\Http\Controllers\LpConfigController;
 use App\Http\Controllers\ImportTmminController;
 use App\Http\Controllers\ImportAdmController;
 use App\Http\Controllers\AdmLeadTimeController;
+
+use App\Http\Controllers\ShippingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -42,6 +44,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/batch-save', [AdmLeadTimeController::class, 'batchSave'])->name('batch-save');
         Route::put('/{id}', [AdmLeadTimeController::class, 'update'])->name('update');
         Route::delete('/{id}', [AdmLeadTimeController::class, 'destroy'])->name('destroy');
+    });
+
+
+    // Shipping Routes
+    Route::prefix('shippings')->name('shippings.')->group(function () {
+        Route::get('/', [ShippingController::class, 'index'])->name('index');
+        Route::post('/move-from-preparation', [ShippingController::class, 'moveFromPreparation'])->name('moveFromPreparation');
+        Route::get('/{shipping}/edit', [ShippingController::class, 'edit'])->name('edit');
+        Route::put('/{shipping}', [ShippingController::class, 'update'])->name('update');
+        Route::delete('/{shipping}', [ShippingController::class, 'destroy'])->name('destroy');
+        Route::delete('/delete/all', [ShippingController::class, 'deleteAll'])->name('deleteAll');
+        
+       // Checking LP Routes
+        Route::get('/checking-lp', [ShippingController::class, 'checkingLp'])->name('checkingLp');
+        Route::post('/check-route', [ShippingController::class, 'checkRoute'])->name('checkRoute');
+        Route::post('/scan-route', [ShippingController::class, 'scanRoute'])->name('scanRoute');
+        Route::get('/by-route', [ShippingController::class, 'getByRoute'])->name('byRoute');
     });
 
     // Profile Routes (Breeze default)
