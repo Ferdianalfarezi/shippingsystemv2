@@ -9,55 +9,65 @@ use Illuminate\Support\Facades\DB;
 class PreparationController extends Controller
 {
     public function index(Request $request)
-    {
-        $perPage = $request->get('per_page', 50);
-        $search = $request->get('search');
-        
-        // Query dasar
-        $query = Preparation::query();
-        
-        // Jika ada pencarian
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('route', 'like', "%{$search}%")
-                  ->orWhere('logistic_partners', 'like', "%{$search}%")
-                  ->orWhere('no_dn', 'like', "%{$search}%")
-                  ->orWhere('customers', 'like', "%{$search}%")
-                  ->orWhere('dock', 'like', "%{$search}%")
-                  ->orWhere('cycle', 'like', "%{$search}%");
-            });
-        }
-        
-        // Order by pulling datetime (yang paling dekat/lewat dulu di atas)
-        $query->orderByRaw("CONCAT(pulling_date, ' ', pulling_time) ASC");
-        
-        // Pagination atau all
-        if ($perPage === 'all') {
-            $preparations = $query->get();
-            // Buat koleksi yang mirip dengan paginator untuk view
-            $preparations = new \Illuminate\Pagination\LengthAwarePaginator(
-                $preparations,
-                $preparations->count(),
-                $preparations->count(),
-                1,
-                ['path' => request()->url(), 'query' => request()->query()]
-            );
-        } else {
-            $preparations = $query->paginate((int)$perPage)->withQueryString();
-        }
-        
-        // Hitung statistik dengan raw query (lebih efisien)
-        $totalAll = Preparation::count();
-        
-        // Di PreparationController@index
-        $totalDelay = Preparation::whereRaw(
-            "CONCAT(delivery_date, ' ', delivery_time) < NOW() OR CONCAT(pulling_date, ' ', pulling_time) < NOW()"
-        )->count();
-
-        $totalOnTime = $totalAll - $totalDelay;
-        
-        return view('preparations.index', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll'));
+{
+    $perPage = $request->get('per_page', 50);
+    $search = $request->get('search');
+    
+    // Query dasar
+    $query = Preparation::query();
+    
+    // Jika ada pencarian
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            $q->where('route', 'like', "%{$search}%")
+              ->orWhere('logistic_partners', 'like', "%{$search}%")
+              ->orWhere('no_dn', 'like', "%{$search}%")
+              ->orWhere('customers', 'like', "%{$search}%")
+              ->orWhere('dock', 'like', "%{$search}%")
+              ->orWhere('cycle', 'like', "%{$search}%");
+        });
     }
+    
+    // Order by pulling datetime (yang paling dekat/lewat dulu di atas)
+    $query->orderByRaw("CONCAT(pulling_date, ' ', pulling_time) ASC");
+    
+    // Pagination atau all
+    if ($perPage === 'all') {
+        $preparations = $query->get();
+        $preparations = new \Illuminate\Pagination\LengthAwarePaginator(
+            $preparations,
+            $preparations->count(),
+            $preparations->count(),
+            1,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+    } else {
+        $preparations = $query->paginate((int)$perPage)->withQueryString();
+    }
+    
+    // Hitung statistik
+    $totalAll = Preparation::count();
+    $totalDelay = Preparation::whereRaw(
+        "CONCAT(delivery_date, ' ', delivery_time) < NOW() OR CONCAT(pulling_date, ' ', pulling_time) < NOW()"
+    )->count();
+    $totalOnTime = $totalAll - $totalDelay;
+    
+    // PERBAIKAN: Get recent scan dengan fresh() untuk force reload
+    $recentScan = \App\Models\Shipping::whereNotNull('scan_to_shipping')
+        ->orderBy('scan_to_shipping', 'desc')
+        ->first();
+    
+    // DEBUG: Log recent scan data
+    if ($recentScan) {
+        \Log::info('Recent Scan Data:', [
+            'no_dn' => $recentScan->no_dn,
+            'moved_by' => $recentScan->moved_by,
+            'scan_time' => $recentScan->scan_to_shipping
+        ]);
+    }
+    
+    return view('preparations.index', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll', 'recentScan'));
+}
 
     public function create()
     {

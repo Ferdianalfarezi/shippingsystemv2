@@ -8,6 +8,14 @@
     <!-- Stats Badges dan Dropdown di kanan -->
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
+        <!-- Toggle View Button -->
+        <div class="card border-0 shadow-sm p-1 bg-warning">
+            <a href="{{ route('shippings.indexReverse') }}" class="btn btn-warning" title="Switch to Reverse View">
+                <i class="fa-solid fa-truck"></i>
+
+            </a>
+        </div>
+        
         <!-- Delete All Button -->
         <div class="card border-4 bg-danger">
             <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">

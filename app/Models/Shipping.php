@@ -24,6 +24,7 @@ class Shipping extends Model
         'address',
         'status',
         'scan_to_shipping',
+        'moved_by',
     ];
 
     protected $casts = [

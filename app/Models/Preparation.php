@@ -11,17 +11,20 @@ class Preparation extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = [
+        protected $fillable = [
         'route',
         'logistic_partners',
-        'no_dn',
+        'no_dn',    
         'customers',
         'dock',
         'delivery_date',
         'delivery_time',
+        'arrival',
         'cycle',
-        'pulling_date',
-        'pulling_time',
+        'address',
+        'status',
+        'scan_to_shipping',
+        'moved_by', // TAMBAHKAN INI
     ];
 
     protected $casts = [

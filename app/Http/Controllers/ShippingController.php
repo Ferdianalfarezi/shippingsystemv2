@@ -82,80 +82,94 @@ class ShippingController extends Controller
         ));
     }
 
-    /**
-     * Move preparation to shipping
-     */
     public function moveFromPreparation(Request $request)
-    {
-        $validated = $request->validate([
-            'preparation_id' => 'required|exists:preparations,id',
-            'address' => 'required|string|max:50',
-        ]);
+{
+    $validated = $request->validate([
+        'preparation_id' => 'required|exists:preparations,id',
+        'address' => 'required|string|max:50',
+    ]);
 
-        DB::beginTransaction();
+    DB::beginTransaction();
+    
+    try {
+        // Get preparation data
+        $preparation = Preparation::findOrFail($validated['preparation_id']);
         
-        try {
-            // Get preparation data
-            $preparation = Preparation::findOrFail($validated['preparation_id']);
-            
-            // Check if no_dn already exists in shippings
-            $existingShipping = Shipping::where('no_dn', $preparation->no_dn)->first();
-            if ($existingShipping) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data dengan No DN ini sudah ada di Shipping!'
-                ], 422);
-            }
-            
-            // Calculate initial status
-            $deliveryDateTime = Carbon::parse($preparation->delivery_date->format('Y-m-d') . ' ' . $preparation->delivery_time);
-            $now = Carbon::now();
-            $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
-            
-            if ($now->greaterThan($deliveryDateTime)) {
-                $status = 'delay';
-            } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
-                $status = 'normal';
-            } else {
-                $status = 'advance';
-            }
-            
-            // Create shipping record
-            $shipping = Shipping::create([
-                'route' => $preparation->route,
-                'logistic_partners' => $preparation->logistic_partners,
-                'no_dn' => $preparation->no_dn,
-                'customers' => $preparation->customers,
-                'dock' => $preparation->dock,
-                'delivery_date' => $preparation->delivery_date,
-                'delivery_time' => $preparation->delivery_time,
-                'arrival' => null, // Kosong sampai di-scan
-                'cycle' => $preparation->cycle,
-                'address' => $validated['address'],
-                'status' => $status,
-                'scan_to_shipping' => Carbon::now(),
-            ]);
-            
-            // Delete preparation permanently
-            $preparation->forceDelete();
-            
-            DB::commit();
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Data berhasil dipindahkan ke Shipping!',
-                'data' => $shipping
-            ]);
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
+        // Check if no_dn already exists in shippings
+        $existingShipping = Shipping::where('no_dn', $preparation->no_dn)->first();
+        if ($existingShipping) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memindahkan data: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Data dengan No DN ini sudah ada di Shipping!'
+            ], 422);
         }
+        
+        // Calculate initial status
+        $deliveryDateTime = Carbon::parse($preparation->delivery_date->format('Y-m-d') . ' ' . $preparation->delivery_time);
+        $now = Carbon::now();
+        $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
+        
+        if ($now->greaterThan($deliveryDateTime)) {
+            $status = 'delay';
+        } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+            $status = 'normal';
+        } else {
+            $status = 'advance';
+        }
+        
+        // Get user name dengan multiple fallback
+        $movedBy = 'System'; // default
+        if (auth()->check()) {
+            $user = auth()->user();
+            // Coba name dulu, kalau kosong pakai email, kalau kosong pakai ID
+            $movedBy = $user->name ?? $user->email ?? 'User#' . $user->id;
+        }
+        
+        // DEBUG: Log user info (hapus setelah testing)
+        \Log::info('Move to shipping - User info:', [
+            'authenticated' => auth()->check(),
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->name ?? null,
+            'moved_by' => $movedBy
+        ]);
+        
+        // Create shipping record
+        $shipping = Shipping::create([
+            'route' => $preparation->route,
+            'logistic_partners' => $preparation->logistic_partners,
+            'no_dn' => $preparation->no_dn,
+            'customers' => $preparation->customers,
+            'dock' => $preparation->dock,
+            'delivery_date' => $preparation->delivery_date,
+            'delivery_time' => $preparation->delivery_time,
+            'arrival' => null,
+            'cycle' => $preparation->cycle,
+            'address' => $validated['address'],
+            'status' => $status,
+            'scan_to_shipping' => Carbon::now(),
+            'moved_by' => $movedBy, // GUNAKAN VARIABLE YANG SUDAH DI-SET
+        ]);
+        
+        // Delete preparation permanently
+        $preparation->forceDelete();
+        
+        DB::commit();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Data berhasil dipindahkan ke Shipping!',
+            'data' => $shipping
+        ]);
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal memindahkan data: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * Get shipping data for edit
@@ -436,5 +450,113 @@ class ShippingController extends Controller
             'success' => true,
             'data' => $shippings
         ]);
+    }
+
+    /**
+     * Display shipping list in reverse view (grouped by route & cycle)
+     */
+    public function indexReverse(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        $search = $request->get('search');
+        
+        // Get all shippings
+        $query = Shipping::query();
+        
+        // Search filter
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('route', 'like', "%{$search}%")
+                ->orWhere('logistic_partners', 'like', "%{$search}%")
+                ->orWhere('customers', 'like', "%{$search}%")
+                ->orWhere('dock', 'like', "%{$search}%");
+            });
+        }
+        
+        // Get all data
+        $allShippings = $query->get();
+        
+        // Group by route and cycle
+        $grouped = $allShippings->groupBy(function($item) {
+            return $item->route . '|' . $item->cycle;
+        })->map(function($group) {
+            $firstItem = $group->first();
+            
+            // Calculate status for the group
+            if ($firstItem->arrival !== null) {
+                $statusLabel = 'On Loading';
+                $statusBadge = 'bg-primary';
+            } else {
+                $deliveryDateTime = Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time);
+                $now = Carbon::now();
+                $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
+                
+                if ($now->greaterThan($deliveryDateTime)) {
+                    $statusLabel = 'Delay';
+                    $statusBadge = 'bg-danger';
+                } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+                    $statusLabel = 'Normal';
+                    $statusBadge = 'bg-success';
+                } else {
+                    $statusLabel = 'Advance';
+                    $statusBadge = 'bg-warning';
+                }
+            }
+            
+            return [
+                'route' => $firstItem->route,
+                'logistic_partners' => $group->pluck('logistic_partners')->unique()->filter()->implode(', '),
+                'cycle' => $firstItem->cycle,
+                'customers' => $group->pluck('customers')->unique()->filter()->implode(', '),
+                'dock' => $group->pluck('dock')->unique()->filter()->implode(', '),
+                'delivery_date' => $firstItem->delivery_date->format('d-m-y'),
+                'delivery_time' => date('H:i:s', strtotime($firstItem->delivery_time)),
+                'arrival' => $firstItem->arrival ? $firstItem->arrival->format('d-m-y H:i') : null,
+                'address' => $group->pluck('address')->unique()->filter()->implode(', '),
+                'status_label' => $statusLabel,
+                'status_badge' => $statusBadge,
+                'no_dns' => $group->pluck('no_dn')->toArray(),
+                'dn_count' => $group->count(),
+                'delivery_datetime' => Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time),
+                'has_arrival' => $firstItem->arrival !== null,
+            ];
+        })->sortBy('delivery_datetime')->values();
+        
+        // Pagination manual
+        if ($perPage === 'all') {
+            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $grouped,
+                $grouped->count(),
+                $grouped->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+            $perPageInt = (int)$perPage;
+            $currentPageItems = $grouped->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
+            
+            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $currentPageItems,
+                $grouped->count(),
+                $perPageInt,
+                $currentPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        }
+        
+        // Statistics - SAMA SEPERTI INDEX BIASA
+        $totalAdvance = $grouped->where('status_label', 'Advance')->count();
+        $totalNormal = $grouped->where('status_label', 'Normal')->count();
+        $totalDelay = $grouped->where('status_label', 'Delay')->count();
+        $totalOnLoading = $grouped->where('status_label', 'On Loading')->count();
+        
+        return view('shippings.index-reverse', compact(
+            'groupedShippings',
+            'totalAdvance',
+            'totalNormal',
+            'totalDelay',
+            'totalOnLoading'
+        ));
     }
 }

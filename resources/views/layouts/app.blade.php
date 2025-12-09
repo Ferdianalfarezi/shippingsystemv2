@@ -13,7 +13,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -331,6 +332,30 @@
             display: block;
         }
 
+        .submenu {
+        display: none;
+        position: absolute;
+        left: 0;
+        top: 100%;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        min-width: 150px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 50;
+    }
+
+    .submenu a {
+        display: block;
+        padding: 8px 12px;
+        color: #333;
+        text-decoration: none;
+    }
+
+    .submenu a:hover {
+        background: #f5f5f5;
+    }
+
     </style>
 
     @stack('styles')
@@ -365,7 +390,8 @@
             
         </div>
 
-        <!-- Menu below Navbar -->
+        @if(auth()->user()->role !== 'lp')
+            <!-- Menu below Navbar -->
             <div class="menu-container">
                 <div class="menu-item">
                     <a href="{{ route('preparations.index') }}">Preparation</a>
@@ -377,13 +403,20 @@
                     <a href="#">Delivery</a>
                 </div>
                 <div class="menu-item">
+                    <a href="#">Milkruns</a>
+                </div>
+                <div class="menu-item">
                     <a href="#">Receipt DN</a>
                 </div>
                 <div class="menu-item">
                     <a href="#">Kanban</a>
                 </div>
-                <div class="menu-item">
-                    <a href="#">Settings</a>
+                <div class="menu-item" id="settingsMenu">
+                    <a href="#" id="settingsBtn">Settings</a>
+
+                    <div class="submenu text-start" id="submenu">
+                        <a href="{{ route('users.index') }}">Users</a>
+                    </div>
                 </div>
                 <div class="menu-item">
                     <a href="#" onclick="confirmLogout(event);">Logout</a>
@@ -392,6 +425,7 @@
                     </form>
                 </div>
             </div>
+        @endif
     </nav>
 
     <!-- Main Content -->
@@ -484,6 +518,21 @@
                 }
             });
         }
+
+        const btn = document.getElementById('settingsBtn');
+        const submenu = document.getElementById('submenu');
+
+        btn.addEventListener('click', function (e) {
+            e.preventDefault(); 
+            submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Tutup jika klik di luar menu
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('settingsMenu').contains(e.target)) {
+                submenu.style.display = 'none';
+            }
+        });
     </script>
 
     @stack('scripts')

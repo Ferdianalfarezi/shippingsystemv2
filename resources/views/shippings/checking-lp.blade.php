@@ -21,7 +21,7 @@
         text-align: center;
         color: #333;
         margin-bottom: 20px;
-        margin-left: 160px;
+        margin-left: 40px;
     }
 
     .scan-input-group {
@@ -145,10 +145,17 @@
 
 @section('content')
 <div class="container-fluid px-4">
-    <!-- Scan Container -->
     <div class="scan-container">
-        <div class="header-box">
+        <div class="header-box d-flex align-items-center justify-content-between">
+            <!-- Tombol Logout -->
+            <button type="button" class="btn btn-danger btn-sm fw-bold mb-4"
+                    onclick="confirmLogout(event)">
+                Logout
+            </button>
+
+
             <span class="scan-title">SCAN ROUTE LP</span>
+
             <div style="width: 100px;"></div>
         </div>
 
@@ -160,14 +167,17 @@
                     1.415-1.414l-3.85-3.85zm-5.242 1.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
                 </svg>
             </button>
-
         </div>
 
-        <p class="scan-hint">Scan route untuk mengisi data arrival pada shipping</p>
-    </div>
+            <p class="scan-hint">Scan route untuk mengisi data arrival pada shipping</p>
+        </div>
+
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+        @csrf
+    </form>
 
     <!-- Available Routes Info -->
-    <p class="route-list-title ms-3">Data Route & Cycle yang Tersedia:</p>
+    <p class="route-list-title ms-3 text-white">Data Route & Cycle yang Tersedia:</p>
 
     <!-- Shipping Table -->
     <div class="table-responsive">

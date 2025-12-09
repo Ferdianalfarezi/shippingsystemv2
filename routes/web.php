@@ -7,6 +7,7 @@ use App\Http\Controllers\LpConfigController;
 use App\Http\Controllers\ImportTmminController;
 use App\Http\Controllers\ImportAdmController;
 use App\Http\Controllers\AdmLeadTimeController;
+use App\Http\Controllers\UserController;
 
 use App\Http\Controllers\ShippingController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    Route::resource('users', UserController::class);
 
     // Route Delete All Preparations (HARUS SEBELUM RESOURCE!)
     Route::delete('/preparations/delete-all', [PreparationController::class, 'deleteAll'])->name('preparations.deleteAll');
@@ -50,13 +53,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Shipping Routes
     Route::prefix('shippings')->name('shippings.')->group(function () {
         Route::get('/', [ShippingController::class, 'index'])->name('index');
+        Route::get('/reverse', [ShippingController::class, 'indexReverse'])->name('indexReverse');
         Route::post('/move-from-preparation', [ShippingController::class, 'moveFromPreparation'])->name('moveFromPreparation');
         Route::get('/{shipping}/edit', [ShippingController::class, 'edit'])->name('edit');
         Route::put('/{shipping}', [ShippingController::class, 'update'])->name('update');
         Route::delete('/{shipping}', [ShippingController::class, 'destroy'])->name('destroy');
         Route::delete('/delete/all', [ShippingController::class, 'deleteAll'])->name('deleteAll');
         
-       // Checking LP Routes
+        // Checking LP Routes
         Route::get('/checking-lp', [ShippingController::class, 'checkingLp'])->name('checkingLp');
         Route::post('/check-route', [ShippingController::class, 'checkRoute'])->name('checkRoute');
         Route::post('/scan-route', [ShippingController::class, 'scanRoute'])->name('scanRoute');
