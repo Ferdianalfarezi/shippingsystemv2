@@ -34,7 +34,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Default redirect
-        return redirect()->intended(route('preparations.index', absolute: false));
+        return redirect()->route('preparations.index');
     }
 
 

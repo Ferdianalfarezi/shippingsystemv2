@@ -13,15 +13,17 @@
             <span class="input-group-text bg-white text-white">
                 <i class="bi bi-qr-code-scan text-dark"></i>
             </span>
-            <input type="text" class="form-control" id="scanDnInput" placeholder="Scan DN disini..." autofocus>
+            <input type="text" class="form-control" id="scanDnInput" placeholder="Scan DN to Shipping..." autofocus>
         </div>
 
-        <!-- Delete All Button -->
-        <div class="card border-4 bg-danger">
-            <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
-                <i class="bi bi-trash-fill"></i>
-            </button>
-        </div>
+        @if(auth()->user()->role === 'superadmin')
+            <!-- Delete All Button -->
+            <div class="card border-4 bg-danger">
+                <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>
+        @endif
         
         <!-- Show By Dropdown -->
         <div class="card border-0 shadow-sm">

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Shipping;
 use App\Models\Preparation;
+use App\Models\Delivery;
+use App\Models\Milkrun;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -72,93 +74,159 @@ class ShippingController extends Controller
             ->count();
         $totalOnLoading = Shipping::whereNotNull('arrival')->count();
         
+        // Get recent scan untuk display
+        $recentScan = Delivery::whereNotNull('scan_to_delivery')
+            ->orderBy('scan_to_delivery', 'desc')
+            ->first();
+        
         return view('shippings.index', compact(
             'shippings', 
             'totalAll', 
             'totalAdvance', 
             'totalNormal', 
             'totalDelay', 
-            'totalOnLoading'
+            'totalOnLoading',
+            'recentScan'
         ));
     }
 
     public function moveFromPreparation(Request $request)
+    {
+        $validated = $request->validate([
+            'preparation_id' => 'required|exists:preparations,id',
+            'address' => 'required|string|max:50',
+        ]);
+
+        DB::beginTransaction();
+        
+        try {
+            // Get preparation data
+            $preparation = Preparation::findOrFail($validated['preparation_id']);
+            
+            // Check if no_dn already exists in shippings
+            $existingShipping = Shipping::where('no_dn', $preparation->no_dn)->first();
+            if ($existingShipping) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data dengan No DN ini sudah ada di Shipping!'
+                ], 422);
+            }
+            
+            // Calculate initial status
+            $deliveryDateTime = Carbon::parse($preparation->delivery_date->format('Y-m-d') . ' ' . $preparation->delivery_time);
+            $now = Carbon::now();
+            $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
+            
+            if ($now->greaterThan($deliveryDateTime)) {
+                $status = 'delay';
+            } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+                $status = 'normal';
+            } else {
+                $status = 'advance';
+            }
+            
+            // Get user name dengan multiple fallback
+            $movedBy = 'System';
+            if (auth()->check()) {
+                $user = auth()->user();
+                $movedBy = $user->name ?? $user->email ?? 'User#' . $user->id;
+            }
+            
+            // Create shipping record
+            $shipping = Shipping::create([
+                'route' => $preparation->route,
+                'logistic_partners' => $preparation->logistic_partners,
+                'no_dn' => $preparation->no_dn,
+                'customers' => $preparation->customers,
+                'dock' => $preparation->dock,
+                'delivery_date' => $preparation->delivery_date,
+                'delivery_time' => $preparation->delivery_time,
+                'arrival' => null,
+                'cycle' => $preparation->cycle,
+                'address' => $validated['address'],
+                'status' => $status,
+                'scan_to_shipping' => Carbon::now(),
+                'moved_by' => $movedBy,
+            ]);
+            
+            // Delete preparation permanently
+            $preparation->forceDelete();
+            
+            DB::commit();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Data berhasil dipindahkan ke Shipping!',
+                'data' => $shipping
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memindahkan data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function moveToDelivery(Request $request)
 {
     $validated = $request->validate([
-        'preparation_id' => 'required|exists:preparations,id',
-        'address' => 'required|string|max:50',
+        'shipping_id' => 'required|exists:shippings,id',
     ]);
 
     DB::beginTransaction();
     
     try {
-        // Get preparation data
-        $preparation = Preparation::findOrFail($validated['preparation_id']);
+        $shipping = Shipping::findOrFail($validated['shipping_id']);
         
-        // Check if no_dn already exists in shippings
-        $existingShipping = Shipping::where('no_dn', $preparation->no_dn)->first();
-        if ($existingShipping) {
+        // Check if no_dn already exists in deliveries
+        $existingDelivery = Delivery::where('no_dn', $shipping->no_dn)->first();
+        if ($existingDelivery) {
             return response()->json([
                 'success' => false,
-                'message' => 'Data dengan No DN ini sudah ada di Shipping!'
+                'message' => 'Data dengan No DN ini sudah ada di Delivery!'
             ], 422);
         }
         
-        // Calculate initial status
-        $deliveryDateTime = Carbon::parse($preparation->delivery_date->format('Y-m-d') . ' ' . $preparation->delivery_time);
-        $now = Carbon::now();
-        $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
-        
-        if ($now->greaterThan($deliveryDateTime)) {
-            $status = 'delay';
-        } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
-            $status = 'normal';
-        } else {
-            $status = 'advance';
-        }
-        
-        // Get user name dengan multiple fallback
-        $movedBy = 'System'; // default
+        // Get user name
+        $movedBy = 'System';
         if (auth()->check()) {
             $user = auth()->user();
-            // Coba name dulu, kalau kosong pakai email, kalau kosong pakai ID
             $movedBy = $user->name ?? $user->email ?? 'User#' . $user->id;
         }
         
-        // DEBUG: Log user info (hapus setelah testing)
-        \Log::info('Move to shipping - User info:', [
-            'authenticated' => auth()->check(),
-            'user_id' => auth()->id(),
-            'user_name' => auth()->user()->name ?? null,
-            'moved_by' => $movedBy
+        $now = Carbon::now();
+        
+        // Create delivery record
+        $delivery = Delivery::create([
+            'route' => $shipping->route,
+            'logistic_partners' => $shipping->logistic_partners,
+            'no_dn' => $shipping->no_dn,
+            'customers' => $shipping->customers,
+            'dock' => $shipping->dock,
+            'cycle' => $shipping->cycle,
+            'address' => $shipping->address,
+            'status' => 'pending',
+            'scan_to_delivery' => $now,
+            'moved_by' => $movedBy,
         ]);
         
-        // Create shipping record
-        $shipping = Shipping::create([
-            'route' => $preparation->route,
-            'logistic_partners' => $preparation->logistic_partners,
-            'no_dn' => $preparation->no_dn,
-            'customers' => $preparation->customers,
-            'dock' => $preparation->dock,
-            'delivery_date' => $preparation->delivery_date,
-            'delivery_time' => $preparation->delivery_time,
-            'arrival' => null,
-            'cycle' => $preparation->cycle,
-            'address' => $validated['address'],
-            'status' => $status,
-            'scan_to_shipping' => Carbon::now(),
-            'moved_by' => $movedBy, // GUNAKAN VARIABLE YANG SUDAH DI-SET
-        ]);
+        // HANYA create/update milkrun jika arrival sudah terisi
+        if ($shipping->arrival) {
+            $this->createOrUpdateMilkrun($shipping, $movedBy, $now);
+        }
         
-        // Delete preparation permanently
-        $preparation->forceDelete();
+        // Delete shipping permanently
+        $shipping->forceDelete();
         
         DB::commit();
         
         return response()->json([
             'success' => true,
-            'message' => 'Data berhasil dipindahkan ke Shipping!',
-            'data' => $shipping
+            'message' => 'Data berhasil dipindahkan ke Delivery!',
+            'data' => $delivery
         ]);
         
     } catch (\Exception $e) {
@@ -170,6 +238,398 @@ class ShippingController extends Controller
         ], 500);
     }
 }
+
+    /**
+     * Move shipping to delivery by scanning DN
+     */
+    public function scanToDelivery(Request $request)
+{
+    $validated = $request->validate([
+        'no_dn' => 'required|string|max:255',
+    ]);
+
+    DB::beginTransaction();
+    
+    try {
+        // Find shipping by no_dn
+        $shipping = Shipping::where('no_dn', $validated['no_dn'])->first();
+        
+        if (!$shipping) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data shipping dengan DN "' . $validated['no_dn'] . '" tidak ditemukan!'
+            ], 404);
+        }
+        
+        // Check if no_dn already exists in deliveries
+        $existingDelivery = Delivery::where('no_dn', $shipping->no_dn)->first();
+        if ($existingDelivery) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data dengan No DN ini sudah ada di Delivery!'
+            ], 422);
+        }
+        
+        // Get user name
+        $movedBy = 'System';
+        if (auth()->check()) {
+            $user = auth()->user();
+            $movedBy = $user->name ?? $user->email ?? 'User#' . $user->id;
+        }
+        
+        $now = Carbon::now();
+        
+        // Create delivery record
+        $delivery = Delivery::create([
+            'route' => $shipping->route,
+            'logistic_partners' => $shipping->logistic_partners,
+            'no_dn' => $shipping->no_dn,
+            'customers' => $shipping->customers,
+            'dock' => $shipping->dock,
+            'cycle' => $shipping->cycle,
+            'address' => $shipping->address,
+            'status' => 'pending',
+            'scan_to_delivery' => $now,
+            'moved_by' => $movedBy,
+        ]);
+        
+        // HANYA create/update milkrun jika arrival sudah terisi
+        if ($shipping->arrival) {
+            $this->createOrUpdateMilkrun($shipping, $movedBy, $now);
+        }
+        
+        // Delete shipping permanently
+        $shipping->forceDelete();
+        
+        DB::commit();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Data berhasil dipindahkan ke Delivery!',
+            'data' => [
+                'no_dn' => $delivery->no_dn,
+                'route' => $delivery->route,
+                'customers' => $delivery->customers,
+                'dock' => $delivery->dock,
+                'cycle' => $delivery->cycle,
+                'scan_time' => $delivery->scan_to_delivery->format('d-m-Y H:i:s'),
+                'moved_by' => $movedBy,
+            ]
+        ]);
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal memindahkan data: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+    /**
+     * Move multiple shippings to delivery by route and cycle
+     */
+    public function moveToDeliveryByRoute(Request $request)
+{
+    $validated = $request->validate([
+        'route' => 'required|string|max:255',
+        'cycle' => 'nullable|integer',
+    ]);
+
+    DB::beginTransaction();
+    
+    try {
+        // Build query
+        $query = Shipping::where('route', $validated['route']);
+        
+        // Filter by cycle jika ada
+        if (isset($validated['cycle']) && $validated['cycle'] !== null) {
+            $query->where('cycle', $validated['cycle']);
+        }
+        
+        $shippings = $query->get();
+        
+        if ($shippings->isEmpty()) {
+            $cycleInfo = isset($validated['cycle']) ? " cycle {$validated['cycle']}" : "";
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada data shipping dengan route "' . $validated['route'] . '"' . $cycleInfo
+            ], 404);
+        }
+        
+        // Get user name
+        $movedBy = 'System';
+        if (auth()->check()) {
+            $user = auth()->user();
+            $movedBy = $user->name ?? $user->email ?? 'User#' . $user->id;
+        }
+        
+        $now = Carbon::now();
+        $count = 0;
+        $skipped = 0;
+        
+        // Pisahkan shipping yang sudah ada arrival dan yang belum
+        $shippingsWithArrival = collect();
+        $shippingsWithoutArrival = collect();
+        
+        foreach ($shippings as $shipping) {
+            // Check if already exists
+            if (Delivery::where('no_dn', $shipping->no_dn)->exists()) {
+                $skipped++;
+                continue;
+            }
+            
+            Delivery::create([
+                'route' => $shipping->route,
+                'logistic_partners' => $shipping->logistic_partners,
+                'no_dn' => $shipping->no_dn,
+                'customers' => $shipping->customers,
+                'dock' => $shipping->dock,
+                'cycle' => $shipping->cycle,
+                'address' => $shipping->address,
+                'status' => 'pending',
+                'scan_to_delivery' => $now,
+                'moved_by' => $movedBy,
+            ]);
+            
+            // Pisahkan berdasarkan arrival
+            if ($shipping->arrival) {
+                $shippingsWithArrival->push($shipping);
+            } else {
+                $shippingsWithoutArrival->push($shipping);
+            }
+            
+            $shipping->forceDelete();
+            $count++;
+        }
+        
+        // HANYA create milkrun untuk shipping yang sudah ada arrival
+        if ($shippingsWithArrival->isNotEmpty()) {
+            $this->createMilkrunFromGroup($shippingsWithArrival, $movedBy, $now);
+        }
+        
+        DB::commit();
+        
+        $cycleInfo = isset($validated['cycle']) ? " Cycle {$validated['cycle']}" : "";
+        $message = "Berhasil memindahkan {$count} data dengan route \"{$validated['route']}\"{$cycleInfo} ke Delivery";
+        if ($skipped > 0) {
+            $message .= " ({$skipped} data dilewati karena sudah ada)";
+        }
+        if ($shippingsWithoutArrival->isNotEmpty()) {
+            $message .= " • {$shippingsWithoutArrival->count()} DN belum masuk milkrun (arrival belum terisi)";
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'moved_count' => $count,
+            'skipped_count' => $skipped,
+            'milkrun_created' => $shippingsWithArrival->isNotEmpty()
+        ]);
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal memindahkan data: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+    /**
+     * Create or update milkrun record from single shipping
+     * Arrival = dari shipping (waktu truk tiba)
+     * Departure = waktu scan to delivery (waktu barang keluar)
+     */
+    private function createOrUpdateMilkrun(Shipping $shipping, string $movedBy, Carbon $scanTime = null): Milkrun
+    {
+        // Waktu scan to delivery = departure time
+        $departureTime = $scanTime ?? Carbon::now();
+        
+        // Find existing milkrun with same route, cycle, delivery_date
+        $milkrun = Milkrun::where('route', $shipping->route)
+            ->where('cycle', $shipping->cycle)
+            ->where('delivery_date', $shipping->delivery_date)
+            ->first();
+        
+        if ($milkrun) {
+            // Update existing milkrun - add DN to list
+            $noDns = $milkrun->no_dns ?? [];
+            if (!in_array($shipping->no_dn, $noDns)) {
+                $noDns[] = $shipping->no_dn;
+            }
+            
+            // Merge customers (unique)
+            $existingCustomers = array_filter(explode(', ', $milkrun->customers));
+            $newCustomers = array_filter(explode(', ', $shipping->customers));
+            $allCustomers = array_unique(array_merge($existingCustomers, $newCustomers));
+            
+            // Merge docks (unique)
+            $existingDocks = array_filter(explode(', ', $milkrun->dock ?? ''));
+            $newDocks = array_filter(explode(', ', $shipping->dock));
+            $allDocks = array_unique(array_merge($existingDocks, $newDocks));
+            
+            // Update milkrun, departure diupdate setiap scan
+            $milkrun->update([
+                'customers' => implode(', ', $allCustomers),
+                'dock' => implode(', ', $allDocks),
+                'no_dns' => $noDns,
+                'dn_count' => count($noDns),
+                'departure' => $departureTime, // Update departure setiap ada scan to delivery
+            ]);
+        } else {
+            // Create new milkrun
+            // Arrival = dari shipping (waktu truk tiba di checking LP)
+            // Departure = waktu scan to delivery
+            $milkrun = Milkrun::create([
+                'customers' => $shipping->customers,
+                'route' => $shipping->route,
+                'logistic_partners' => $shipping->logistic_partners,
+                'cycle' => $shipping->cycle,
+                'dock' => $shipping->dock,
+                'delivery_date' => $shipping->delivery_date,
+                'delivery_time' => $shipping->delivery_time,
+                'arrival' => $shipping->arrival, // Arrival dari shipping (waktu truk tiba)
+                'departure' => $departureTime, // Departure = waktu scan to delivery
+                'status' => 'pending', // Will be calculated
+                'dn_count' => 1,
+                'no_dns' => [$shipping->no_dn],
+                'address' => $shipping->address,
+                'moved_by' => $movedBy,
+            ]);
+            
+            // Calculate and update status based on arrival
+            $milkrun->status = $milkrun->calculateStatus();
+            $milkrun->save();
+        }
+        
+        return $milkrun;
+    }
+
+    /**
+     * Create milkrun from group of shippings
+     * Arrival = dari shipping pertama (waktu truk tiba)
+     * Departure = waktu scan to delivery (waktu barang keluar)
+     */
+    private function createMilkrunFromGroup($shippings, string $movedBy, Carbon $scanTime = null): Milkrun
+    {
+        $firstShipping = $shippings->first();
+        
+        // Waktu scan to delivery = departure time
+        $departureTime = $scanTime ?? Carbon::now();
+        
+        // Find existing milkrun
+        $milkrun = Milkrun::where('route', $firstShipping->route)
+            ->where('cycle', $firstShipping->cycle)
+            ->where('delivery_date', $firstShipping->delivery_date)
+            ->first();
+        
+        // Collect all unique values
+        $allCustomers = $shippings->pluck('customers')->flatMap(function($c) {
+            return array_filter(explode(', ', $c));
+        })->unique()->values()->toArray();
+        
+        $allDocks = $shippings->pluck('dock')->flatMap(function($d) {
+            return array_filter(explode(', ', $d));
+        })->unique()->values()->toArray();
+        
+        $allLps = $shippings->pluck('logistic_partners')->flatMap(function($lp) {
+            return array_filter(explode(', ', $lp));
+        })->unique()->values()->toArray();
+        
+        $allDns = $shippings->pluck('no_dn')->toArray();
+        
+        if ($milkrun) {
+            // Merge with existing
+            $existingDns = $milkrun->no_dns ?? [];
+            $mergedDns = array_unique(array_merge($existingDns, $allDns));
+            
+            $existingCustomers = array_filter(explode(', ', $milkrun->customers));
+            $mergedCustomers = array_unique(array_merge($existingCustomers, $allCustomers));
+            
+            $existingDocks = array_filter(explode(', ', $milkrun->dock ?? ''));
+            $mergedDocks = array_unique(array_merge($existingDocks, $allDocks));
+            
+            // Update milkrun, departure diupdate setiap scan
+            $milkrun->update([
+                'customers' => implode(', ', $mergedCustomers),
+                'dock' => implode(', ', $mergedDocks),
+                'no_dns' => $mergedDns,
+                'dn_count' => count($mergedDns),
+                'departure' => $departureTime, // Update departure setiap ada scan to delivery
+            ]);
+        } else {
+            // Create new
+            // Arrival = dari shipping pertama (waktu truk tiba di checking LP)
+            // Departure = waktu scan to delivery
+            $milkrun = Milkrun::create([
+                'customers' => implode(', ', $allCustomers),
+                'route' => $firstShipping->route,
+                'logistic_partners' => implode(', ', $allLps),
+                'cycle' => $firstShipping->cycle,
+                'dock' => implode(', ', $allDocks),
+                'delivery_date' => $firstShipping->delivery_date,
+                'delivery_time' => $firstShipping->delivery_time,
+                'arrival' => $firstShipping->arrival, // Arrival dari shipping (waktu truk tiba)
+                'departure' => $departureTime, // Departure = waktu scan to delivery
+                'status' => 'pending', // Will be calculated
+                'dn_count' => count($allDns),
+                'no_dns' => $allDns,
+                'address' => $shippings->pluck('address')->unique()->filter()->implode(', '),
+                'moved_by' => $movedBy,
+            ]);
+            
+            // Calculate and update status based on arrival
+            $milkrun->status = $milkrun->calculateStatus();
+            $milkrun->save();
+        }
+        
+        return $milkrun;
+    }
+
+    /**
+     * Find shipping by DN number
+     */
+    public function findByDn(Request $request)
+    {
+        $noDn = $request->get('no_dn');
+        
+        if (!$noDn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No DN tidak boleh kosong'
+            ], 400);
+        }
+        
+        $shipping = Shipping::where('no_dn', $noDn)->first();
+        
+        if (!$shipping) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data shipping dengan DN ' . $noDn . ' tidak ditemukan',
+                'data' => null
+            ]);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Data ditemukan',
+            'data' => [
+                'id' => $shipping->id,
+                'no_dn' => $shipping->no_dn,
+                'route' => $shipping->route,
+                'logistic_partners' => $shipping->logistic_partners,
+                'customers' => $shipping->customers,
+                'dock' => $shipping->dock,
+                'cycle' => $shipping->cycle,
+                'address' => $shipping->address,
+                'delivery_date' => $shipping->delivery_date->format('Y-m-d'),
+                'delivery_time' => $shipping->delivery_time,
+            ]
+        ]);
+    }
 
     /**
      * Get shipping data for edit
@@ -361,7 +821,7 @@ class ShippingController extends Controller
     {
         $validated = $request->validate([
             'route' => 'required|string|max:255',
-            'cycle' => 'nullable|integer', // Optional, jika null scan semua cycle
+            'cycle' => 'nullable|integer',
         ]);
 
         try {
@@ -545,7 +1005,7 @@ class ShippingController extends Controller
             );
         }
         
-        // Statistics - SAMA SEPERTI INDEX BIASA
+        // Statistics
         $totalAdvance = $grouped->where('status_label', 'Advance')->count();
         $totalNormal = $grouped->where('status_label', 'Normal')->count();
         $totalDelay = $grouped->where('status_label', 'Delay')->count();

@@ -470,10 +470,10 @@
                     <a href="{{ route('shippings.index') }}">Shipping</a>
                 </div>
                 <div class="menu-item">
-                    <a href="#">Delivery</a>
+                    <a href="{{ route('deliveries.index') }}">Delivery</a>
                 </div>
                 <div class="menu-item">
-                    <a href="#">Milkruns</a>
+                    <a href="{{ route('milkruns.index') }}">Milkrun</a>
                 </div>
                 <div class="menu-item">
                     <a href="#">Receipt DN</a>
@@ -481,13 +481,15 @@
                 <div class="menu-item">
                     <a href="#">Kanban</a>
                 </div>
-                <div class="menu-item" id="settingsMenu">
-                    <a href="#" id="settingsBtn">Settings</a>
+                @if(auth()->user()->role === 'superadmin')
+                    <div class="menu-item" id="settingsMenu">
+                        <a href="#" id="settingsBtn">Settings</a>
 
-                    <div class="submenu text-start" id="submenu">
-                        <a href="{{ route('users.index') }}">Users</a>
+                        <div class="submenu text-start" id="submenu">
+                            <a href="{{ route('users.index') }}">Users</a>
+                        </div>
                     </div>
-                </div>
+                @endif
                 <div class="menu-item">
                     <a href="#" onclick="confirmLogout(event);">Logout</a>
                     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
@@ -506,26 +508,34 @@
     <!-- Floating User Info -->
     @auth
     <div class="floating-user-info">
-        <div class="floating-user-content">
-            <div class="floating-user-avatar">
+    <div class="floating-user-content">
+        <div class="floating-user-avatar">
+            @if(auth()->user()->id == 7)
+                <img src="{{ asset('images/user7.png') }}" 
+                     alt="User Photo" 
+                     style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%;">
+            @else
                 <i class="fas fa-user"></i>
-            </div>
-            <div class="floating-user-details">
-                <div class="floating-user-name">{{ auth()->user()->name }}</div>
-                @php
-                    $role = auth()->user()->role ?? 'user';
-                    $roleClass = match($role) {
-                        'admin' => 'role-admin',
-                        'operator' => 'role-operator',
-                        'lp' => 'role-lp',
-                        default => 'role-default'
-                    };
-                @endphp
-                <span class="text-start {{ $roleClass }}">{{ $role }}</span>
-            </div>
+            @endif
+        </div>
+
+        <div class="floating-user-details">
+            <div class="floating-user-name">{{ auth()->user()->name }}</div>
+            @php
+                $role = auth()->user()->role ?? 'user';
+                $roleClass = match($role) {
+                    'admin' => 'role-admin',
+                    'operator' => 'role-operator',
+                    'lp' => 'role-lp',
+                    default => 'role-default'
+                };
+            @endphp
+            <span class="{{ $roleClass }}">{{ $role }}</span>
         </div>
     </div>
-    @endauth
+</div>
+@endauth
+
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
