@@ -25,17 +25,19 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
-
         $request->session()->regenerate();
+
+        // Tambah flash message
+        session()->flash('success', 'Selamat datang!.');
 
         // Cek role user
         if (Auth::user()->role === 'lp') {
             return redirect()->route('shippings.checkingLp');
         }
 
-        // Default redirect
         return redirect()->route('preparations.index');
     }
+
 
 
     /**

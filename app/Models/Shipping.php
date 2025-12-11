@@ -25,12 +25,15 @@ class Shipping extends Model
         'status',
         'scan_to_shipping',
         'moved_by',
+        'pulling_date',
+        'pulling_time',
     ];
 
     protected $casts = [
         'delivery_date' => 'date',
         'arrival' => 'datetime',
         'scan_to_shipping' => 'datetime',
+        'pulling_date' => 'date',
     ];
 
     /**

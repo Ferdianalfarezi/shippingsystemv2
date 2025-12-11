@@ -293,4 +293,44 @@ class PreparationController extends Controller
             ]
         ]);
     }
+
+    public function andon(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        
+        // Query dasar - sama seperti index tapi tanpa search
+        $query = Preparation::query();
+        
+        // Order by pulling datetime (yang paling dekat/lewat dulu di atas)
+        $query->orderByRaw("CONCAT(pulling_date, ' ', pulling_time) ASC");
+        
+        // Pagination atau all
+        if ($perPage === 'all') {
+            $preparations = $query->get();
+            $preparations = new \Illuminate\Pagination\LengthAwarePaginator(
+                $preparations,
+                $preparations->count(),
+                $preparations->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $preparations = $query->paginate((int)$perPage)->withQueryString();
+        }
+        
+        // Hitung statistik
+        $totalAll = Preparation::count();
+        $totalDelay = Preparation::whereRaw(
+            "CONCAT(delivery_date, ' ', delivery_time) < NOW() OR CONCAT(pulling_date, ' ', pulling_time) < NOW()"
+        )->count();
+        $totalOnTime = $totalAll - $totalDelay;
+        
+        // Get recent scan dengan fresh() untuk force reload
+        $recentScan = \App\Models\Shipping::whereNotNull('scan_to_shipping')
+            ->orderBy('scan_to_shipping', 'desc')
+            ->first();
+        
+        // Return view andon
+        return view('andon.preparations', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll', 'recentScan'));
+    }
 }

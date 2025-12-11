@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Delivery;
 use App\Models\Shipping;
+use App\Models\History;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -49,6 +50,10 @@ class DeliveryController extends Controller
                 return $delivery->status === $statusFilter;
             });
         }
+
+        $recentScan = History::whereNotNull('completed_at')
+            ->orderBy('completed_at', 'desc')
+            ->first();
         
         // Calculate statistics dari semua data (sebelum pagination)
         $allDataForStats = Delivery::all();
@@ -83,7 +88,8 @@ class DeliveryController extends Controller
             'deliveries', 
             'totalAll', 
             'totalNormal', 
-            'totalDelay'
+            'totalDelay',
+             'recentScan'
         ));
     }
 
@@ -142,6 +148,10 @@ class DeliveryController extends Controller
             ];
         })->sortByDesc('scan_datetime')->values();
         
+         $recentScan = History::whereNotNull('completed_at')
+            ->orderBy('completed_at', 'desc')
+            ->first();
+
         // Pagination manual
         if ($perPage === 'all') {
             $groupedDeliveries = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -172,7 +182,8 @@ class DeliveryController extends Controller
         return view('deliveries.index-reverse', compact(
             'groupedDeliveries',
             'totalNormal',
-            'totalDelay'
+            'totalDelay',
+            'recentScan'
         ));
     }
 
@@ -494,5 +505,143 @@ class DeliveryController extends Controller
                 'scan_to_delivery' => $delivery->scan_to_delivery?->format('Y-m-d H:i:s'),
             ]
         ]);
+    }
+
+     public function andon(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        
+        // Query dasar - sama seperti index tapi tanpa search
+        $query = Delivery::query();
+        
+        // Order by scan_to_delivery (yang paling baru di atas)
+        $query->orderBy('scan_to_delivery', 'desc');
+        
+        // Pagination atau all
+        if ($perPage === 'all') {
+            $deliveries = $query->get();
+            $deliveries = new \Illuminate\Pagination\LengthAwarePaginator(
+                $deliveries,
+                $deliveries->count(),
+                $deliveries->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $deliveries = $query->paginate((int)$perPage)->withQueryString();
+        }
+        
+        // Hitung statistik
+        $allDataForStats = Delivery::all();
+        $totalAll = $allDataForStats->count();
+        $totalNormal = $allDataForStats->filter(fn($d) => $d->status === 'normal')->count();
+        $totalDelay = $allDataForStats->filter(fn($d) => $d->status === 'delay')->count();
+        
+        // Get recent scan dengan fresh() untuk force reload
+        $recentScan = \App\Models\History::whereNotNull('completed_at')
+            ->orderBy('completed_at', 'desc')
+            ->first();
+        
+        // DEBUG: Log recent scan data (optional)
+        if ($recentScan) {
+            \Log::info('Recent Scan Data (Delivery Andon):', [
+                'no_dn' => $recentScan->no_dn,
+                'moved_by' => $recentScan->moved_by,
+                'completed_at' => $recentScan->completed_at
+            ]);
+        }
+        
+        // Return view andon untuk delivery
+        return view('andon.deliveries', compact(
+            'deliveries', 
+            'totalNormal', 
+            'totalDelay',
+            'totalAll',
+            'recentScan'
+        ));
+    }
+
+    /**
+     * Andon reverse page untuk delivery monitoring (grouped by route & cycle)
+     */
+    public function andonReverse(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        
+        // Get all deliveries
+        $query = Delivery::query();
+        
+        // Get all data
+        $allDeliveries = $query->get();
+        
+        // Group by route and cycle
+        $grouped = $allDeliveries->groupBy(function($item) {
+            return $item->route . '|' . $item->cycle;
+        })->map(function($group) {
+            $firstItem = $group->first();
+            
+            // Calculate status for the group
+            // Jika ada satu saja yang delay, group = delay
+            $hasDelay = $group->contains(fn($item) => $item->status === 'delay');
+            $groupStatus = $hasDelay ? 'delay' : 'normal';
+            
+            $statusLabel = $groupStatus === 'delay' ? 'Delay' : 'Normal';
+            $statusBadge = $groupStatus === 'delay' ? 'bg-danger' : 'bg-success';
+            
+            return [
+                'route' => $firstItem->route,
+                'logistic_partners' => $group->pluck('logistic_partners')->unique()->filter()->implode(', '),
+                'cycle' => $firstItem->cycle,
+                'customers' => $group->pluck('customers')->unique()->filter()->implode(', '),
+                'dock' => $group->pluck('dock')->unique()->filter()->implode(', '),
+                'scan_to_delivery' => $firstItem->scan_to_delivery ? $firstItem->scan_to_delivery->format('d-m-y H:i') : null,
+                'address' => $group->pluck('address')->unique()->filter()->implode(', '),
+                'status' => $groupStatus,
+                'status_label' => $statusLabel,
+                'status_badge' => $statusBadge,
+                'no_dns' => $group->pluck('no_dn')->toArray(),
+                'dn_count' => $group->count(),
+                'scan_datetime' => $firstItem->scan_to_delivery,
+            ];
+        })->sortByDesc('scan_datetime')->values();
+        
+        // Pagination manual
+        if ($perPage === 'all') {
+            $groupedDeliveries = new \Illuminate\Pagination\LengthAwarePaginator(
+                $grouped,
+                $grouped->count(),
+                $grouped->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+            $perPageInt = (int)$perPage;
+            $currentPageItems = $grouped->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
+            
+            $groupedDeliveries = new \Illuminate\Pagination\LengthAwarePaginator(
+                $currentPageItems,
+                $grouped->count(),
+                $perPageInt,
+                $currentPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        }
+        
+        // Statistics
+        $totalNormal = $grouped->where('status', 'normal')->count();
+        $totalDelay = $grouped->where('status', 'delay')->count();
+        
+        // Get recent scan dengan fresh() untuk force reload
+        $recentScan = \App\Models\History::whereNotNull('completed_at')
+            ->orderBy('completed_at', 'desc')
+            ->first();
+        
+        return view('andon.deliveries-group', compact(
+            'groupedDeliveries',
+            'totalNormal',
+            'totalDelay',
+            'recentScan'
+        ));
     }
 }

@@ -130,7 +130,7 @@
             </div>
             
             <!-- Delay Badge -->
-            <div class="bg-danger card border-0 shadow-sm me-3 {{ $totalDelay > 0 ? 'badge-delay-blink' : '' }}">
+            <div class="bg-danger card border-0 shadow-sm me-3 ">
                 <div class="card-body p-1">
                     <div class="d-flex align-items-center">
                         <div class="bg-white bg-opacity-10 p-2 rounded me-2">

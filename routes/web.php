@@ -10,6 +10,8 @@ use App\Http\Controllers\AdmLeadTimeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\MilkrunController;
+use App\Http\Controllers\HistoryController; 
+use App\Http\Controllers\RunningTextController;
 
 use App\Http\Controllers\ShippingController;
 use Illuminate\Support\Facades\Route;
@@ -118,10 +120,38 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/{milkrun}/departure', [MilkrunController::class, 'updateDeparture'])->name('updateDeparture');
     });
 
+    // History Routes
+    Route::prefix('histories')->name('histories.')->group(function () {
+        // Index - list all
+        Route::get('/', [HistoryController::class, 'index'])->name('index');
+        
+        // Delete ALL - HARUS SEBELUM /{history}
+        Route::delete('/delete-all', [HistoryController::class, 'deleteAll'])->name('deleteAll');
+        
+        // Scan to history (dipanggil dari halaman Delivery)
+        Route::post('/scan-to-history', [HistoryController::class, 'scanToHistory'])->name('scanToHistory');
+        
+        // Parameter routes - HARUS DI PALING BAWAH
+        Route::get('/{history}', [HistoryController::class, 'show'])->name('show');
+        Route::delete('/{history}', [HistoryController::class, 'destroy'])->name('destroy');
+    });
+
+    // Running Text Routes
+    Route::get('/running-text/data', [RunningTextController::class, 'getData'])->name('running-text.data');
+    Route::post('/running-text/update', [RunningTextController::class, 'update'])->name('running-text.update')->middleware('auth');
+
+
     // Profile Routes (Breeze default)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+    Route::get('/andon/preparations', [PreparationController::class, 'andon'])->name('andon.preparations');
+    Route::get('/andon/shippings', [ShippingController::class, 'andon'])->name('andon.shippings');
+    Route::get('/andon/shippings-group', [ShippingController::class, 'andonReverse'])->name('andon.shippings.group');
+    Route::get('/andon/deliveries', [DeliveryController::class, 'andon'])->name('andon.deliveries');
+    Route::get('/andon/deliveries/group', [DeliveryController::class, 'andonReverse'])->name('andon.deliveries.group');
+    Route::get('/andon/milkruns', [MilkrunController::class, 'andon'])->name('andon.milkruns');
+
+require __DIR__.'/auth.php';    

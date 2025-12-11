@@ -19,12 +19,14 @@ class Preparation extends Model
         'dock',
         'delivery_date',
         'delivery_time',
+        'pulling_date',     
+        'pulling_time', 
         'arrival',
         'cycle',
         'address',
         'status',
         'scan_to_shipping',
-        'moved_by', // TAMBAHKAN INI
+        'moved_by',
     ];
 
     protected $casts = [

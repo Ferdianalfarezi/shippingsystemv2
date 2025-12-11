@@ -21,10 +21,20 @@ class Delivery extends Model
         'address',
         'scan_to_delivery',
         'moved_by',
+        'pulling_date',
+        'pulling_time',
+        'delivery_date',
+        'delivery_time',
+        'scan_to_shipping',
+        'arrival',
     ];
 
     protected $casts = [
         'scan_to_delivery' => 'datetime',
+        'pulling_date' => 'date',
+        'delivery_date' => 'date',
+        'scan_to_shipping' => 'datetime',
+        'arrival' => 'datetime',
     ];
 
     /**

@@ -8,6 +8,14 @@
     <!-- Stats Badges dan Dropdown di kanan -->
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
+        <!-- Scan DN to History Input -->
+        <div class="input-group" style="width: 280px;">
+            <span class="input-group-text bg-white text-dark">
+                <i class="bi bi-qr-code-scan"></i>
+            </span>
+            <input type="text" class="form-control" id="scanToHistoryInput" placeholder="Scan DN to History..." autofocus>
+        </div>
+        
         <!-- Toggle View Button -->
         <div class="card border-0 shadow-sm p-1 bg-warning">
             <a href="{{ route('deliveries.indexReverse') }}" class="btn btn-warning text-dark" title="Switch to Reverse View">
@@ -15,12 +23,14 @@
             </a>
         </div>
         
-        <!-- Delete All Button -->
-        <div class="card border-4 bg-danger">
-            <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
-                <i class="bi bi-trash-fill"></i>
-            </button>
-        </div>
+        @if(auth()->user()->role === 'superadmin')
+            <!-- Delete All Button -->
+            <div class="card border-4 bg-danger">
+                <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>
+        @endif
         
         <!-- Show By Dropdown -->
         <div class="card border-0 shadow-sm">
@@ -88,6 +98,89 @@
         
     </div>
 
+    @if($recentScan)
+    <div class="card border-0 shadow-sm mb-3 ms-3 me-3"
+     style="border-radius:0; background-color:#000000; outline:2px solid #ffffff;">
+
+        <div class="card-body py-1 px-4">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+
+                <!-- Icon & Label -->
+                <div class="d-flex align-items-center gap-2">
+                    <div>
+                        <i class="bi bi-arrow-right-circle-fill text-white fs-6"></i>
+                    </div>
+                    <small class="text-white fw-semibold" style="font-size: 0.7rem; letter-spacing: 0.5px;">RECENT SCAN</small>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- No DN -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">No DN:</small>
+                    <strong class="text-white">{{ $recentScan->no_dn }}</strong>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Route -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Route:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->route }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Dock -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Dock:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->dock }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Cycle -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Cycle:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->cycle }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Customer -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Customer:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->customers }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Moved By -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Scan by:</small>
+                    <span class="fw-semibold text-white">
+                        <i class="bi bi-person-fill"></i> {{ $recentScan->moved_by ?? 'System' }}
+                    </span>
+                </div>
+
+                <!-- Timestamp -->
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-white fw-bold">
+                        <i class="bi bi-clock-fill"></i> {{ $recentScan->completed_at->format('H:i:s') }}
+                    </span>
+                    <span class="text-white fw-bold">{{ $recentScan->completed_at->format('d/m/Y') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="table-responsive p-0 mt-0">
         <table class="table table-compact w-100 mt-1" id="deliveriesTable">
             <thead>
@@ -150,7 +243,7 @@
                     </tr>
                 @empty
                     <tr class="mt-3">
-                        <td colspan="11" class="text-center py-4">
+                        <td colspan="10" class="text-center py-4">
                             <div class="text-muted">
                                 <i class="bi bi-inbox" style="font-size: 3rem;"></i>
                                 <p class="mt-2">Belum ada data delivery</p>
@@ -177,6 +270,87 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
+
+        // ==================== SCAN DN TO HISTORY ====================
+        let scanTimeout;
+        $('#scanToHistoryInput').on('input', function() {
+            clearTimeout(scanTimeout);
+            const noDn = $(this).val().trim();
+            
+            if (noDn.length > 0) {
+                // Delay 500ms untuk menunggu scanner selesai input
+                scanTimeout = setTimeout(function() {
+                    processScanToHistory(noDn);
+                }, 500);
+            }
+        });
+
+        // Handle Enter key pada scan input
+        $('#scanToHistoryInput').on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                clearTimeout(scanTimeout);
+                const noDn = $(this).val().trim();
+                if (noDn.length > 0) {
+                    processScanToHistory(noDn);
+                }
+            }
+        });
+
+        // Function untuk proses scan DN to History
+        function processScanToHistory(noDn) {
+            // Show loading
+            Swal.fire({
+                title: 'Memproses...',
+                text: 'Memindahkan ke History',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: '{{ route("histories.scanToHistory") }}',
+                type: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    no_dn: noDn
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Clear input
+                        $('#scanToHistoryInput').val('');
+                        
+                        // Success notification
+                        Swal.fire({
+                            title: 'Berhasil!',
+                            html: `DN <strong>${response.data.no_dn}</strong> dipindahkan ke History<br>
+                                   <small>Status: ${response.data.final_status}</small>`,
+                            icon: 'success',
+                            confirmButtonColor: '#198754',
+                            timer: 2000,
+                            timerProgressBar: true
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: xhr.responseJSON?.message || 'Terjadi kesalahan',
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626',
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+                    $('#scanToHistoryInput').val('').focus();
+                }
+            });
+        }
+        // ==================== END SCAN DN TO HISTORY ====================
+
         // Delete confirmation dengan SweetAlert
         $('.delete-form').on('submit', function(e) {
             e.preventDefault();

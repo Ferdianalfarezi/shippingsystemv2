@@ -1,4 +1,4 @@
-{{-- resources/views/layouts/app.blade.php --}}
+{{-- resources/views/layouts/andon.blade.php --}}
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -36,7 +36,6 @@
             padding: 0;
             margin: 0 !important;
             padding: 0 !important;
-            padding-bottom: 80px !important;
         }
 
         /* Header Navigation */
@@ -211,32 +210,6 @@
             padding-bottom: 80px !important;
         }
 
-        /* Custom CSS untuk nested dropdown */
-        .dropdown-menu .dropend .dropdown-toggle::after {
-            display: inline-block;
-            margin-left: 0.5em;
-            vertical-align: 0.255em;
-            content: "";
-            border-top: 0.3em solid transparent;
-            border-right: 0;
-            border-bottom: 0.3em solid transparent;
-            border-left: 0.3em solid;
-        }
-
-        .dropdown-menu .dropend > .dropdown-menu {
-            top: 0;
-            left: 100%;
-            margin-top: -1px;
-        }
-
-        .dropend:hover > .dropdown-menu {
-            display: block;
-        }
-
-        .dropdown-item:hover {
-            background-color: #f8f9fa;
-        }
-
         /* Prevent horizontal scrollbar dengan word wrap */
         .table-responsive {
             overflow-x: auto;
@@ -277,176 +250,6 @@
             margin-top: -1px;
         }
 
-        .menu-item {
-            display: table-cell;
-            text-align: center;
-            padding: 10px;
-            border-top: 3px solid #fff;
-            border-left: 3px solid #fff;
-            background-color: #000000;
-            transition: background-color 0.3s;
-            position: relative;
-        }
-        
-        .menu-item:first-child {
-            border-left: none;
-        }
-
-        .menu-item:hover {
-            background-color: #555;
-        }
-
-        .menu-item a {
-            color: #fff;
-            font-weight: 500;
-            font-size: 18px;
-            text-decoration: none;
-        }
-
-        #settingsMenu {
-            padding-left: 1px !important;
-            padding-right: 1px !important;
-        }
-
-
-        .menu-item a:hover {
-            color: #dfe6e9;
-        }
-
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background-color: #fff;
-            border: 1px solid #ddd;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-            z-index: 1000;
-            padding: 0.5rem 1rem;
-            min-width: 150px;
-        }
-
-        .dropdown-menu a {
-            display: block;
-            padding: 0.5rem 0;
-            text-decoration: none;
-            color: #333;
-        }
-
-        .dropdown-menu a:hover {
-            background-color: #f1f1f1;
-        }
-
-        .menu-item:hover .dropdown-menu {
-            display: block;
-        }
-
-        .submenu {
-            display: none;
-            position: absolute;
-            left: 0;
-            top: 100%;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            min-width: 180px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            z-index: 50;
-        }
-
-        .submenu a {
-            display: block;
-            padding: 10px 15px;
-            color: #333;
-            text-decoration: none;
-            border-bottom: 1px solid #eee;
-            transition: background 0.2s;
-        }
-
-        .submenu a:last-child {
-            border-bottom: none;
-        }
-
-        .submenu a:hover {
-            background: #f5f5f5;
-        }
-
-        .submenu a i {
-            width: 20px;
-            margin-right: 8px;
-            color: #666;
-        }
-
-        
-
-        /* Floating User Info */
-        .floating-user-info {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.9);
-            border: 2px solid #333;
-            border-radius: 12px;
-            padding: 12px 16px;
-            z-index: 9999;
-            min-width: 160px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-        }
-
-        .floating-user-info:hover {
-            border-color: #ffffff;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.2);
-        }
-
-        .floating-user-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .floating-user-avatar {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #ffffff, #7c7c7c);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .floating-user-avatar i {
-            color: #000000;
-            font-size: 18px;
-        }
-
-        .floating-user-details {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .floating-user-name {
-            font-weight: 700;
-            font-size: 17px;
-            color: #ffffff;
-            line-height: 1.2;
-        }
-
-        .floating-user-role {
-            font-size: 15px;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: inline-block;
-            width: fit-content;
-        }
-
         .fixed-running-text {
             position: fixed;
             bottom: 0;
@@ -482,16 +285,6 @@
             to { transform: translateX(-100%); }
         }
 
-        .andon-toggle {
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .andon-submenu a {
-            display: block;
-            padding: 3px 0;
-        }
-
         @keyframes blink-animation {
             0%, 49% { opacity: 1; }
             50%, 99% { opacity: 0.2; }
@@ -502,7 +295,6 @@
         .blink-badge {
             animation: blink-animation 1s steps(1) infinite;
         }
-</style>
     </style>
 
     @stack('styles')
@@ -534,78 +326,6 @@
                 </div>
             </div>
         </div>
-
-        @if(auth()->user()->role !== 'lp')
-            <!-- Menu below Navbar -->
-            <div class="menu-container">
-                <div class="menu-item">
-                    <a href="{{ route('preparations.index') }}">Preparation</a>
-                </div>
-                <div class="menu-item">
-                    <a href="{{ route('shippings.index') }}">Shipping</a>
-                </div>
-                <div class="menu-item">
-                    <a href="{{ route('deliveries.index') }}">Delivery</a>
-                </div>
-                <div class="menu-item">
-                    <a href="{{ route('milkruns.index') }}">Milkrun</a>
-                </div>
-                <div class="menu-item">
-                    <a href="{{ route('histories.index') }}">History</a>
-                </div>
-                <div class="menu-item">
-                    <a href="#">Kanban</a>
-                </div>
-                @if(auth()->user()->role === 'superadmin')
-                    <div class="menu-item" id="settingsMenu">
-                        <a href="#" id="settingsBtn">More & Settings</a>
-
-                        <div class="submenu text-start" id="submenu">
-
-                            <a href="{{ route('users.index') }}">
-                                <i class="fas fa-users"></i> Users
-                            </a>
-
-                            <a href="#" id="runningTextBtn" data-bs-toggle="modal" data-bs-target="#runningTextModal">
-                                <i class="fas fa-scroll"></i> Running Text
-                            </a>
-
-                            {{-- MENU ANDON UTAMA (klik untuk collapse) --}}
-                            <a href="#" class="andon-toggle d-flex justify-content-between align-items-center">
-                                <span><i class="fas fa-desktop"></i> Andon</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </a>
-
-                            {{-- SUBMENU ANDON --}}
-                            <div class="andon-submenu mt-1 mb-1" style="display: none; padding-left: 40px;">
-                                <a href="{{ route('andon.preparations') }}" target="_blank" style="font-size:15px; opacity:0.7;">
-                                    • Preparations
-                                </a>
-                                <a href="{{ route('andon.shippings.group') }}" target="_blank" style="font-size:15px; opacity:0.7;">
-                                    • Shippings
-                                </a>
-                                <a href="{{ route('andon.deliveries') }}" target="_blank" style="font-size:15px; opacity:0.7;">
-                                    • Deliveries
-                                </a>
-                                <a href="{{ route('andon.milkruns') }}" target="_blank" style="font-size:15px; opacity:0.7;">
-                                    • Milkruns
-                                </a>
-                            </div>
-
-                        </div>
-                    </div>
-                @endif
-
-                <div class="menu-item">
-                    <a href="#" onclick="confirmLogout(event);">Logout</a>
-                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                        @csrf
-                    </form>
-                </div>
-            </div>
-
-            
-        @endif
     </nav>
 
     <!-- Main Content -->
@@ -613,36 +333,7 @@
         @yield('content')
     </main>
 
-    <!-- Floating User Info -->
-    @auth
-    <div class="floating-user-info mb-5">
-        <div class="floating-user-content">
-            <div class="floating-user-avatar">
-                @if(auth()->user()->id == 7)
-                    <img src="{{ asset('images/user7.png') }}" 
-                         alt="User Photo" 
-                         style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%;">
-                @else
-                    <i class="fas fa-user"></i>
-                @endif
-            </div>
-
-            <div class="floating-user-details">
-                <div class="floating-user-name">{{ auth()->user()->name }}</div>
-                @php
-                    $role = auth()->user()->role ?? 'user';
-                    $roleClass = match($role) {
-                        'admin' => 'role-admin',
-                        'operator' => 'role-operator',
-                        'lp' => 'role-lp',
-                        default => 'role-default'
-                    };
-                @endphp
-                <span class="{{ $roleClass }}">{{ $role }}</span>
-            </div>
-        </div>
-    </div>
-    @endauth
+    
 
     @php
         $runningText = \App\Models\RunningText::getActive();
@@ -780,16 +471,6 @@
                 }
             });
         }
-
-        document.addEventListener("DOMContentLoaded", function() {
-            const btn = document.querySelector(".andon-toggle");
-            const submenu = document.querySelector(".andon-submenu");
-
-            btn.addEventListener("click", function(e) {
-                e.preventDefault();
-                submenu.style.display = submenu.style.display === "none" ? "block" : "none";
-            });
-        });
     </script>
 
     @stack('scripts')

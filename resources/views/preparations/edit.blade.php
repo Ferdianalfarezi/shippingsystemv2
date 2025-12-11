@@ -110,7 +110,7 @@
                             <!-- Pulling Date -->
                             <div class="mb-3">
                                 <label for="edit_pulling_date" class="form-label text-dark">Pulling Date <span class="text-danger">*</span></label>
-                                <input type="date"  
+                                <input type="date"
                                        class="form-control" 
                                        id="edit_pulling_date" 
                                        name="pulling_date" 
@@ -121,7 +121,7 @@
                             <!-- Pulling Time -->
                             <div class="mb-3">
                                 <label for="edit_pulling_time" class="form-label text-dark">Pulling Time <span class="text-danger">*</span></label>
-                                <input type="time" 
+                                <input type="time"
                                        class="form-control" 
                                        id="edit_pulling_time" 
                                        name="pulling_time" 

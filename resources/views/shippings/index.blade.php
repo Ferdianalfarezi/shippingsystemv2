@@ -13,7 +13,7 @@
             <a href="{{ route('shippings.indexReverse') }}" class="btn btn-warning" title="Switch to Reverse View">
                 <i class="fa-solid fa-truck"></i>
             </a>
-        </div>
+        </div>  
         
         <!-- Scan DN Input (langsung tanpa modal) -->
         <div class="input-group" style="width: 280px;">
@@ -23,12 +23,14 @@
             <input type="text" class="form-control" id="scanDnInput" placeholder="Scan DN to Delivery..." autofocus>
         </div>
         
-        <!-- Delete All Button -->
-        <div class="card border-4 bg-danger">
-            <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
-                <i class="bi bi-trash-fill"></i>
-            </button>
-        </div>
+        @if(auth()->user()->role === 'superadmin')
+            <!-- Delete All Button -->
+            <div class="card border-4 bg-danger">
+                <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>
+        @endif
         
         <!-- Show By Dropdown -->
         <div class="card border-0 shadow-sm">

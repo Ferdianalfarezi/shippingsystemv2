@@ -416,4 +416,67 @@ class MilkrunController extends Controller
             ], 500);
         }
     }
+
+     public function andon(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        
+        // Date filter - default hari ini
+        $dateFilter = $request->get('date', Carbon::today()->format('Y-m-d'));
+        
+        // HANYA tampilkan milkrun yang sudah ada arrival (tidak ada pending)
+        $query = Milkrun::whereNotNull('arrival');
+        
+        // Filter berdasarkan delivery_date
+        if ($dateFilter) {
+            $query->whereDate('delivery_date', $dateFilter);
+        }
+        
+        // Order by delivery datetime
+        $query->orderByRaw("CONCAT(delivery_date, ' ', delivery_time) ASC");
+        
+        // Pagination atau all
+        if ($perPage === 'all') {
+            $milkruns = $query->get();
+            $milkruns = new \Illuminate\Pagination\LengthAwarePaginator(
+                $milkruns,
+                $milkruns->count(),
+                $milkruns->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $milkruns = $query->paginate((int)$perPage)->withQueryString();
+        }
+        
+        // Statistics (TANPA PENDING) - filtered by date juga
+        $statsQuery = Milkrun::whereNotNull('arrival');
+        if ($dateFilter) {
+            $statsQuery->whereDate('delivery_date', $dateFilter);
+        }
+        
+        $totalAll = (clone $statsQuery)->count();
+        $totalAdvance = (clone $statsQuery)->where('status', 'advance')->count();
+        $totalOnTime = (clone $statsQuery)->where('status', 'on_time')->count();
+        $totalDelay = (clone $statsQuery)->where('status', 'delay')->count();
+        
+        // DEBUG: Log milkrun data (optional, bisa dihapus di production)
+        \Log::info('Milkrun Andon Data:', [
+            'date_filter' => $dateFilter,
+            'total_all' => $totalAll,
+            'total_advance' => $totalAdvance,
+            'total_on_time' => $totalOnTime,
+            'total_delay' => $totalDelay,
+        ]);
+        
+        // Return view andon untuk milkrun
+        return view('andon.milkruns', compact(
+            'milkruns', 
+            'totalAll', 
+            'totalAdvance', 
+            'totalOnTime', 
+            'totalDelay',
+            'dateFilter'
+        ));
+    }
 }

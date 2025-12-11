@@ -147,6 +147,8 @@ class ShippingController extends Controller
                 'status' => $status,
                 'scan_to_shipping' => Carbon::now(),
                 'moved_by' => $movedBy,
+                'pulling_date' => $preparation->pulling_date,
+                'pulling_time' => $preparation->pulling_time,
             ]);
             
             // Delete preparation permanently
@@ -211,6 +213,12 @@ class ShippingController extends Controller
             'status' => 'pending',
             'scan_to_delivery' => $now,
             'moved_by' => $movedBy,
+            'pulling_date' => $shipping->pulling_date,
+            'pulling_time' => $shipping->pulling_time,
+            'delivery_date' => $shipping->delivery_date,
+            'delivery_time' => $shipping->delivery_time,
+            'scan_to_shipping' => $shipping->scan_to_shipping,
+            'arrival' => $shipping->arrival,
         ]);
         
         // HANYA create/update milkrun jika arrival sudah terisi
@@ -291,6 +299,12 @@ class ShippingController extends Controller
             'status' => 'pending',
             'scan_to_delivery' => $now,
             'moved_by' => $movedBy,
+            'pulling_date' => $shipping->pulling_date,
+            'pulling_time' => $shipping->pulling_time,
+            'delivery_date' => $shipping->delivery_date,
+            'delivery_time' => $shipping->delivery_time,
+            'scan_to_shipping' => $shipping->scan_to_shipping,
+            'arrival' => $shipping->arrival,
         ]);
         
         // HANYA create/update milkrun jika arrival sudah terisi
@@ -391,6 +405,12 @@ class ShippingController extends Controller
                 'status' => 'pending',
                 'scan_to_delivery' => $now,
                 'moved_by' => $movedBy,
+                'pulling_date' => $shipping->pulling_date,
+                'pulling_time' => $shipping->pulling_time,
+                'delivery_date' => $shipping->delivery_date,
+                'delivery_time' => $shipping->delivery_time,
+                'scan_to_shipping' => $shipping->scan_to_shipping,
+                'arrival' => $shipping->arrival,
             ]);
             
             // Pisahkan berdasarkan arrival
@@ -1017,6 +1037,169 @@ class ShippingController extends Controller
             'totalNormal',
             'totalDelay',
             'totalOnLoading'
+        ));
+    }
+
+    public function andon(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        
+        // Query dasar - sama seperti index tapi tanpa search
+        $query = Shipping::query();
+        
+        // Order by delivery datetime (yang paling dekat di atas)
+        $query->orderByRaw("CONCAT(delivery_date, ' ', delivery_time) ASC");
+        
+        // Pagination atau all
+        if ($perPage === 'all') {
+            $shippings = $query->get();
+            $shippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $shippings,
+                $shippings->count(),
+                $shippings->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $shippings = $query->paginate((int)$perPage)->withQueryString();
+        }
+        
+        // Hitung statistik
+        $totalAll = Shipping::count();
+        $totalAdvance = Shipping::whereNull('arrival')
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) > DATE_ADD(NOW(), INTERVAL 15 MINUTE)")
+            ->count();
+        $totalNormal = Shipping::whereNull('arrival')
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 15 MINUTE)")
+            ->count();
+        $totalDelay = Shipping::whereNull('arrival')
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) < NOW()")
+            ->count();
+        $totalOnLoading = Shipping::whereNotNull('arrival')->count();
+        
+        // Get recent scan dengan fresh() untuk force reload
+        $recentScan = \App\Models\Delivery::whereNotNull('scan_to_delivery')
+            ->orderBy('scan_to_delivery', 'desc')
+            ->first();
+        
+        // DEBUG: Log recent scan data (optional)
+        if ($recentScan) {
+            \Log::info('Recent Scan Data (Shipping Andon):', [
+                'no_dn' => $recentScan->no_dn,
+                'moved_by' => $recentScan->moved_by,
+                'scan_time' => $recentScan->scan_to_delivery
+            ]);
+        }
+        
+        // Return view andon untuk shipping
+        return view('andon.shippings', compact(
+            'shippings', 
+            'totalAdvance', 
+            'totalNormal', 
+            'totalDelay', 
+            'totalOnLoading',
+            'totalAll',
+            'recentScan'
+        ));
+    }
+
+    public function andonReverse(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        
+        // Get all shippings
+        $query = Shipping::query();
+        
+        // Get all data
+        $allShippings = $query->get();
+        
+        // Group by route and cycle
+        $grouped = $allShippings->groupBy(function($item) {
+            return $item->route . '|' . $item->cycle;
+        })->map(function($group) {
+            $firstItem = $group->first();
+            
+            // Calculate status for the group
+            if ($firstItem->arrival !== null) {
+                $statusLabel = 'On Loading';
+                $statusBadge = 'bg-primary';
+            } else {
+                $deliveryDateTime = Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time);
+                $now = Carbon::now();
+                $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
+                
+                if ($now->greaterThan($deliveryDateTime)) {
+                    $statusLabel = 'Delay';
+                    $statusBadge = 'bg-danger';
+                } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+                    $statusLabel = 'Normal';
+                    $statusBadge = 'bg-success';
+                } else {
+                    $statusLabel = 'Advance';
+                    $statusBadge = 'bg-warning';
+                }
+            }
+            
+            return [
+                'route' => $firstItem->route,
+                'logistic_partners' => $group->pluck('logistic_partners')->unique()->filter()->implode(', '),
+                'cycle' => $firstItem->cycle,
+                'customers' => $group->pluck('customers')->unique()->filter()->implode(', '),
+                'dock' => $group->pluck('dock')->unique()->filter()->implode(', '),
+                'delivery_date' => $firstItem->delivery_date->format('d-m-y'),
+                'delivery_time' => date('H:i:s', strtotime($firstItem->delivery_time)),
+                'arrival' => $firstItem->arrival ? $firstItem->arrival->format('d-m-y H:i') : null,
+                'address' => $group->pluck('address')->unique()->filter()->implode(', '),
+                'status_label' => $statusLabel,
+                'status_badge' => $statusBadge,
+                'no_dns' => $group->pluck('no_dn')->toArray(),
+                'dn_count' => $group->count(),
+                'delivery_datetime' => Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time),
+                'has_arrival' => $firstItem->arrival !== null,
+            ];
+        })->sortBy('delivery_datetime')->values();
+        
+        // Pagination manual
+        if ($perPage === 'all') {
+            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $grouped,
+                $grouped->count(),
+                $grouped->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+            $perPageInt = (int)$perPage;
+            $currentPageItems = $grouped->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
+            
+            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $currentPageItems,
+                $grouped->count(),
+                $perPageInt,
+                $currentPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        }
+        
+        // Statistics
+        $totalAdvance = $grouped->where('status_label', 'Advance')->count();
+        $totalNormal = $grouped->where('status_label', 'Normal')->count();
+        $totalDelay = $grouped->where('status_label', 'Delay')->count();
+        $totalOnLoading = $grouped->where('status_label', 'On Loading')->count();
+        
+        // Get recent scan dengan fresh() untuk force reload
+        $recentScan = \App\Models\Delivery::whereNotNull('scan_to_delivery')
+            ->orderBy('scan_to_delivery', 'desc')
+            ->first();
+        
+        return view('andon.shippings-group', compact(
+            'groupedShippings',
+            'totalAdvance',
+            'totalNormal',
+            'totalDelay',
+            'totalOnLoading',
+            'recentScan'
         ));
     }
 }

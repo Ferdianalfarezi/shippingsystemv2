@@ -69,6 +69,89 @@
         </div>
     </div>
 
+     @if($recentScan)
+    <div class="card border-0 shadow-sm mb-3 ms-3 me-3"
+     style="border-radius:0; background-color:#000000; outline:2px solid #ffffff;">
+
+        <div class="card-body py-1 px-4">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+
+                <!-- Icon & Label -->
+                <div class="d-flex align-items-center gap-2">
+                    <div>
+                        <i class="bi bi-arrow-right-circle-fill text-white fs-6"></i>
+                    </div>
+                    <small class="text-white fw-semibold" style="font-size: 0.7rem; letter-spacing: 0.5px;">RECENT SCAN</small>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- No DN -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">No DN:</small>
+                    <strong class="text-white">{{ $recentScan->no_dn }}</strong>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Route -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Route:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->route }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Dock -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Dock:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->dock }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Cycle -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Cycle:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->cycle }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Customer -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Customer:</small>
+                    <span class="fw-semibold text-white">{{ $recentScan->customers }}</span>
+                </div>
+
+                <!-- Vertical Divider -->
+                <div class="vr" style="height: 30px; opacity: 0.2;"></div>
+
+                <!-- Moved By -->
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-white" style="font-size: 1rem;">Scan by:</small>
+                    <span class="fw-semibold text-white">
+                        <i class="bi bi-person-fill"></i> {{ $recentScan->moved_by ?? 'System' }}
+                    </span>
+                </div>
+
+                <!-- Timestamp -->
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-white fw-bold">
+                        <i class="bi bi-clock-fill"></i> {{ $recentScan->completed_at->format('H:i:s') }}
+                    </span>
+                    <span class="text-white fw-bold">{{ $recentScan->completed_at->format('d/m/Y') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="table-responsive p-0 mt-0">
         <table class="table table-compact w-100 mt-1" id="deliveriesReverseTable">
             <thead>
