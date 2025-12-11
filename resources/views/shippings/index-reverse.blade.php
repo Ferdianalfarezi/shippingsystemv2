@@ -146,12 +146,13 @@
                             {{ $formattedAddress }}
                         </td>
 
-                        <td>
-                            <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 text-uppercase mt-1 mb-1">
+                       <td>
+                            <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 text-uppercase mt-1 mb-1
+                                {{ strtolower($group['status_label']) === 'delay' ? 'blink-badge' : '' }}">
+                                
                                 {{ $group['status_label'] }}
                             </span>
                         </td>
-
                         <td>
                             <div class="btn-group" role="group">
                                 <button 

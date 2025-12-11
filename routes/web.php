@@ -39,7 +39,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/preparations/import-adm', [App\Http\Controllers\ImportAdmController::class, 'import'])->name('preparations.import-adm');
     Route::get('/preparations/find-by-dn', [App\Http\Controllers\PreparationController::class, 'findByDn'])
     ->name('preparations.findByDn');
-
+    Route::get('/preparations/scan', [PreparationController::class, 'scan'])->name('preparations.scan');
     // Preparations CRUD
     Route::resource('preparations', PreparationController::class);
 

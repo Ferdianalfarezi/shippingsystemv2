@@ -28,17 +28,19 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         // Tambah flash message
-        session()->flash('success', 'Selamat datang!.');
+        session()->flash('success', 'Selamat datang !');
 
         // Cek role user
         if (Auth::user()->role === 'lp') {
             return redirect()->route('shippings.checkingLp');
         }
 
+        if (Auth::user()->role === 'scanner') {
+            return redirect()->route('preparations.scan');
+        }
+
         return redirect()->route('preparations.index');
     }
-
-
 
     /**
      * Destroy an authenticated session.

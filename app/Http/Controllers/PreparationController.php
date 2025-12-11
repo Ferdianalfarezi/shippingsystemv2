@@ -333,4 +333,19 @@ class PreparationController extends Controller
         // Return view andon
         return view('andon.preparations', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll', 'recentScan'));
     }
+
+    public function scan()
+    {
+        // Total counts
+        $totalPreparations = Preparation::count();
+        $totalShippings = \App\Models\Shipping::count();
+        
+        // Get recent scans (10 terakhir)
+        $recentScans = \App\Models\Shipping::whereNotNull('scan_to_shipping')
+            ->orderBy('scan_to_shipping', 'desc')
+            ->limit(5)
+            ->get();
+        
+        return view('preparations.scan', compact('totalPreparations', 'totalShippings', 'recentScans'));
+    }
 }

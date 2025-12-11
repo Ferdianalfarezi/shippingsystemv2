@@ -1,41 +1,89 @@
 <x-guest-layout>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
+    <style>
+        /* Input styling override */
+        .form-control {
+            border-radius: 6px !important;
+            border: 1px solid #ccc !important;
+            box-shadow: none !important;
+        }
 
-        <!-- Username -->
-        <div>
-            <x-input-label for="username" :value="__('Username')" />
-            <x-text-input id="username" class="block mt-1 w-full" type="text" name="username" :value="old('username')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('username')" class="mt-2" />
-        </div>
+        .form-control:focus {
+            border-color: #ffffff !important;
+            box-shadow: 0 0 4px rgba(120, 120, 120, 0.4) !important;
+        }
+    </style>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
+    <!-- Bootstrap Login Card -->
+    <div class="card shadow-sm p-5"
+     style="max-width: 420px; width: 100%; border-radius: 12px; 
+            background-color: rgba(255, 255, 255, 0.821);">
 
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
+        <!-- Session Status -->
+        @if (session('status'))
+            <div class="alert alert-success text-center mb-3">
+                {{ session('status') }}
+            </div>
+        @endif
 
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
+        <h2 class="text-center mb-4 fs-4 fw-bolder">LOGIN</h2>
 
-        <!-- Pastikan checkbox "Remember Me" ada dan checked by default -->
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="remember" id="remember" checked>
-            <label class="form-check-label" for="remember">
-                Ingat Saya
-            </label>
-        </div>
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
-        </div>
-    </form>
+        <form method="POST" action="{{ route('login') }}">
+            @csrf
+
+            <!-- Username -->
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input 
+                    id="username" 
+                    type="text" 
+                    class="form-control @error('username') is-invalid @enderror"
+                    name="username"
+                    value="{{ old('username') }}"
+                    required 
+                    autofocus
+                >
+                @error('username')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input 
+                    id="password"  
+                    type="password"  
+                    class="form-control @error('password') is-invalid @enderror"
+                    name="password" 
+                    required
+                >
+                @error('password')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <!-- Remember Me -->
+            <div class="form-check mb-3">
+                <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="remember" 
+                    name="remember" 
+                    checked
+                >
+                <label class="form-check-label" for="remember">Ingat Saya</label>
+            </div>
+
+            <!-- Button -->
+            <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-dark px-4">
+                    Log in
+                </button>
+            </div>
+
+        </form>
+    </div>
+
 </x-guest-layout>

@@ -13,8 +13,24 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'auth' => \App\Http\Middleware\Authenticate::class,
-            'guest' => \Illuminate\Auth\Middleware\RedirectIfAuthenticated::class,
+            'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         ]);
+        
+        $middleware->redirectGuestsTo('/login');
+        
+        $middleware->redirectUsersTo(function ($request) {
+            $user = $request->user();
+            
+            if ($user->role === 'lp') {
+                return route('shippings.checkingLp');
+            }
+            
+            if ($user->role === 'scanner') {
+                return route('preparations.scan');
+            }
+            
+            return route('preparations.index');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

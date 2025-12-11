@@ -227,35 +227,6 @@
 @endsection
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-
-@push('styles')
-<style>
-    /* Spin animation on hover */
-    .spin-on-hover {
-        transition: transform 0.3s ease;
-    }
-    
-    .btn:hover .spin-on-hover {
-        transform: rotate(180deg);
-    }
-
-    /* Delay row highlight */
-    .table-danger-subtle {
-        background-color: rgba(220, 53, 69, 0.1) !important;
-    }
-
-    /* Delay badge animation */
-    .badge-delay {
-        animation: pulse-delay 1.5s infinite;
-    }
-
-    @keyframes pulse-delay {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-</style>
-@endpush
-
 @push('scripts')
 <script>
     $(document).ready(function() {
