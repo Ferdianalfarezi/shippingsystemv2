@@ -14,6 +14,7 @@ use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\RunningTextController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\ShippingController;
+use App\Http\Controllers\KanbanTmminsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -136,12 +137,22 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{history}', [HistoryController::class, 'destroy'])->name('destroy');
     });
 
-    // Import Excel
-Route::get('addresses/import', [AddressController::class, 'importPage'])->name('addresses.import.page');
-Route::post('addresses/import', [AddressController::class, 'import'])->name('addresses.import');
+    Route::prefix('kanbantmmins')->name('kanbantmmins.')->group(function () {
+    Route::get('/', [KanbanTmminsController::class, 'index'])->name('index');
+    Route::post('/import', [KanbanTmminsController::class, 'importTxt'])->name('import');
+    Route::get('/print/{id}', [KanbanTmminsController::class, 'print'])->name('print');
+    Route::get('/printall', [KanbanTmminsController::class, 'printAll'])->name('printall');
+    Route::get('/print-selected', [KanbanTmminsController::class, 'printSelected'])->name('printselected');
+    Route::post('/print-group', [KanbanTmminsController::class, 'printGroup'])->name('printgroup');
+    Route::delete('/{id}', [KanbanTmminsController::class, 'destroy'])->name('destroy');
+});
 
-// Address CRUD (tanpa show)
-Route::resource('addresses', AddressController::class)->except(['show']);
+    // Import Excel
+    Route::get('addresses/import', [AddressController::class, 'importPage'])->name('addresses.import.page');
+    Route::post('addresses/import', [AddressController::class, 'import'])->name('addresses.import');
+
+    // Address CRUD (tanpa show)
+    Route::resource('addresses', AddressController::class)->except(['show']);
 
 
     

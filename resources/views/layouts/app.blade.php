@@ -554,7 +554,7 @@
                     <a href="{{ route('histories.index') }}">History</a>
                 </div>
                 <div class="menu-item">
-                    <a href="#">Kanban</a>
+                    <a href="{{ route('kanbantmmins.index') }}">Kanban</a>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
                     <div class="menu-item" id="settingsMenu">
