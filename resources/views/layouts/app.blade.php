@@ -562,16 +562,20 @@
 
                         <div class="submenu text-start" id="submenu">
 
-                            <a href="{{ route('users.index') }}">
-                                <i class="fas fa-users"></i> Users
+                            <a href="{{ route('users.index') }}" class="fs-6">
+                                <i class="fas fa-users fs-6"></i> Users
                             </a>
 
-                            <a href="#" id="runningTextBtn" data-bs-toggle="modal" data-bs-target="#runningTextModal">
+                            <a href="#" id="runningTextBtn" class="fs-6" data-bs-toggle="modal" data-bs-target="#runningTextModal">
                                 <i class="fas fa-scroll"></i> Running Text
                             </a>
 
+                            <a href="{{ route('addresses.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> TMMIN Address
+                            </a>
+
                             {{-- MENU ANDON UTAMA (klik untuk collapse) --}}
-                            <a href="#" class="andon-toggle d-flex justify-content-between align-items-center">
+                            <a href="#" class="andon-toggle d-flex justify-content-between align-items-center fs-6">
                                 <span><i class="fas fa-desktop"></i> Andon</span>
                                 <i class="fas fa-chevron-down"></i>
                             </a>

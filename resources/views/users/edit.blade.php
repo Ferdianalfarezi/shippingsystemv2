@@ -9,8 +9,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="editUserForm" method="POST">
-                @csrf
-                @method('PUT')
+                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="_method" value="PUT">
                 <input type="hidden" id="edit_user_id" name="user_id">
                 
                 <div class="modal-body">
@@ -70,6 +70,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     $(document).ready(function() {
         // Toggle password visibility for edit modal
@@ -104,12 +105,15 @@
             e.preventDefault();
             
             const userId = $('#edit_user_id').val();
-            const formData = $(this).serialize();
+            
+            // Debug - cek data yang dikirim
+            console.log('Submitting to: /users/' + userId);
+            console.log('Form data:', $(this).serialize());
             
             $.ajax({
                 url: '/users/' + userId,
                 type: 'POST',
-                data: formData,
+                data: $(this).serialize(),
                 success: function(response) {
                     $('#editUserModal').modal('hide');
                     
@@ -123,6 +127,8 @@
                     });
                 },
                 error: function(xhr) {
+                    console.log('Error:', xhr); // Debug
+                    
                     let errorMessage = 'Terjadi kesalahan saat mengupdate user';
                     
                     if (xhr.responseJSON && xhr.responseJSON.errors) {
@@ -152,3 +158,4 @@
         });
     });
 </script>
+@endpush

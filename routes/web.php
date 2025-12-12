@@ -12,7 +12,7 @@ use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\MilkrunController;
 use App\Http\Controllers\HistoryController; 
 use App\Http\Controllers\RunningTextController;
-
+use App\Http\Controllers\AddressController;
 use App\Http\Controllers\ShippingController;
 use Illuminate\Support\Facades\Route;
 
@@ -136,10 +136,20 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{history}', [HistoryController::class, 'destroy'])->name('destroy');
     });
 
+    // Import Excel
+Route::get('addresses/import', [AddressController::class, 'importPage'])->name('addresses.import.page');
+Route::post('addresses/import', [AddressController::class, 'import'])->name('addresses.import');
+
+// Address CRUD (tanpa show)
+Route::resource('addresses', AddressController::class)->except(['show']);
+
+
+    
+
     // Running Text Routes
     Route::get('/running-text/data', [RunningTextController::class, 'getData'])->name('running-text.data');
     Route::post('/running-text/update', [RunningTextController::class, 'update'])->name('running-text.update')->middleware('auth');
-
+    
 
     // Profile Routes (Breeze default)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
