@@ -51,7 +51,7 @@ class Preparation extends Model
                 return 'delay';
             }
             
-            return 'normal';
+            return 'open';
         } catch (\Exception $e) {
             return 'unknown';
         }
@@ -66,7 +66,7 @@ class Preparation extends Model
         switch ($this->status) {
             case 'delay':
                 return 'bg-danger';
-            case 'normal':
+            case 'open':
                 return 'bg-success';
             default:
                 return 'bg-secondary';
@@ -81,8 +81,8 @@ class Preparation extends Model
         switch ($this->status) {
             case 'delay':
                 return 'DELAY';
-            case 'normal':
-                return 'NORMAL';
+            case 'open':
+                return 'OPEN';
             default:
                 return 'UNKNOWN';
         }

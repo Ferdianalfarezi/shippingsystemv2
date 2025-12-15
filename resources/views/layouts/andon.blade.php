@@ -307,7 +307,7 @@
             <div class="table-row">
                 <!-- Logo -->
                 <div class="table-cell logo-cell">
-                    <a href="{{ route('dashboard') }}">
+                    {{-- <a href="{{ route('dashboard') }}"> --}}
                         <img src="{{ asset('images/logostep.png') }}" alt="Logo" class="logo">
                     </a>
                 </div>
@@ -472,7 +472,7 @@
             });
         }
     </script>
-
+    @include('partials.ad-player')
     @stack('scripts')
 </body>
 </html>

@@ -99,7 +99,7 @@
                     <th>Manifest No</th>
                     <th>Part No</th>
                     <th>Part Name</th>
-                    <th>Dock Code</th>
+                    <th>Dock</th>
                     <th>Address</th>
                     <th>PCS</th>
                     <th>Route</th>
@@ -150,7 +150,7 @@
     </div>
 
     <!-- Pagination Info & Controls -->
-    <div class="d-flex justify-content-between align-items-center mt-3" id="paginationContainer">
+    <div class="d-flex justify-content-between align-items-center mt-3 me-3" id="paginationContainer">
         <div class="text-muted" id="paginationInfo">
             Showing <span id="showingFrom">1</span> to <span id="showingTo">10</span> of <span id="totalFiltered">{{ count($kanbantmmins) }}</span> entries
         </div>

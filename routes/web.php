@@ -15,6 +15,7 @@ use App\Http\Controllers\RunningTextController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\KanbanTmminsController;
+use App\Http\Controllers\AdvertisementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -138,14 +139,23 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::prefix('kanbantmmins')->name('kanbantmmins.')->group(function () {
-    Route::get('/', [KanbanTmminsController::class, 'index'])->name('index');
-    Route::post('/import', [KanbanTmminsController::class, 'importTxt'])->name('import');
-    Route::get('/print/{id}', [KanbanTmminsController::class, 'print'])->name('print');
-    Route::get('/printall', [KanbanTmminsController::class, 'printAll'])->name('printall');
-    Route::get('/print-selected', [KanbanTmminsController::class, 'printSelected'])->name('printselected');
-    Route::post('/print-group', [KanbanTmminsController::class, 'printGroup'])->name('printgroup');
-    Route::delete('/{id}', [KanbanTmminsController::class, 'destroy'])->name('destroy');
-});
+        Route::get('/', [KanbanTmminsController::class, 'index'])->name('index');
+        Route::post('/import', [KanbanTmminsController::class, 'importTxt'])->name('import');
+        Route::get('/print/{id}', [KanbanTmminsController::class, 'print'])->name('print');
+        Route::get('/printall', [KanbanTmminsController::class, 'printAll'])->name('printall');
+        Route::get('/print-selected', [KanbanTmminsController::class, 'printSelected'])->name('printselected');
+        Route::post('/print-group', [KanbanTmminsController::class, 'printGroup'])->name('printgroup');
+        Route::delete('/{id}', [KanbanTmminsController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('advertisements')->name('advertisements.')->group(function () {
+        Route::get('/', [AdvertisementController::class, 'index'])->name('index');
+        Route::post('/', [AdvertisementController::class, 'store'])->name('store');
+        Route::get('/{advertisement}/edit', [AdvertisementController::class, 'edit'])->name('edit');
+        Route::put('/{advertisement}', [AdvertisementController::class, 'update'])->name('update');
+        Route::delete('/{advertisement}', [AdvertisementController::class, 'destroy'])->name('destroy');
+        Route::post('/{advertisement}/toggle', [AdvertisementController::class, 'toggleActive'])->name('toggle');
+    });
 
     // Import Excel
     Route::get('addresses/import', [AddressController::class, 'importPage'])->name('addresses.import.page');
@@ -153,9 +163,6 @@ Route::middleware(['auth'])->group(function () {
 
     // Address CRUD (tanpa show)
     Route::resource('addresses', AddressController::class)->except(['show']);
-
-
-    
 
     // Running Text Routes
     Route::get('/running-text/data', [RunningTextController::class, 'getData'])->name('running-text.data');
@@ -174,5 +181,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/andon/deliveries', [DeliveryController::class, 'andon'])->name('andon.deliveries');
     Route::get('/andon/deliveries/group', [DeliveryController::class, 'andonReverse'])->name('andon.deliveries.group');
     Route::get('/andon/milkruns', [MilkrunController::class, 'andon'])->name('andon.milkruns');
+
+    Route::get('/api/advertisements/current', [AdvertisementController::class, 'checkCurrentAd'])->name('api.advertisements.current');
 
 require __DIR__.'/auth.php';    

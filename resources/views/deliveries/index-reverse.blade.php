@@ -183,7 +183,7 @@
                                 $numbers = array_map(function($addr) {
                                     return trim(str_replace('Shipping', '', $addr));
                                 }, $addresses);
-                                $formattedAddress = 'D- ' . implode(',', $numbers);
+                                $formattedAddress = 'S- ' . implode(',', $numbers);
                             @endphp
 
                             {{ $formattedAddress }}

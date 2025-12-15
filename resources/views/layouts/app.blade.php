@@ -515,7 +515,7 @@
             <div class="table-row">
                 <!-- Logo -->
                 <div class="table-cell logo-cell">
-                    <a href="{{ route('dashboard') }}">
+                    {{-- <a href="{{ route('dashboard') }}"> --}}
                         <img src="{{ asset('images/logostep.png') }}" alt="Logo" class="logo">
                     </a>
                 </div>
@@ -568,6 +568,10 @@
 
                             <a href="#" id="runningTextBtn" class="fs-6" data-bs-toggle="modal" data-bs-target="#runningTextModal">
                                 <i class="fas fa-scroll"></i> Running Text
+                            </a>
+
+                            <a href="{{ route('advertisements.index') }}" class="fs-6">
+                                <i class="fas fa-ad"></i> Iklan
                             </a>
 
                             <a href="{{ route('addresses.index') }}" class="fs-6">
@@ -795,6 +799,8 @@
             });
         });
     </script>
+
+    @include('partials.ad-player')
 
     @stack('scripts')
 </body>

@@ -906,7 +906,14 @@
                     <div class="daparture-box-content">
                         <div>
                         <div class="date-time-value">
-                                {{ ($currentNote && $currentNote->departure_time) ? \Carbon\Carbon::parse($currentNote->departure_time)->format('d/m Y-H:i') : '' }}
+                                @if($currentNote && $currentNote->departure_time)
+                                    @php
+                                        $dt = \Carbon\Carbon::parse($currentNote->departure_time);
+                                    @endphp
+
+                                    <strong style="font-size: 1.2em;">{{ $dt->format('d/m') }}</strong>
+                                    {{ $dt->format(' Y-H:i') }}
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -915,7 +922,14 @@
                     <div class="arrival-box-header">ARRIVAL TIME</div>
                     <div class="arrival-box-content">
                         <div>
-                            {{ ($currentNote && $currentNote->arrival_time) ? \Carbon\Carbon::parse($currentNote->arrival_time)->format('d/m Y-H:i') : '' }}
+                            @if($currentNote && $currentNote->arrival_time)
+                                @php
+                                    $dt = \Carbon\Carbon::parse($currentNote->arrival_time);
+                                @endphp
+
+                                <strong style="font-size: 1.2em;">{{ $dt->format('d/m') }}</strong>
+                                {{ $dt->format(' Y-H:i') }}
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -1097,7 +1111,17 @@
                             <span>OUT</span>
                         </div>
                       <div class="out-box-content">
-                            {{ ($currentNote && $currentNote->out_time) ? \Carbon\Carbon::parse($currentNote->out_time)->format('d/m Y-H:i') : '' }}
+                            @if($currentNote && $currentNote->out_time)
+                                @php
+                                    $dt = \Carbon\Carbon::parse($currentNote->out_time);
+                                @endphp
+
+                                <strong style="font-size: 1.2em;">
+                                    {{ $dt->format('d/m') }}&nbsp;
+                                </strong>
+                                {{ $dt->format(' Y-H:i') }}
+
+                            @endif
                         </div>
                     </div>
                     
