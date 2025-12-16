@@ -41,9 +41,16 @@
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
         <!-- Delete All Button -->
-        <div class="card border-4 bg-danger">
+        <div class="card border-0 shadow-sm p-1 bg-danger">
             <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
                 <i class="bi bi-trash-fill"></i>
+            </button>
+        </div>
+
+        <!-- Print Delay Button -->
+        <div class="card border-0 shadow-sm p-1 bg-secondary">
+            <button type="button" class="btn btn-secondary" id="openPrintDelayModal" title="Print Data Delay">
+                <i class="bi bi-printer-fill"></i>
             </button>
         </div>
         
@@ -162,7 +169,9 @@
                     <th>Departure</th>
                     <th>Status</th>
                     <th>DN</th>
-                    <th>Action</th>
+                    @if(auth()->user()->role === 'superadmin')
+                        <th>Action</th>
+                    @endif
                 </tr>
             </thead>
 
@@ -220,29 +229,30 @@
                             </button>
                         </td>
 
-                        {{-- ACTION --}}
-                        <td>
-                            <div class="btn-group" role="group">
-                                <button onclick="openEditModal({{ $milkrun->id }})"
-                                        class="btn btn-warning btn-sm"
-                                        style="border-radius: 6px 0 0 6px; border-right: none;"
-                                        title="Edit">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                <form action="{{ route('milkruns.destroy', $milkrun->id) }}"
-                                    method="POST"
-                                    class="d-inline m-0 p-0">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit"
-                                            class="btn btn-danger btn-sm"
-                                            style="border-radius: 0 6px 6px 0;"
-                                            title="Hapus">
-                                        <i class="bi bi-trash-fill"></i>
+                        @if(auth()->user()->role === 'superadmin')
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button onclick="openEditModal({{ $milkrun->id }})"
+                                            class="btn btn-warning btn-sm"
+                                            style="border-radius: 6px 0 0 6px; border-right: none;"
+                                            title="Edit">
+                                        <i class="bi bi-pencil-fill"></i>
                                     </button>
-                                </form>
-                            </div>
-                        </td>
+                                    <form action="{{ route('milkruns.destroy', $milkrun->id) }}"
+                                        method="POST"
+                                        class="d-inline m-0 p-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit"
+                                                class="btn btn-danger btn-sm"
+                                                style="border-radius: 0 6px 6px 0;"
+                                                title="Hapus">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        @endif
                     </tr>
 
                 @empty
@@ -267,6 +277,7 @@
 
     <!-- Edit Modal -->
     @include('milkruns.edit')
+    @include('milkruns.print')
     
 @endsection
 

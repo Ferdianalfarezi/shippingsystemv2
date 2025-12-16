@@ -16,6 +16,13 @@
             <input type="text" class="form-control" id="scanToHistoryInput" placeholder="Scan DN to History..." autofocus>
         </div>
         
+        <!-- Print Delay Button -->
+        <div class="card border-0 shadow-sm p-1 bg-secondary">
+            <button type="button" class="btn btn-secondary" id="openPrintDelayModal" title="Print Data Delay">
+                <i class="bi bi-printer-fill"></i>
+            </button>
+        </div>
+
         <!-- Toggle View Button -->
         <div class="card border-0 shadow-sm p-1 bg-warning">
             <a href="{{ route('deliveries.indexReverse') }}" class="btn btn-warning text-dark" title="Switch to Reverse View">
@@ -25,7 +32,7 @@
         
         @if(auth()->user()->role === 'superadmin')
             <!-- Delete All Button -->
-            <div class="card border-4 bg-danger">
+            <div class="card border-0 shadow-sm p-1 bg-danger">
                 <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
                     <i class="bi bi-trash-fill"></i>
                 </button>
@@ -194,7 +201,9 @@
                     <th>Cyc</th>
                     <th>Address</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    @if(auth()->user()->role === 'superadmin')
+                        <th>Action</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -206,7 +215,6 @@
                         <td>{{ $delivery->customers }}</td>
                         <td><strong>{{ $delivery->dock }}</strong></td>
                         <td>{{ $delivery->formatted_scan_time }}</td>
-                        
                         <td><strong>{{ $delivery->cycle }}</strong></td>
                         <td>{{ $delivery->address }}</td>
                         <td>
@@ -221,25 +229,27 @@
                             @endif
                         </span>
                         </td>
-                        <td>
-                            <div class="d-flex justify-content-center" style="gap: 0;">
-                                <button onclick="openEditModal({{ $delivery->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                
-                                <form action="{{ route('deliveries.destroy', $delivery->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
-                                </form>
+                        @if(auth()->user()->role === 'superadmin')
+                            <td>
+                                <div class="d-flex justify-content-center" style="gap: 0;">
+                                        <button onclick="openEditModal({{ $delivery->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        
+                                        <form action="{{ route('deliveries.destroy', $delivery->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
 
-                                <a href="javascript:void(0)" onclick="showQrCode('{{ $delivery->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="QR Code">
-                                    <i class="bi bi-qr-code"></i>
-                                </a>
-                            </div>
-                        </td>
+                                    <a href="javascript:void(0)" onclick="showQrCode('{{ $delivery->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="QR Code">
+                                        <i class="bi bi-qr-code"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr class="mt-3">
@@ -261,6 +271,7 @@
     </div>
 
     @include('deliveries.edit')
+    @include('deliveries.print')    
     
 @endsection
 
@@ -325,8 +336,7 @@
                         // Success notification
                         Swal.fire({
                             title: 'Berhasil!',
-                            html: `DN <strong>${response.data.no_dn}</strong> dipindahkan ke History<br>
-                                   <small>Status: ${response.data.final_status}</small>`,
+                            html: `DN <strong>${response.data.no_dn}</strong> dipindahkan ke History<br>`,
                             icon: 'success',
                             confirmButtonColor: '#198754',
                             timer: 2000,

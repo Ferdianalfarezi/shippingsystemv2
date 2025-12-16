@@ -107,7 +107,48 @@ class HistoryController extends Controller
             ]);
         }
         
-        return view('histories.show', compact('history'));
+        return view('histories.index', compact('history'));
+    }
+
+    /**
+     * Print history - template berbeda berdasarkan customer
+     */
+    public function print(History $history)
+    {
+        // Prepare data untuk print
+        $history->customer = $history->customers;
+        $history->order_no = $history->no_dn;
+        
+        // Format delivery date dan time
+        if ($history->delivery_date) {
+            $history->delivery_date = Carbon::parse($history->delivery_date)->format('d M Y');
+        }
+        if ($history->delivery_time) {
+            $history->delivery_time = $history->delivery_time;
+        }
+        
+        // Format scan timestamps
+        if ($history->scan_to_shipping) {
+            $history->scan_to_shipping = Carbon::parse($history->scan_to_shipping)->format('d M Y H:i:s');
+        }
+        if ($history->scan_to_delivery) {
+            $history->scan_to_delivery = Carbon::parse($history->scan_to_delivery)->format('d M Y H:i:s');
+        }
+        if ($history->completed_at) {
+            $history->scan_to_history = Carbon::parse($history->completed_at)->format('d M Y H:i:s');
+        }
+        
+        // Determine template based on customer
+        // Check if customer contains 'TMMIN' (case insensitive)
+        $customerUpper = strtoupper($history->customers ?? '');
+        
+        if (str_contains($customerUpper, 'TMMIN')) {
+            // Use TMMIN template
+            return view('histories.print_tmmin', compact('history'));
+        } else {
+            // Use ADM template (default for ADM and others)
+            return view('histories.print_adm', compact('history'));
+        }
     }
 
     /**

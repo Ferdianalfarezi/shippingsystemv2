@@ -30,7 +30,7 @@
                                 <i class="bi bi-eye"></i>
                             </button>
                         </div>
-                        <small class="text-muted">Minimal 6 karakter</small>
+                        <small class="text-muted">Minimal 5 karakter</small>
                     </div>
 
                     <div class="mb-3">

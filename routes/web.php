@@ -84,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Delivery Routes
     Route::prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::get('/delay-data', [DeliveryController::class, 'getDelayData'])->name('getDelayData');
         // Index views
         Route::get('/', [DeliveryController::class, 'index'])->name('index');
         Route::get('/reverse', [DeliveryController::class, 'indexReverse'])->name('indexReverse');
@@ -111,6 +112,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [MilkrunController::class, 'index'])->name('index');
         Route::delete('/delete-all', [MilkrunController::class, 'deleteAll'])->name('deleteAll');
         Route::post('/scan-arrival', [MilkrunController::class, 'scanArrival'])->name('scanArrival');
+        Route::get('/delay-data', [MilkrunController::class, 'getDelayData'])->name('getDelayData');
         
         // Route untuk DN list - HARUS SEBELUM {milkrun} routes
         Route::get('/{milkrun}/dns', [MilkrunController::class, 'getDnList'])->name('dns');
@@ -136,6 +138,7 @@ Route::middleware(['auth'])->group(function () {
         // Parameter routes - HARUS DI PALING BAWAH
         Route::get('/{history}', [HistoryController::class, 'show'])->name('show');
         Route::delete('/{history}', [HistoryController::class, 'destroy'])->name('destroy');
+        Route::get('/{history}/print', [HistoryController::class, 'print'])->name('print');
     });
 
     Route::prefix('kanbantmmins')->name('kanbantmmins.')->group(function () {

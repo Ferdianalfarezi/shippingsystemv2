@@ -9,7 +9,7 @@
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
         <!-- Delete All Button -->
-        <div class="card border-4 bg-danger">
+        <div class="card border-0 shadow-sm p-1 bg-danger">
             <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
                 <i class="bi bi-trash-fill"></i>
             </button>
@@ -98,6 +98,15 @@
                                         title="Detail">
                                     <i class="bi bi-eye-fill"></i>
                                 </button>
+
+                                <!-- Tombol Print -->
+                                <a href="{{ route('histories.print', $history->id) }}" 
+                                   target="_blank"
+                                   class="btn btn-info btn-sm btn-action-square" 
+                                   style="border-radius: 6px;" 
+                                   title="Print">
+                                    <i class="bi bi-printer-fill"></i>
+                                </a>
 
                                 @if(auth()->user()->role === 'superadmin')
                                 <!-- Tombol Delete -->

@@ -644,4 +644,63 @@ class DeliveryController extends Controller
             'recentScan'
         ));
     }
+
+    public function getDelayData(Request $request)
+    {
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+        
+        // Query dasar - ambil semua delivery dulu
+        $query = Delivery::query();
+        
+        // Filter by date range pada scan_to_delivery
+        if ($dateFrom) {
+            $query->whereDate('scan_to_delivery', '>=', $dateFrom);
+        }
+        
+        if ($dateTo) {
+            $query->whereDate('scan_to_delivery', '<=', $dateTo);
+        }
+        
+        // Order by scan_to_delivery desc
+        $query->orderBy('scan_to_delivery', 'desc');
+        
+        // Get all data
+        $deliveries = $query->get();
+        
+        // Filter hanya yang delay (karena status adalah calculated/accessor)
+        $delayData = $deliveries->filter(function($delivery) {
+            return $delivery->status === 'delay';
+        })->values();
+        
+        // Format data untuk response
+        $formattedData = $delayData->map(function($delivery) {
+            return [
+                'id' => $delivery->id,
+                'route' => $delivery->route,
+                'logistic_partners' => $delivery->logistic_partners,
+                'no_dn' => $delivery->no_dn,
+                'customers' => $delivery->customers,
+                'dock' => $delivery->dock,
+                'cycle' => $delivery->cycle,
+                'address' => $delivery->address,
+                'scan_to_delivery' => $delivery->scan_to_delivery?->format('Y-m-d H:i:s'),
+                'scan_to_delivery_formatted' => $delivery->scan_to_delivery?->format('d-m-y H:i'),
+                'status' => $delivery->status,
+                'status_label' => $delivery->status_label,
+                'delay_duration' => $delivery->delay_duration ?? null,
+            ];
+        });
+        
+        return response()->json([
+            'success' => true,
+            'data' => $formattedData,
+            'total' => $formattedData->count(),
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ]
+        ]);
+    }
+
 }

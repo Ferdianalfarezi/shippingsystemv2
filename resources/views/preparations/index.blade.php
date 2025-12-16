@@ -18,7 +18,7 @@
 
         @if(auth()->user()->role === 'superadmin')
             <!-- Delete All Button -->
-            <div class="card border-4 bg-danger">
+            <div class="card border-0 shadow-sm p-1 bg-danger">
                 <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
                     <i class="bi bi-trash-fill"></i>
                 </button>

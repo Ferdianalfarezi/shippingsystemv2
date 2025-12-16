@@ -479,4 +479,60 @@ class MilkrunController extends Controller
             'dateFilter'
         ));
     }
+
+    public function getDelayData(Request $request)
+    {
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+        
+        // Query dasar - ambil milkrun yang sudah ada arrival dan status delay
+        $query = Milkrun::whereNotNull('arrival')
+            ->where('status', 'delay');
+        
+        // Filter by date range pada delivery_date
+        if ($dateFrom) {
+            $query->whereDate('delivery_date', '>=', $dateFrom);
+        }
+        
+        if ($dateTo) {
+            $query->whereDate('delivery_date', '<=', $dateTo);
+        }
+        
+        // Order by delivery_date desc
+        $query->orderBy('delivery_date', 'desc')
+            ->orderBy('delivery_time', 'desc');
+        
+        // Get all data
+        $milkruns = $query->get();
+        
+        // Format data untuk response
+        $formattedData = $milkruns->map(function($milkrun) {
+            return [
+                'id' => $milkrun->id,
+                'customers' => $milkrun->customers,
+                'route' => $milkrun->route,
+                'logistic_partners' => $milkrun->logistic_partners,
+                'cycle' => $milkrun->cycle,
+                'dock' => $milkrun->dock,
+                'delivery_date' => $milkrun->delivery_date?->format('Y-m-d'),
+                'delivery_date_formatted' => $milkrun->delivery_date?->format('d-m-y'),
+                'delivery_time' => $milkrun->delivery_time ? date('H:i', strtotime($milkrun->delivery_time)) : null,
+                'arrival' => $milkrun->arrival?->format('Y-m-d H:i:s'),
+                'arrival_formatted' => $milkrun->arrival?->format('d-m-y H:i'),
+                'status' => $milkrun->status,
+                'status_label' => $milkrun->status_label,
+                'time_diff' => $milkrun->time_diff_info ?? null,
+            ];
+        });
+        
+        return response()->json([
+            'success' => true,
+            'data' => $formattedData,
+            'total' => $formattedData->count(),
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ]
+        ]);
+    }
 }

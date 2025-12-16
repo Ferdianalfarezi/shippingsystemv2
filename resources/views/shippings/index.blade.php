@@ -25,7 +25,7 @@
         
         @if(auth()->user()->role === 'superadmin')
             <!-- Delete All Button -->
-            <div class="card border-4 bg-danger">
+            <div class="card border-0 shadow-sm p-1 bg-danger">
                 <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
                     <i class="bi bi-trash-fill"></i>
                 </button>
@@ -281,17 +281,19 @@
                         </td>
                         <td>
                             <div class="d-flex justify-content-center" style="gap: 0;">
-                                <button onclick="openEditModal({{ $ship->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                
-                                <form action="{{ route('shippings.destroy', $ship->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
-                                        <i class="bi bi-trash-fill"></i>
+                                @if(auth()->user()->role === 'superadmin')
+                                    <button onclick="openEditModal({{ $ship->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
+                                        <i class="bi bi-pencil-fill"></i>
                                     </button>
-                                </form>
+                                    
+                                    <form action="{{ route('shippings.destroy', $ship->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
+                                @endif
 
                                 <a href="javascript:void(0)" onclick="showQrCode('{{ $ship->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="QR Code">
                                     <i class="bi bi-qr-code"></i>
