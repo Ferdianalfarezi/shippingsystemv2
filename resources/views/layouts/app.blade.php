@@ -630,6 +630,10 @@
                     <img src="{{ asset('images/user7.png') }}" 
                          alt="User Photo" 
                          style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%;">
+                @elseif(auth()->user()->id == 1)
+                    <img src="{{ asset('images/wa.png') }}" 
+                         alt="User Photo" 
+                         style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%;">
                 @else
                     <i class="fas fa-user"></i>
                 @endif

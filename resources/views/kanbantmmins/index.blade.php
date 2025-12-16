@@ -114,7 +114,7 @@
                         <td><strong>{{ $item->manifest_no }}</strong></td>
                         <td>{{ $item->part_no }}</td>
                         <td>{{ Str::limit($item->part_name, 30) }}</td>
-                        <td><span class="badge bg-white text-dark">{{ $item->dock_code }}</span></td>
+                        <td><span class="badge bg-white text-dark fs-6">{{ $item->dock_code }}</span></td>
                         <td><strong>{{ $item->address }}</strong></td>
                         <td>{{ $item->pcs }}</td>
                         <td>{{ $item->route }}</td>
@@ -473,7 +473,6 @@
         });
         
         // ========== DELETE ==========
-        
         $('.delete-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -533,72 +532,70 @@
         });
 
         // ========== IMPORT ==========
-        
         $('#importTxtForm').on('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const fileInput = $('#txtFile')[0];
-    
-    if (!fileInput.files.length) {
-        Swal.fire({
-            title: 'Error!',
-            text: 'Silakan pilih file TXT terlebih dahulu',
-            icon: 'error',
-            confirmButtonColor: '#dc2626'
-        });
-        return;
-    }
-    
-    Swal.fire({
-        title: 'Import Data?',
-        text: 'Semua data yang ada akan dihapus dan diganti dengan data baru!',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Ya, Import!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $('#importProgress').removeClass('d-none');
-            $('#importButton').prop('disabled', true);
+            e.preventDefault();
             
-            $.ajax({
-                url: '{{ route("kanbantmmins.import") }}',
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    $('#importProgress').addClass('d-none');
-                    $('#importButton').prop('disabled', false);
-                    $('#importTxtModal').modal('hide');
-
-                    Swal.fire({
-                        title: 'Berhasil!',
-                        text: 'Data berhasil diimport.',
-                        icon: 'success',
-                        confirmButtonColor: '#3085d6'
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                },
-                error: function(xhr) {
-                    $('#importProgress').addClass('d-none');
-                    $('#importButton').prop('disabled', false);
+            const formData = new FormData(this);
+            const fileInput = $('#txtFile')[0];
+            
+            if (!fileInput.files.length) {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Silakan pilih file TXT terlebih dahulu',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Import Data?',
+                text: 'Semua data yang ada akan dihapus dan diganti dengan data baru!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Ya, Import!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#importProgress').removeClass('d-none');
+                    $('#importButton').prop('disabled', true);
                     
-                    Swal.fire({
-                        title: 'Gagal!',
-                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat import',
-                        icon: 'error',
-                        confirmButtonColor: '#dc2626'
+                    $.ajax({
+                        url: '{{ route("kanbantmmins.import") }}',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+                            $('#importProgress').addClass('d-none');
+                            $('#importButton').prop('disabled', false);
+                            $('#importTxtModal').modal('hide');
+
+                            Swal.fire({
+                                title: 'Berhasil!',
+                                text: 'Data berhasil diimport.',
+                                icon: 'success',
+                                confirmButtonColor: '#3085d6'
+                            }).then(() => {
+                                window.location.reload();
+                            });
+                        },
+                        error: function(xhr) {
+                            $('#importProgress').addClass('d-none');
+                            $('#importButton').prop('disabled', false);
+                            
+                            Swal.fire({
+                                title: 'Gagal!',
+                                text: xhr.responseJSON?.message || 'Terjadi kesalahan saat import',
+                                icon: 'error',
+                                confirmButtonColor: '#dc2626'
+                            });
+                        }
                     });
                 }
             });
-        }
-    });
-});
-
+        });
 
         // Sweet Alert for flash messages
         @if(session('sweet_alert'))
