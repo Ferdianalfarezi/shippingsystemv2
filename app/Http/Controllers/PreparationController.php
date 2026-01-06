@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Preparation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class PreparationController extends Controller
 {
@@ -47,9 +48,11 @@ class PreparationController extends Controller
     
     // Hitung statistik
     $totalAll = Preparation::count();
-    $totalDelay = Preparation::whereRaw(
-        "CONCAT(delivery_date, ' ', delivery_time) < NOW() OR CONCAT(pulling_date, ' ', pulling_time) < NOW()"
-    )->count();
+    $now = \Carbon\Carbon::now()->format('Y-m-d H:i:s');
+        $totalDelay = Preparation::whereRaw(
+            "CONCAT(pulling_date, ' ', pulling_time) < ?",
+            [$now]
+        )->count();
     $totalOnTime = $totalAll - $totalDelay;
     
     // PERBAIKAN: Get recent scan dengan fresh() untuk force reload
@@ -65,6 +68,17 @@ class PreparationController extends Controller
             'scan_time' => $recentScan->scan_to_shipping
         ]);
     }
+
+    // // Tambahin sebelum return view
+    // $testPrep = Preparation::first();
+    // dd([
+    //     'pulling_date_raw' => $testPrep->getAttributes()['pulling_date'],
+    //     'pulling_date_cast' => $testPrep->pulling_date,
+    //     'pulling_time' => $testPrep->pulling_time,
+    //     'pulling_datetime_parsed' => Carbon::parse($testPrep->pulling_date->format('Y-m-d') . ' ' . $testPrep->pulling_time)->toDateTimeString(),
+    //     'now' => Carbon::now()->toDateTimeString(),
+    //     'is_delay' => Carbon::now()->greaterThan(Carbon::parse($testPrep->pulling_date->format('Y-m-d') . ' ' . $testPrep->pulling_time)),
+    // ]);
     
     return view('preparations.index', compact('preparations', 'totalDelay', 'totalOnTime', 'totalAll', 'recentScan'));
 }
@@ -320,8 +334,10 @@ class PreparationController extends Controller
         
         // Hitung statistik
         $totalAll = Preparation::count();
+        $now = \Carbon\Carbon::now()->format('Y-m-d H:i:s');
         $totalDelay = Preparation::whereRaw(
-            "CONCAT(delivery_date, ' ', delivery_time) < NOW() OR CONCAT(pulling_date, ' ', pulling_time) < NOW()"
+            "CONCAT(pulling_date, ' ', pulling_time) < ?",
+            [$now]
         )->count();
         $totalOnTime = $totalAll - $totalDelay;
         

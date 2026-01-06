@@ -291,32 +291,51 @@ class KanbanTmminsController extends Controller
     {
         $order_no = 'UNKNOWN';
         
-        if (isset($d1[8]) && strlen(trim($d1[8])) === 10 && ctype_digit(trim($d1[8])) && substr(trim($d1[8]), 0, 4) === '2025') {
+        // Dynamic year check - current year and next year (untuk data planning)
+        $currentYear = date('Y');
+        $nextYear = (string)((int)$currentYear + 1);
+        $validYears = [$currentYear, $nextYear];
+        
+        // Helper function to check if value is valid order_no
+        $isValidOrderNo = function($value) use ($validYears) {
+            $clean = trim($value);
+            if (strlen($clean) !== 10 || !ctype_digit($clean)) {
+                return false;
+            }
+            $yearPrefix = substr($clean, 0, 4);
+            return in_array($yearPrefix, $validYears);
+        };
+        
+        // Check column 8 first
+        if (isset($d1[8]) && $isValidOrderNo($d1[8])) {
             $order_no = trim($d1[8]);
-        } else if (!empty($d2Entries) && isset($d2Entries[0][5])) {
+        } 
+        // Check from D2 QR code
+        else if (!empty($d2Entries) && isset($d2Entries[0][5])) {
             $qrCode = trim($d2Entries[0][5]);
             if (strlen($qrCode) >= 22) {
                 $possibleOrderNo = substr($qrCode, 12, 10);
-                if (ctype_digit($possibleOrderNo) && substr($possibleOrderNo, 0, 4) === '2025') {
+                if ($isValidOrderNo($possibleOrderNo)) {
                     $order_no = $possibleOrderNo;
                 }
             }
         }
         
+        // Fallback: scan all D1 columns
         if ($order_no === 'UNKNOWN') {
             foreach ($d1 as $index => $value) {
-                $cleanValue = trim($value);
-                if (strlen($cleanValue) === 10 && ctype_digit($cleanValue) && substr($cleanValue, 0, 4) === '2025') {
-                    $order_no = $cleanValue;
+                if ($isValidOrderNo($value)) {
+                    $order_no = trim($value);
                     break;
                 }
             }
         }
         
+        // Fallback: extract from manifest_no
         if ($order_no === 'UNKNOWN' && isset($manifestNo) && strlen($manifestNo) >= 10) {
-            foreach(range(0, strlen($manifestNo) - 10) as $i) {
+            foreach (range(0, strlen($manifestNo) - 10) as $i) {
                 $segment = substr($manifestNo, $i, 10);
-                if (ctype_digit($segment) && substr($segment, 0, 4) === '2025') {
+                if ($isValidOrderNo($segment)) {
                     $order_no = $segment;
                     break;
                 }

@@ -58,7 +58,7 @@
                         <div>
                             <i class="bi bi-arrow-right-circle-fill text-white fs-6"></i>
                         </div>
-                        <small class="text-white fw-semibold" style="font-size: 0.7rem;">RECENT SCAN TO HISTORY</small>
+                        <small class="text-white fw-semibold" style="font-size: 0.7rem;">RECENT SCAN</small>
                     </div>
 
                     <div class="vr" style="height: 30px; opacity: 0.2;"></div>

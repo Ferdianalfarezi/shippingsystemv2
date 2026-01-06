@@ -216,6 +216,9 @@ $(document).ready(function() {
             url: url,
             method: 'POST',
             data: formData,
+            headers: {
+                'X-HTTP-Method-Override': 'PUT'  // <-- TAMBAHIN INI
+            },
             success: function(response) {
                 Swal.fire({
                     icon: 'success',

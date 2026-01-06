@@ -293,6 +293,7 @@ class ImportTmminController extends Controller
                     Log::warning('Logistic Partner tidak ditemukan untuk route: ' . $route);
                 }
             }
+            unset($data); // Unset reference
 
             // Cek apakah ada data yang valid
             if (empty($preparationsData)) {
@@ -305,10 +306,32 @@ class ImportTmminController extends Controller
             }
 
             // ========================================
+            // DEBUG: CEK DUPLIKAT DI PREPARATIONS DATA
+            // ========================================
+            
+            $allNoDn = array_column($preparationsData, 'no_dn');
+            Log::info('DEBUG - preparationsData count: ' . count($preparationsData));
+            Log::info('DEBUG - allNoDn count: ' . count($allNoDn));
+            Log::info('DEBUG - allNoDn unique count: ' . count(array_unique($allNoDn)));
+            
+            // Cari duplikat
+            $noDnCounts = array_count_values($allNoDn);
+            $duplicatesInData = array_filter($noDnCounts, function($count) {
+                return $count > 1;
+            });
+            
+            if (!empty($duplicatesInData)) {
+                Log::warning('DEBUG - Duplicate no_dn found in preparationsData: ', $duplicatesInData);
+            }
+
+            // ========================================
             // CEK DUPLIKAT DI DATABASE
             // ========================================
             
-            $existingPreparations = Preparation::whereIn('no_dn', $noDnList)->pluck('no_dn')->toArray();
+            $uniqueNoDnList = array_unique($noDnList);
+            $existingPreparations = Preparation::whereIn('no_dn', $uniqueNoDnList)->pluck('no_dn')->toArray();
+            
+            Log::info('DEBUG - existingPreparations count: ' . count($existingPreparations));
 
             if (!empty($existingPreparations) && !$request->has('force_import')) {
                 return response()->json([
@@ -330,8 +353,11 @@ class ImportTmminController extends Controller
             
             $savedCount = 0;
             $skippedCount = 0;
+            $savedNoDnList = [];
 
-            foreach ($preparationsData as $data) {
+            foreach ($preparationsData as $key => $data) {
+                Log::info('DEBUG - Processing key: ' . $key . ', no_dn: ' . $data['no_dn']);
+                
                 if (!in_array($data['no_dn'], $existingPreparations)) {
                     try {
                         Log::info('Saving TMMIN Preparation:', ['no_dn' => $data['no_dn'], 'route' => $data['route']]);
@@ -340,6 +366,7 @@ class ImportTmminController extends Controller
                             $data
                         );
                         $savedCount++;
+                        $savedNoDnList[] = $data['no_dn'];
                     } catch (\Exception $e) {
                         Log::error('Failed to save preparation ' . $data['no_dn'] . ': ' . $e->getMessage());
                         $skippedCount++;
@@ -351,22 +378,53 @@ class ImportTmminController extends Controller
             }
 
             // ========================================
-            // SUCCESS MESSAGE
+            // VERIFIKASI HASIL SAVE
             // ========================================
             
-            $successMessage = "TMMIN data berhasil diimpor. {$savedCount} data berhasil disimpan";
-            if ($skippedCount > 0) {
-                $successMessage .= ", {$skippedCount} data dilewati";
+            $actualSavedCount = Preparation::whereIn('no_dn', $savedNoDnList)->count();
+            Log::info('DEBUG - savedCount dari loop: ' . $savedCount);
+            Log::info('DEBUG - actualSavedCount dari DB: ' . $actualSavedCount);
+            
+            if ($savedCount !== $actualSavedCount) {
+                Log::warning('DEBUG - MISMATCH! Loop count: ' . $savedCount . ', DB count: ' . $actualSavedCount);
+                
+                // Cek mana yang tidak tersimpan
+                $savedInDb = Preparation::whereIn('no_dn', $savedNoDnList)->pluck('no_dn')->toArray();
+                $notSaved = array_diff($savedNoDnList, $savedInDb);
+                if (!empty($notSaved)) {
+                    Log::warning('DEBUG - no_dn yang tidak tersimpan: ', $notSaved);
+                }
+            }
+
+            // ========================================
+            // SUCCESS MESSAGE (pakai actualSavedCount)
+            // ========================================
+            
+            $totalData = count($preparationsData);
+            $duplicateInFile = count($noDnList) - count(array_unique($noDnList));
+
+            // Gunakan actualSavedCount untuk akurasi
+            $finalSavedCount = $actualSavedCount;
+            $finalSkippedCount = $totalData - $actualSavedCount;
+
+            $successMessage = "TMMIN data berhasil diimpor. {$finalSavedCount} dari {$totalData} data berhasil disimpan";
+            if ($finalSkippedCount > 0) {
+                $successMessage .= ", {$finalSkippedCount} data dilewati";
+            }
+            if ($duplicateInFile > 0) {
+                $successMessage .= ", {$duplicateInFile} duplikat dalam file";
             }
             $successMessage .= ".";
 
             Log::info('Import TMMIN completed: ' . $successMessage);
+            Log::info('Import stats: noDnList=' . count($noDnList) . ', unique=' . count(array_unique($noDnList)) . ', preparationsData=' . $totalData . ', actualSaved=' . $actualSavedCount);
 
             return response()->json([
                 'status' => 'success',
                 'message' => $successMessage,
-                'saved' => $savedCount,
-                'skipped' => $skippedCount,
+                'saved' => $finalSavedCount,
+                'skipped' => $finalSkippedCount,
+                'total' => $totalData,
             ], 200);
 
         } catch (\Exception $e) {

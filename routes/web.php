@@ -23,6 +23,12 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+Route::prefix('api/token')->group(function () {
+    Route::post('/validate', [TokenController::class, 'validateToken'])->name('api.token.validate');
+    Route::get('/is-expired', [TokenController::class, 'isSystemExpired'])->name('api.token.is-expired');
+    Route::get('/expiry', [TokenController::class, 'getSystemExpiry'])->name('api.token.expiry');
+});
+
 Route::middleware(['auth'])->group(function () {
     // Dashboard
     Route::get('/dashboard', function () {

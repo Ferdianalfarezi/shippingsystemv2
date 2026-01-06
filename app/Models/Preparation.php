@@ -34,20 +34,15 @@ class Preparation extends Model
         'pulling_date' => 'date',
     ];
 
-    /**
-     * Get status based on pulling time vs delivery time
-     * Status DELAY jika pulling time melebihi delivery time
-     * Status NORMAL jika pulling time belum melebihi delivery time
-     */
+   
     public function getStatusAttribute()
     {
         try {
-            $deliveryDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
             $pullingDateTime = Carbon::parse($this->pulling_date->format('Y-m-d') . ' ' . $this->pulling_time);
             $now = Carbon::now();
             
-            // Jika waktu sekarang sudah melewati delivery time ATAU pulling time = DELAY
-            if ($now->greaterThan($deliveryDateTime) || $now->greaterThan($pullingDateTime)) {
+            // Jika waktu sekarang sudah melewati pulling time = DELAY
+            if ($now->greaterThan($pullingDateTime)) {
                 return 'delay';
             }
             
