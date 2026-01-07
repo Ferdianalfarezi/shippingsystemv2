@@ -502,6 +502,8 @@
         .blink-badge {
             animation: blink-animation 1s steps(1) infinite;
         }
+
+        
 </style>
     </style>
 

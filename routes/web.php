@@ -151,11 +151,14 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('kanbantmmins')->name('kanbantmmins.')->group(function () {
         Route::get('/', [KanbanTmminsController::class, 'index'])->name('index');
+        Route::get('/by-dn', [KanbanTmminsController::class, 'indexByDn'])->name('indexByDn');
         Route::post('/import', [KanbanTmminsController::class, 'importTxt'])->name('import');
         Route::get('/print/{id}', [KanbanTmminsController::class, 'print'])->name('print');
         Route::get('/printall', [KanbanTmminsController::class, 'printAll'])->name('printall');
         Route::get('/print-selected', [KanbanTmminsController::class, 'printSelected'])->name('printselected');
-        Route::post('/print-group', [KanbanTmminsController::class, 'printGroup'])->name('printgroup');
+        // Route::get('/print-plant', [KanbanTmminsController::class, 'printByPlant'])->name('printplant');
+        Route::get('/print-group', [KanbanTmminsController::class, 'printGroup'])->name('printgroup');
+        Route::delete('/destroy-group/{manifest_no}', [KanbanTmminsController::class, 'destroyGroup'])->where('manifest_no', '.*')->name('destroygroup');
         Route::delete('/{id}', [KanbanTmminsController::class, 'destroy'])->name('destroy');
     });
 
@@ -195,4 +198,4 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/api/advertisements/current', [AdvertisementController::class, 'checkCurrentAd'])->name('api.advertisements.current');
 
-require __DIR__.'/auth.php';    
+require __DIR__.'/auth.php';

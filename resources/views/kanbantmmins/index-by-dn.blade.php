@@ -7,6 +7,8 @@
 @section('content')
     @php
         $uniqueDockCodes = $kanbantmmins->pluck('dock_code')->unique()->filter()->sort();
+        // Group by manifest_no
+        $groupedByManifest = $kanbantmmins->groupBy('manifest_no');
     @endphp
 
     <!-- Stats Badges dan Dropdown di kanan -->
@@ -28,10 +30,10 @@
 
             <!-- View Toggle Buttons -->
             <div class="btn-group" role="group" aria-label="View toggle">
-                <a href="{{ route('kanbantmmins.index') }}" class="btn btn-secondary active" title="View All Items">
+                <a href="{{ route('kanbantmmins.index') }}" class="btn btn-outline-secondary" title="View All Items">
                     <i class="bi bi-list-ul"></i> All Items
                 </a>
-                <a href="{{ route('kanbantmmins.indexByDn') }}" class="btn btn-outline-secondary" title="View By Delivery Note">
+                <a href="{{ route('kanbantmmins.indexByDn') }}" class="btn btn-secondary active" title="View By Delivery Note">
                     <i class="bi bi-collection"></i> By DN
                 </a>
             </div>
@@ -45,6 +47,7 @@
             <button class="btn btn-primary" id="printAllBtn">
                 <i class="bi bi-printer me-1"></i> Print All
             </button>
+
             <!-- Dock Filter Dropdown -->
             <select class="form-select" id="dockFilterSelect" style="width: 130px;">
                 <option value="all">All Dock</option>
@@ -55,7 +58,7 @@
 
             <!-- Search Bar -->
             <div class="input-group" style="width: 280px;">
-                <input type="text" class="form-control" id="searchInput" placeholder="Cari Part No, Manifest..." value="">
+                <input type="text" class="form-control" id="searchInput" placeholder="Cari Manifest No, Part No..." value="">
                 <button class="btn btn-secondary" type="button" id="searchButton">
                     <i class="bi bi-search"></i>
                 </button>
@@ -96,8 +99,8 @@
                             <i class="bi bi-box-seam text-white fs-5"></i>
                         </div>
                         <div>
-                            <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Total</small>
-                            <h5 class="mb-0 fw-bold text-white">{{ count($kanbantmmins) }}</h5>
+                            <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Total DN</small>
+                            <h5 class="mb-0 fw-bold text-white">{{ $groupedByManifest->count() }}</h5>
                         </div>
                     </div>
                 </div>
@@ -111,39 +114,81 @@
             <thead>
                 <tr class="fs-6">
                     <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
-                    <th>Manifest No</th>
-                    <th>Part No</th>
-                    <th>Part Name</th>
-                    <th>Dock</th>
-                    <th>Address</th>
-                    <th>PCS</th>
+                    <th>Manifest No (DN)</th>
+                    <th>Dock Code</th>
                     <th>Route</th>
                     <th>Supplier</th>
+                    <th>Total Part No</th>
+                    <th>Total PCS</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
-                @forelse($kanbantmmins as $index => $item)
-                    <tr class="fs-6 kanban-row" data-dock="{{ $item->dock_code }}" data-id="{{ $item->id }}">
-                        <td><input type="checkbox" class="form-check-input row-select" value="{{ $item->id }}" data-dock="{{ $item->dock_code }}"></td>
-                        <td><strong>{{ $item->manifest_no }}</strong></td>
-                        <td>{{ $item->part_no }}</td>
-                        <td>{{ Str::limit($item->part_name, 30) }}</td>
-                        <td><span class="badge bg-white text-dark fs-6">{{ $item->dock_code }}</span></td>
-                        <td><strong>{{ $item->address }}</strong></td>
-                        <td>{{ $item->pcs }}</td>
-                        <td>{{ $item->route }}</td>
-                        <td>{{ Str::limit($item->supplier, 20) }}</td>
+                @forelse($groupedByManifest as $manifestNo => $items)
+                    @php
+                        $firstItem = $items->first();
+                        $totalPcs = $items->sum('pcs');
+                        $uniquePartNoCount = $items->pluck('part_no')->unique()->count();
+                        $dockCodes = $items->pluck('dock_code')->unique()->implode(', ');
+                        $routes = $items->pluck('route')->unique()->filter()->implode(', ');
+                        $suppliers = $items->pluck('supplier')->unique()->filter()->first() ?? '-';
+                    @endphp
+                    <tr class="fs-6 kanban-row" 
+                        data-dock="{{ $firstItem->dock_code }}" 
+                        data-manifest="{{ $manifestNo }}"
+                        data-ids="{{ $items->pluck('id')->implode(',') }}">
+                        <td>
+                            <input type="checkbox" class="form-check-input row-select" 
+                                   value="{{ $items->pluck('id')->implode(',') }}" 
+                                   data-dock="{{ $firstItem->dock_code }}"
+                                   data-manifest="{{ $manifestNo }}">
+                        </td>
+                        <td><strong>{{ $manifestNo }}</strong></td>
+                        <td>
+                            @foreach($items->pluck('dock_code')->unique() as $dc)
+                                <span class="badge bg-white text-dark fs-6">{{ $dc }}</span>
+                            @endforeach
+                        </td>
+                        <td>{{ $routes ?: '-' }}</td>
+                        <td>{{ Str::limit($suppliers, 25) }}</td>
+                        <td>
+                            <span class="badge bg-info text-dark">{{ $uniquePartNoCount }} part</span>
+                        </td>
+                        <td><strong>{{ $totalPcs }}</strong></td>
                         <td>
                             <div class="d-flex justify-content-center p-1" style="gap: 0;">
-                                <a href="{{ route('kanbantmmins.print', $item->id) }}" class="btn btn-success btn-sm btn-action-square btn-print-individual" style="border-radius: 6px 0 0 6px; margin: 0;" title="Print">
+                                <!-- List Items Button -->
+                                <button type="button" 
+                                        class="btn btn-info btn-sm btn-action-square list-items-btn" 
+                                        style="border-radius: 6px 0 0 6px; margin: 0;" 
+                                        title="View Items"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#itemsModal"
+                                        data-manifest="{{ $manifestNo }}"
+                                        data-items='@json($items)'>
+                                    <i class="bi bi-list-ul"></i>
+                                </button>
+                                
+                                <!-- Print Group Button -->
+                                <a href="{{ route('kanbantmmins.printgroup', ['manifest_no' => $manifestNo]) }}" 
+                                   class="btn btn-success btn-sm btn-action-square" 
+                                   style="border-radius: 0; margin: 0;" 
+                                   title="Print Group" 
+                                   target="_blank">
                                     <i class="bi bi-printer-fill"></i>
                                 </a>
                                 
-                                <form action="{{ route('kanbantmmins.destroy', $item->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
+                                <!-- Delete Group Button -->
+                                <form action="{{ route('kanbantmmins.destroygroup', ['manifest_no' => $manifestNo]) }}" 
+                                      method="POST" 
+                                      class="d-inline delete-group-form" 
+                                      style="margin: 0;">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Hapus">
+                                    <button type="submit" 
+                                            class="btn btn-danger btn-sm btn-action-square" 
+                                            style="border-radius: 0 6px 6px 0; margin: 0;" 
+                                            title="Hapus Group">
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </form>
@@ -152,7 +197,7 @@
                     </tr>
                 @empty
                     <tr class="mt-3 empty-row">
-                        <td colspan="10" class="text-center py-4">
+                        <td colspan="8" class="text-center py-4">
                             <div class="text-muted">
                                 <i class="bi bi-inbox" style="font-size: 3rem;"></i>
                                 <p class="mt-2">Belum ada data kanban</p>
@@ -167,13 +212,62 @@
     <!-- Pagination Info & Controls -->
     <div class="d-flex justify-content-between align-items-center mt-3 me-3" id="paginationContainer">
         <div class="text-muted" id="paginationInfo">
-            Showing <span id="showingFrom">1</span> to <span id="showingTo">10</span> of <span id="totalFiltered">{{ count($kanbantmmins) }}</span> entries
+            Showing <span id="showingFrom">1</span> to <span id="showingTo">10</span> of <span id="totalFiltered">{{ $groupedByManifest->count() }}</span> entries
         </div>
         <nav aria-label="Page navigation">
             <ul class="pagination mb-0" id="paginationNav">
                 <!-- Pagination will be generated by JS -->
             </ul>
         </nav>
+    </div>
+
+    <!-- Items List Modal -->
+    <div class="modal fade" id="itemsModal" tabindex="-1" aria-labelledby="itemsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-dark" id="itemsModalLabel">
+                        <i class="bi bi-list-ul me-2"></i>Items for Manifest: <span id="modalManifestNo"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="itemsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Part No</th>
+                                    <th>Part Name</th>
+                                    <th>Dock</th>
+                                    <th>Address</th>
+                                    <th>PCS</th>
+                                    <th>Route</th>
+                                    <th>Unique No</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsTableBody">
+                                <!-- Items will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="me-auto">
+                        <span class="text-muted">
+                            Total: <strong id="modalTotalPartNo">0</strong> unique part, 
+                            <strong id="modalTotalItems">0</strong> items, 
+                            <strong id="modalTotalPcs">0</strong> PCS
+                        </span>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn btn-success" id="printGroupBtn" target="_blank">
+                        <i class="bi bi-printer me-1"></i> Print All Items
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Import TXT Modal -->
@@ -245,31 +339,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Print Preview Modal -->
-    <div class="modal fade" id="printPreviewModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" style="max-width: 50vw;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-dark">
-                        <i class="bi bi-printer me-2"></i>Print Preview
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-0" style="height: 70vh;">
-                    <iframe id="printPreviewFrame" style="width: 100%; height: 100%; border: none;"></iframe>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle me-1"></i>Batal
-                    </button>
-                    <button type="button" class="btn btn-primary" id="confirmPrintBtn">
-                        <i class="bi bi-printer-fill me-1"></i>Print
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
     
 @endsection
 
@@ -278,12 +347,13 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-        // ========== PAGINATION VARIABLES ==========
+        // Pagination variables
         let currentPage = 1;
         let perPage = 10;
         let allRows = [];
         let filteredRows = [];
         
+        // Initialize rows
         function initRows() {
             allRows = $('.kanban-row').not('.empty-row').toArray();
             filteredRows = [...allRows];
@@ -291,8 +361,9 @@
         
         initRows();
         
-        // ========== PAGINATION FUNCTIONS ==========
+        // Apply pagination
         function applyPagination() {
+            // Hide all rows first
             $(allRows).hide();
             
             if (perPage === 'all') {
@@ -313,6 +384,7 @@
             }
         }
         
+        // Update pagination info text
         function updatePaginationInfo(from, to, total) {
             if (total === 0) {
                 $('#paginationInfo').html('No entries found');
@@ -323,6 +395,7 @@
             }
         }
         
+        // Render pagination buttons
         function renderPagination(current, total) {
             let html = '';
             
@@ -331,10 +404,12 @@
                 return;
             }
             
+            // Previous button
             html += `<li class="page-item ${current === 1 ? 'disabled' : ''}">
                 <a class="page-link" href="#" data-page="${current - 1}">«</a>
             </li>`;
             
+            // Page numbers
             let startPage = Math.max(1, current - 2);
             let endPage = Math.min(total, current + 2);
             
@@ -358,6 +433,7 @@
                 html += `<li class="page-item"><a class="page-link" href="#" data-page="${total}">${total}</a></li>`;
             }
             
+            // Next button
             html += `<li class="page-item ${current === total ? 'disabled' : ''}">
                 <a class="page-link" href="#" data-page="${current + 1}">»</a>
             </li>`;
@@ -365,6 +441,7 @@
             $('#paginationNav').html(html);
         }
         
+        // Pagination click handler
         $(document).on('click', '#paginationNav .page-link', function(e) {
             e.preventDefault();
             const page = $(this).data('page');
@@ -374,6 +451,7 @@
             }
         });
         
+        // Per page change
         $('#perPageSelect').on('change', function() {
             const val = $(this).val();
             perPage = val === 'all' ? 'all' : parseInt(val);
@@ -381,7 +459,7 @@
             applyPagination();
         });
         
-        // ========== FILTER FUNCTIONS ==========
+        // Filter function
         function filterTable() {
             const search = $('#searchInput').val().toLowerCase();
             const selectedDock = $('#dockFilterSelect').val();
@@ -400,77 +478,67 @@
             currentPage = 1;
             applyPagination();
             
+            // Reset checkbox states when filter changes
             $('#selectAll').prop('checked', false);
             updateSelectedCount();
         }
         
+        // Search functionality
         $('#searchButton').on('click', filterTable);
         $('#searchInput').on('keypress', function(e) {
             if (e.which === 13) filterTable();
         });
         $('#searchInput').on('input', filterTable);
+        
+        // Dock filter dropdown
         $('#dockFilterSelect').on('change', filterTable);
         
+        // Initial pagination
         applyPagination();
         
         // ========== CHECKBOX & PRINT SELECTED ==========
+        
+        // Update selected count and show/hide print button
         function updateSelectedCount() {
-            const count = $('.row-select:checked').length;
-            $('#selectedCount').text(count);
+            let totalIds = 0;
+            $('.row-select:checked').each(function() {
+                const ids = $(this).val().split(',');
+                totalIds += ids.length;
+            });
+            $('#selectedCount').text(totalIds);
             
-            if (count > 0) {
+            if (totalIds > 0) {
                 $('#printSelectedBtn').removeClass('d-none');
             } else {
                 $('#printSelectedBtn').addClass('d-none');
             }
         }
         
+        // Select all checkbox
         $('#selectAll').on('change', function() {
             const isChecked = $(this).is(':checked');
+            // Only select visible rows
             $('.kanban-row:visible .row-select').prop('checked', isChecked);
             updateSelectedCount();
         });
         
+        // Individual row checkbox
         $(document).on('change', '.row-select', function() {
             updateSelectedCount();
             
+            // Update select all checkbox state
             const totalVisible = $('.kanban-row:visible .row-select').length;
             const checkedVisible = $('.kanban-row:visible .row-select:checked').length;
             $('#selectAll').prop('checked', totalVisible > 0 && totalVisible === checkedVisible);
         });
         
-        // ========== PRINT PREVIEW MODAL FUNCTIONS ==========
-        function showPrintPreview(url) {
-            Swal.fire({
-                title: 'Loading Preview...',
-                text: 'Mohon tunggu sebentar',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-            
-            const iframe = $('#printPreviewFrame');
-            iframe.attr('src', 'about:blank');
-            iframe.attr('src', url);
-            
-            iframe.off('load').on('load', function() {
-                Swal.close();
-                $('#printPreviewModal').modal('show');
-            });
-            
-            setTimeout(function() {
-                Swal.close();
-                $('#printPreviewModal').modal('show');
-            }, 3000);
-        }
-        
-        // ========== PRINT SELECTED ==========
+        // Print Selected Button
         $('#printSelectedBtn').on('click', function() {
-            const selectedIds = $('.row-select:checked').map(function() {
-                return $(this).val();
-            }).get();
+            let selectedIds = [];
+            $('.row-select:checked').each(function() {
+                const ids = $(this).val().split(',');
+                selectedIds = selectedIds.concat(ids);
+            });
             
             if (selectedIds.length === 0) {
                 Swal.fire({
@@ -481,11 +549,64 @@
                 return;
             }
             
+            // Open print page with selected IDs
             const url = '{{ route("kanbantmmins.printselected") }}?ids=' + selectedIds.join(',');
-            showPrintPreview(url);
+            window.open(url, '_blank');
+        });
+        
+        // ========== ITEMS MODAL ==========
+        
+        $(document).on('click', '.list-items-btn', function() {
+            const manifestNo = $(this).data('manifest');
+            const items = $(this).data('items');
+            
+            $('#modalManifestNo').text(manifestNo);
+            $('#printGroupBtn').attr('href', '{{ url("kanbantmmins/print-group") }}?manifest_no=' + encodeURIComponent(manifestNo));
+            
+            let html = '';
+            let totalPcs = 0;
+            let uniquePartNos = new Set();
+            
+            if (items && items.length > 0) {
+                items.forEach(function(item, index) {
+                    totalPcs += parseInt(item.pcs) || 0;
+                    if (item.part_no) {
+                        uniquePartNos.add(item.part_no);
+                    }
+                    html += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td><strong>${item.part_no || '-'}</strong></td>
+                            <td>${(item.part_name || '-').substring(0, 30)}</td>
+                            <td><span class="badge bg-secondary">${item.dock_code || '-'}</span></td>
+                            <td><strong>${item.address || '-'}</strong></td>
+                            <td>${item.pcs || 0}</td>
+                            <td>${item.route || '-'}</td>
+                            <td>${item.unique_no || '-'}</td>
+                            <td>
+                                <a href="{{ url('kanbantmmins/print') }}/${item.id}" class="btn btn-success btn-sm" target="_blank" title="Print">
+                                    <i class="bi bi-printer-fill"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                $('#modalTotalPartNo').text(uniquePartNos.size);
+                $('#modalTotalItems').text(items.length);
+                $('#modalTotalPcs').text(totalPcs);
+            } else {
+                html = '<tr><td colspan="9" class="text-center">No items found</td></tr>';
+                $('#modalTotalPartNo').text(0);
+                $('#modalTotalItems').text(0);
+                $('#modalTotalPcs').text(0);
+            }
+            
+            $('#itemsTableBody').html(html);
         });
         
         // ========== PRINT ALL ==========
+        
         $('#printAllBtn').on('click', function() {
             $('#printAllModal').modal('show');
         });
@@ -513,28 +634,12 @@
             }
             
             const url = '{{ route("kanbantmmins.printall") }}?dock_codes=' + selectedDocks.join(',');
+            window.open(url, '_blank');
             $('#printAllModal').modal('hide');
-            showPrintPreview(url);
         });
         
-        // ========== PRINT INDIVIDUAL (PREVENT DEFAULT) ==========
-        $(document).on('click', '.btn-print-individual', function(e) {
-            e.preventDefault();
-            const url = $(this).attr('href');
-            showPrintPreview(url);
-        });
-        
-        // ========== CONFIRM PRINT BUTTON IN MODAL ==========
-        $('#confirmPrintBtn').on('click', function() {
-            const iframe = document.getElementById('printPreviewFrame');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-            }
-        });
-        
-        // ========== DELETE ==========
-        $('.delete-form').on('submit', function(e) {
+        // ========== DELETE GROUP ==========
+        $('.delete-group-form').on('submit', function(e) {
             e.preventDefault();
             
             const form = $(this);
@@ -542,12 +647,12 @@
             
             Swal.fire({
                 title: 'Apakah Anda yakin?',
-                text: "Data ini akan dihapus permanen!",
+                text: "Semua data dalam group ini akan dihapus permanen!",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc2626',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Hapus!',
+                confirmButtonText: 'Ya, Hapus Semua!',
                 cancelButtonText: 'Batal',
                 reverseButtons: true
             }).then((result) => {
@@ -658,6 +763,7 @@
             });
         });
 
+        // Sweet Alert for flash messages
         @if(session('sweet_alert'))
             Swal.fire({
                 icon: '{{ session("sweet_alert.type") }}',

@@ -23,6 +23,39 @@ class KanbanTmminsController extends Controller
         return view('kanbantmmins.index', compact('kanbantmmins', 'latestUploadInfo'));
     }
 
+    public function indexByDn()
+    {
+        $kanbantmmins = KanbanTmmins::all();
+        $latestUploadInfo = KanbanTmmins::getLatestUploadInfo();
+        
+        return view('kanbantmmins.index-by-dn', compact('kanbantmmins', 'latestUploadInfo'));
+    }
+
+    /**
+     * Delete all records by manifest_no (group delete)
+     */
+    public function destroyGroup($manifest_no)
+    {
+        try {
+            $deletedCount = KanbanTmmins::where('manifest_no', $manifest_no)->count();
+            KanbanTmmins::where('manifest_no', $manifest_no)->delete();
+            
+            Log::info("Successfully deleted {$deletedCount} records for manifest_no: {$manifest_no}");
+            
+            return response()->json([
+                'success' => true,
+                'message' => "{$deletedCount} data dengan Manifest No {$manifest_no} berhasil dihapus!"
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error deleting kanban group: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menghapus: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Import TXT file
      */
@@ -289,60 +322,60 @@ class KanbanTmminsController extends Controller
      */
     private function extractOrderNo($d1, $d2Entries, $manifestNo)
     {
-        $order_no = 'UNKNOWN';
-        
-        // Dynamic year check - current year and next year (untuk data planning)
-        $currentYear = date('Y');
-        $nextYear = (string)((int)$currentYear + 1);
-        $validYears = [$currentYear, $nextYear];
-        
+        // Dynamic year check - 2 tahun ke belakang + tahun sekarang + 1 tahun ke depan
+        $currentYear = (int)date('Y');
+        $validYears = [
+            (string)($currentYear - 2), // 2 tahun lalu
+            (string)($currentYear - 1), // tahun lalu
+            (string)$currentYear,        // tahun sekarang
+            (string)($currentYear + 1),  // tahun depan
+        ];
+
         // Helper function to check if value is valid order_no
         $isValidOrderNo = function($value) use ($validYears) {
-            $clean = trim($value);
+            $clean = trim((string)$value);
             if (strlen($clean) !== 10 || !ctype_digit($clean)) {
                 return false;
             }
             $yearPrefix = substr($clean, 0, 4);
             return in_array($yearPrefix, $validYears);
         };
-        
-        // Check column 8 first
+
+        // 1. Check column 8 first (standard position)
         if (isset($d1[8]) && $isValidOrderNo($d1[8])) {
-            $order_no = trim($d1[8]);
-        } 
-        // Check from D2 QR code
-        else if (!empty($d2Entries) && isset($d2Entries[0][5])) {
+            return trim($d1[8]);
+        }
+
+        // 2. Check from D2 QR code
+        if (!empty($d2Entries) && isset($d2Entries[0][5])) {
             $qrCode = trim($d2Entries[0][5]);
             if (strlen($qrCode) >= 22) {
                 $possibleOrderNo = substr($qrCode, 12, 10);
                 if ($isValidOrderNo($possibleOrderNo)) {
-                    $order_no = $possibleOrderNo;
+                    return $possibleOrderNo;
                 }
             }
         }
-        
-        // Fallback: scan all D1 columns
-        if ($order_no === 'UNKNOWN') {
-            foreach ($d1 as $index => $value) {
-                if ($isValidOrderNo($value)) {
-                    $order_no = trim($value);
-                    break;
-                }
+
+        // 3. Fallback: scan all D1 columns
+        foreach ($d1 as $value) {
+            if ($isValidOrderNo($value)) {
+                return trim($value);
             }
         }
-        
-        // Fallback: extract from manifest_no
-        if ($order_no === 'UNKNOWN' && isset($manifestNo) && strlen($manifestNo) >= 10) {
-            foreach (range(0, strlen($manifestNo) - 10) as $i) {
+
+        // 4. Fallback: extract from manifest_no
+        if (!empty($manifestNo) && strlen($manifestNo) >= 10) {
+            $len = strlen($manifestNo) - 9;
+            for ($i = 0; $i < $len; $i++) {
                 $segment = substr($manifestNo, $i, 10);
                 if ($isValidOrderNo($segment)) {
-                    $order_no = $segment;
-                    break;
+                    return $segment;
                 }
             }
         }
-        
-        return $order_no;
+
+        return 'UNKNOWN';
     }
 
     /**
@@ -1167,4 +1200,6 @@ class KanbanTmminsController extends Controller
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
+    
+    
 }
