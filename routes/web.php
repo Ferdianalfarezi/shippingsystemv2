@@ -156,6 +156,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/print/{id}', [KanbanTmminsController::class, 'print'])->name('print');
         Route::get('/printall', [KanbanTmminsController::class, 'printAll'])->name('printall');
         Route::get('/print-selected', [KanbanTmminsController::class, 'printSelected'])->name('printselected');
+        Route::post('/get-plant-counts', [KanbanTmminsController::class, 'getPlantCounts'])->name('getPlantCounts');
         // Route::get('/print-plant', [KanbanTmminsController::class, 'printByPlant'])->name('printplant');
         Route::get('/print-group', [KanbanTmminsController::class, 'printGroup'])->name('printgroup');
         Route::delete('/destroy-group/{manifest_no}', [KanbanTmminsController::class, 'destroyGroup'])->where('manifest_no', '.*')->name('destroygroup');

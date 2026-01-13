@@ -964,6 +964,9 @@ class KanbanTmminsController extends Controller
                 return redirect()->back()->with('error', 'No valid dock codes found');
             }
             
+            // Get plant filter parameter
+            $plantFilter = $request->input('plant', 'all'); // all, 1, 2
+            
             $kanbantmmins = KanbanTmmins::whereIn('dock_code', $selectedDockCodes)
                                  ->orderByDesc('manifest_no')
                                  ->orderByDesc('address')
@@ -986,6 +989,25 @@ class KanbanTmminsController extends Controller
             
             if ($kanbantmmins->isEmpty()) {
                 return redirect()->back()->with('error', 'No data found for selected dock codes');
+            }
+            
+            // Filter by plant based on address prefix
+            if ($plantFilter === '1') {
+                // Plant 1: address NOT starting with 'K'
+                $kanbantmmins = $kanbantmmins->filter(function($item) {
+                    $address = strtoupper(trim($item->address ?? ''));
+                    return !str_starts_with($address, 'K');
+                });
+            } elseif ($plantFilter === '2') {
+                // Plant 2: address starting with 'K'
+                $kanbantmmins = $kanbantmmins->filter(function($item) {
+                    $address = strtoupper(trim($item->address ?? ''));
+                    return str_starts_with($address, 'K');
+                });
+            }
+            
+            if ($kanbantmmins->isEmpty()) {
+                return redirect()->back()->with('error', 'No data found for selected plant filter');
             }
             
             // Sort data
@@ -1061,7 +1083,10 @@ class KanbanTmminsController extends Controller
                 $groupedData->put($dockCode, $sortedItems);
             }
             
-            return view('kanbantmmins.printall', compact('groupedData', 'selectedDockCodes', 'kanbantmmins'));
+            // Pass plant filter to view for separator page
+            $showPlantSeparator = ($plantFilter === '2');
+            
+            return view('kanbantmmins.printall', compact('groupedData', 'selectedDockCodes', 'kanbantmmins', 'plantFilter', 'showPlantSeparator'));
             
         } catch (\Exception $e) {
             Log::error('Print All Error: ' . $e->getMessage());
@@ -1089,7 +1114,7 @@ class KanbanTmminsController extends Controller
         return view('kanbantmmins.print-group', compact('kanbantmmins'));
     }
 
-     public function printSelected(Request $request)
+    public function printSelected(Request $request)
     {
         try {
             $generator = new BarcodeGeneratorPNG();
@@ -1106,6 +1131,9 @@ class KanbanTmminsController extends Controller
                 return redirect()->back()->with('error', 'No valid IDs found');
             }
             
+            // Get plant filter parameter
+            $plantFilter = $request->input('plant', 'all'); // all, 1, 2
+            
             $kanbantmmins = KanbanTmmins::whereIn('id', $selectedIds)
                                  ->orderByDesc('manifest_no')
                                  ->orderByDesc('address')
@@ -1115,6 +1143,25 @@ class KanbanTmminsController extends Controller
             
             if ($kanbantmmins->isEmpty()) {
                 return redirect()->back()->with('error', 'No data found for selected IDs');
+            }
+            
+            // Filter by plant based on address prefix
+            if ($plantFilter === '1') {
+                // Plant 1: address NOT starting with 'K'
+                $kanbantmmins = $kanbantmmins->filter(function($item) {
+                    $address = strtoupper(trim($item->address ?? ''));
+                    return !str_starts_with($address, 'K');
+                });
+            } elseif ($plantFilter === '2') {
+                // Plant 2: address starting with 'K'
+                $kanbantmmins = $kanbantmmins->filter(function($item) {
+                    $address = strtoupper(trim($item->address ?? ''));
+                    return str_starts_with($address, 'K');
+                });
+            }
+            
+            if ($kanbantmmins->isEmpty()) {
+                return redirect()->back()->with('error', 'No data found for selected plant filter');
             }
             
             // Sort data
@@ -1193,7 +1240,10 @@ class KanbanTmminsController extends Controller
                 $groupedData->put($dockCode, $sortedItems);
             }
             
-            return view('kanbantmmins.printall', compact('groupedData', 'selectedDockCodes', 'kanbantmmins'));
+            // Pass plant filter to view for separator page
+            $showPlantSeparator = ($plantFilter === '2');
+            
+            return view('kanbantmmins.printall', compact('groupedData', 'selectedDockCodes', 'kanbantmmins', 'plantFilter', 'showPlantSeparator'));
             
         } catch (\Exception $e) {
             Log::error('Print Selected Error: ' . $e->getMessage());
@@ -1201,5 +1251,42 @@ class KanbanTmminsController extends Controller
         }
     }
     
-    
+    /**
+     * Get plant counts for AJAX request
+     */
+    public function getPlantCounts(Request $request)
+    {
+        try {
+            $dockCodes = $request->input('dock_codes', []);
+            $ids = $request->input('ids', []);
+            
+            if (!empty($ids)) {
+                // For print selected
+                $items = KanbanTmmins::whereIn('id', $ids)->get();
+            } elseif (!empty($dockCodes)) {
+                // For print all
+                $items = KanbanTmmins::whereIn('dock_code', $dockCodes)->get();
+            } else {
+                return response()->json(['plant1' => 0, 'plant2' => 0]);
+            }
+            
+            $plant1Count = $items->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return !str_starts_with($address, 'K');
+            })->count();
+            
+            $plant2Count = $items->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return str_starts_with($address, 'K');
+            })->count();
+            
+            return response()->json([
+                'plant1' => $plant1Count,
+                'plant2' => $plant2Count
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json(['plant1' => 0, 'plant2' => 0]);
+        }
+    }
 }

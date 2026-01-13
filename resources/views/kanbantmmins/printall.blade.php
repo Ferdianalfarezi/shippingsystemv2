@@ -5,17 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Print Delivery Note</title>
-    <!-- Include JsBarcode library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <!-- Include QRCode.js library (qrcodejs) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     @php
-        // Deteksi apakah ini single item atau multiple items
         $isSingleItem = isset($note) && !isset($groupedData) && !isset($allData);
         $isMultipleItems = isset($groupedData) || isset($allData);
         
-        // Siapkan data untuk diproses
         if ($isSingleItem) {
             $itemsToProcess = collect([$note]);
         } elseif (isset($groupedData)) {
@@ -27,6 +23,10 @@
         } else {
             $itemsToProcess = collect([]);
         }
+        
+        // Check if we need to show Plant 2 separator
+        $showPlantSeparator = $showPlantSeparator ?? false;
+        $plantFilter = $plantFilter ?? 'all';
     @endphp
 
     @if($itemsToProcess->isEmpty())
@@ -46,9 +46,45 @@
             box-sizing: border-box;
         }
 
-        /* Page break untuk multiple items */
         .page-break {
             page-break-before: always;
+        }
+
+        /* Plant 2 Separator Page */
+        .plant-separator {
+            width: 794px;
+            height: 283px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            margin-left: 15px;
+            margin-top: 5px;
+            border: 3px solid #000;
+        }
+
+        .plant-separator-content {
+            text-align: center;
+        }
+
+        .plant-separator-title {
+            font-size: 72px;
+            font-weight: bold;
+            color: #000;
+            letter-spacing: 5px;
+        }
+
+        .plant-separator-line {
+            width: 300px;
+            height: 4px;
+            background: #000;
+            margin: 15px auto;
+        }
+
+        .plant-separator-subtitle {
+            font-size: 18px;
+            color: #333;
+            margin-top: 10px;
         }
 
         .border {
@@ -60,7 +96,6 @@
             position: relative;
         }
 
-        /* Container utama */
         .delivery-note-container {
             position: absolute;
             top: 3px;
@@ -71,7 +106,6 @@
             gap: 10px;
         }
 
-        /* supplier */
         .supplier-box {
             width: 266px;
             height: 65px;
@@ -107,7 +141,6 @@
             font-weight: bold;
         }
 
-        /* company */
         .company-box {
             margin-top: 6px;
             text-align: center;
@@ -123,7 +156,6 @@
             margin-top: 10px;
         }
 
-        /* dock code */
         .dock-code-box {
             width: 114px;
             height: 72px;
@@ -168,7 +200,6 @@
             justify-content: center;
         }
 
-        /* progress line no */
         .progress-line-box {
             width: 166px;
             height: 73px;
@@ -213,7 +244,6 @@
             justify-content: center;
         }
 
-        /* Departure and Arrival Container - Absolute Positioning */
         .departure-arrival-container {
             position: absolute;
             top: 74px;
@@ -223,7 +253,6 @@
             gap: -1px;
         }
 
-        /* Departure time */
         .daparture-box {
             width: 132px;
             height: 40px;
@@ -249,10 +278,8 @@
             margin-top: 1px;
             margin-bottom: 3px;
             font-size: 13px;
-            
         }
 
-        /* Arrival time */
         .arrival-box {
             width: 132px;
             height: 40px;
@@ -281,7 +308,6 @@
             font-size: 13px;
         }
 
-        /* Route and Cycle container - Absolute Positioning */
         .route-cycle-container {
             position: absolute;
             top: 122px;
@@ -291,7 +317,6 @@
             gap: 0px;
         }
 
-        /* Route */
         .route-box {
             width: 151px;
             height: 51px;
@@ -334,7 +359,6 @@
             font-weight: bold;
         }
 
-        /* Cycle */
         .cycle-box {
             width: 113px;
             height: 51px;
@@ -378,7 +402,6 @@
             font-weight: bold;
         }
 
-        /* part no container - Absolute Positioning */
         .part-no-container {
             position: absolute;
             top: 7px;
@@ -388,7 +411,6 @@
             width: 331px;
         }
 
-        /* part no */
         .part-no-box {
             width: 335px;
             height: 63px;
@@ -438,7 +460,6 @@
             font-weight: bold;
         }
 
-        /* Unique no and QR code container */
         .unique-qr-container {
             display: flex;
             flex-direction: row;
@@ -446,7 +467,6 @@
             width: 100%;
         }
 
-        /* Unique no */
         .unique-no-box {
             min-width: 250px;
             height: 53px;
@@ -498,7 +518,6 @@
             flex-direction: row;
         }
 
-
         .unique-no-content-reverse {
             flex-grow: 1;
             display: flex;
@@ -509,7 +528,6 @@
             font-weight: bold;
         }
 
-        /* Keterangan */
         .keterangan-box {
             width: 20px;
             height: 60px;
@@ -533,7 +551,6 @@
             margin-bottom: 2px;
         }
 
-        /* QR code */
         .qr-code {
             width: 60px;
             height: 55px;
@@ -545,7 +562,6 @@
             margin-left: 5px;
         }
 
-        /* Conveyance No - NEW ADDITION */
         .conveyance-box {
             min-width: 166px;
             height: 53px;
@@ -588,7 +604,6 @@
             font-weight: bold;
         }
 
-        /* Container for out and manifest - Absolute Positioning */
         .out-manifest-container {
             position: absolute;
             top: 4px;
@@ -597,7 +612,6 @@
             flex-direction: column;
         }
 
-        /* out */
         .out-box {
             width: 166px;
             height: 25px;
@@ -639,7 +653,6 @@
             justify-content: center;
         }
 
-        /* manifest no */
         .manifest-box {
             width: 166px;
             height: 35px;
@@ -677,7 +690,6 @@
             font-weight: bold;
         }
 
-        /* Supplier Data - Absolute Positioning */
         .supplier-data-box {
             position: absolute;
             top: 181px;
@@ -722,7 +734,6 @@
             margin: 0 auto;
         }
 
-        /* PCS/KANBAN Box - Absolute Positioning */
         .pcs-box {
             position: absolute;
             top: 214px;
@@ -757,9 +768,8 @@
             font-weight: bold;
         }
 
-        /* Order No Box - Absolute Positioning */
         .order-no-box {
-           position: absolute;
+            position: absolute;
             top: 214px;
             left: 363px;
             width: 182px;
@@ -787,14 +797,14 @@
         }
 
         .order-no-box-header span {
-           writing-mode: vertical-lr;
+            writing-mode: vertical-lr;
             font-size: 7px;
             text-orientation: mixed;
             white-space: nowrap;
             transform: rotate(180deg);
         }
 
-        .order-no-box-content  {
+        .order-no-box-content {
             flex-grow: 1;
             display: flex;
             align-items: center;
@@ -808,7 +818,6 @@
             font-weight: bold;
         }
 
-        /* Part Address Box - Absolute Positioning */
         .part-address-box {
             position: absolute;
             top: 214px;
@@ -853,11 +862,92 @@
             font-size: 32px;
             font-weight: bold;
         }
+
+        @media print {
+            .plant-separator {
+                page-break-after: always;
+            }
+        }
+
+        /* Plant 2 Separator Page */
+        .plant-separator {
+            width: 794px;
+            height: 283px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            margin-left: 15px;
+            margin-top: 5px;
+            border: 3px solid #000;
+            position: relative;
+        }
+
+        /* Blok hitam pojok kiri atas */
+        .plant-separator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 50px;
+            background: #000;
+        }
+
+        /* Blok hitam pojok kanan atas */
+        .plant-separator::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50px;
+            height: 50px;
+            background: #000;
+        }
+
+        .plant-separator-content {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Blok hitam pojok kiri bawah */
+        .plant-separator-content::before {
+            content: '';
+            position: absolute;
+            bottom: -141px;
+            left: -372px;
+            width: 50px;
+            height: 50px;
+            background: #000;
+        }
+
+        /* Blok hitam pojok kanan bawah */
+        .plant-separator-content::after {
+            content: '';
+            position: absolute;
+            bottom: -141px;
+            right: -372px;
+            width: 50px;
+            height: 50px;
+            background: #000;
+        }
     </style>
 </head>
 <body>
+    {{-- Plant 2 Separator Page (only shown when printing Plant 2) --}}
+    @if($showPlantSeparator)
+        <div class="plant-separator">
+            <div class="plant-separator-content">
+                <div class="plant-separator-title">PLANT 2</div>
+                <div class="plant-separator-line"></div>
+                <div class="plant-separator-subtitle">{{ $itemsToProcess->count() }} Items | {{ now()->format('d M Y H:i') }}</div>
+            </div>
+        </div>
+    @endif
+
     @foreach($itemsToProcess as $index => $currentNote)
-        @if($index > 0)
+        @if($index > 0 || $showPlantSeparator)
             <div class="page-break"></div>
         @endif
 
@@ -867,7 +957,6 @@
                     <div class="supplier-box-header">SUPPLIER</div>
                     <div class="supplier-box-content">
                         <div><div>{{$currentNote->supplier??'-'}}</div><div class="supplier-code">{{$currentNote->supplier_code??'5007-1'}}@if(!empty($currentNote->customer_address))-{{$currentNote->customer_address}}@endif</div></div>
-
                     </div>
                 </div>
 
@@ -905,12 +994,11 @@
                     <div class="daparture-box-header">DAPARTURE TIME</div>
                     <div class="daparture-box-content">
                         <div>
-                        <div class="date-time-value">
+                            <div class="date-time-value">
                                 @if($currentNote && $currentNote->departure_time)
                                     @php
                                         $dt = \Carbon\Carbon::parse($currentNote->departure_time);
                                     @endphp
-
                                     <strong style="font-size: 1.2em;">{{ $dt->format('d/m') }}</strong>
                                     {{ $dt->format(' Y-H:i') }}
                                 @endif
@@ -922,11 +1010,10 @@
                     <div class="arrival-box-header">ARRIVAL TIME</div>
                     <div class="arrival-box-content">
                         <div>
-                           @if($currentNote && $currentNote->arrival_time)
+                            @if($currentNote && $currentNote->arrival_time)
                                 @php
                                     $dt = \Carbon\Carbon::parse($currentNote->arrival_time);
                                 @endphp
-
                                 <strong style="font-size: 1.2em;">{{ $dt->format('d/m') }}</strong>
                                 {{ $dt->format(' Y-H:i') }}
                             @endif
@@ -943,16 +1030,13 @@
                                     $currentSequence = 1;
                                     $totalSequence = 1;
                                     
-                                    // For single item printing, we need to query the database to get the actual sequence
                                     if($isSingleItem && isset($currentNote->qr_code) && !empty($currentNote->qr_code)) {
                                         $currentQrCode = $currentNote->qr_code;
                                         
-                                        // Check if QR code ends with a digit (indicating sequence)
                                         if(preg_match('/^(.+)(\d)$/', $currentQrCode, $matches)) {
                                             $baseQrCode = $matches[1];
                                             $currentDigit = (int)$matches[2];
                                             
-                                            // Query database for all items with similar QR code pattern
                                             $relatedItems = \App\Models\KanbanTmmins::where('qr_code', 'LIKE', $baseQrCode . '%')->get();
                                             
                                             if($relatedItems->count() > 0) {
@@ -962,9 +1046,7 @@
                                                         $allDigits[] = (int)$digitMatches[1];
                                                     }
                                                 }
-                                                
                                                 sort($allDigits);
-                                                
                                                 $currentSequence = array_search($currentDigit, $allDigits) + 1;
                                                 $totalSequence = count($allDigits);
                                             } else {
@@ -972,14 +1054,10 @@
                                                 $totalSequence = 1;
                                             }
                                         } else {
-                                            // If no digit pattern, check by part number
                                             $currentPartNo = $currentNote->part_no ?? '';
-                                            
                                             if(!empty($currentPartNo)) {
-                                                // Query database for all items with same part number
                                                 $samePartNumbers = \App\Models\KanbanTmmins::where('part_no', $currentPartNo)->get();
                                                 $totalSequence = $samePartNumbers->count();
-                                                
                                                 if($totalSequence > 1) {
                                                     $sortedItems = $samePartNumbers->sortBy('qr_code');
                                                     $currentSequence = 1;
@@ -993,7 +1071,6 @@
                                             }
                                         }
                                     }
-                                    // For multiple items, use the existing logic with $itemsToProcess
                                     elseif($isMultipleItems && isset($currentNote->qr_code) && !empty($currentNote->qr_code)) {
                                         $currentQrCode = $currentNote->qr_code;
                                         
@@ -1015,9 +1092,7 @@
                                                         $allDigits[] = (int)$digitMatches[1];
                                                     }
                                                 }
-                                                
                                                 sort($allDigits);
-                                                
                                                 $currentSequence = array_search($currentDigit, $allDigits) + 1;
                                                 $totalSequence = count($allDigits);
                                             } else {
@@ -1026,11 +1101,9 @@
                                             }
                                         } else {
                                             $currentPartNo = $currentNote->part_no ?? '';
-                                            
                                             if(!empty($currentPartNo)) {
                                                 $samePartNumbers = $itemsToProcess->where('part_no', $currentPartNo);
                                                 $totalSequence = $samePartNumbers->count();
-                                                
                                                 $sortedItems = $samePartNumbers->sortBy('qr_code')->values();
                                                 foreach($sortedItems as $idx => $item) {
                                                     if($item->qr_code === $currentNote->qr_code) {
@@ -1041,14 +1114,11 @@
                                             }
                                         }
                                     }
-                                    // Fallback for items without QR codes
                                     elseif($isMultipleItems) {
                                         $currentPartNo = $currentNote->part_no ?? '';
-                                        
                                         if(!empty($currentPartNo)) {
                                             $samePartNumbers = $itemsToProcess->where('part_no', $currentPartNo);
                                             $totalSequence = $samePartNumbers->count();
-                                            
                                             $sortedItems = $samePartNumbers->sortBy('id')->values();
                                             foreach($sortedItems as $idx => $item) {
                                                 if($item->id === $currentNote->id) {
@@ -1068,7 +1138,6 @@
                     
                     <div class="unique-qr-container">
                         @php
-                            // Check if unique_no exists in run_outs table
                             $isRunOut = false;
                             if (isset($currentNote->unique_no) && !empty($currentNote->unique_no)) {
                                 $isRunOut = \DB::table('run_outs')
@@ -1078,11 +1147,9 @@
                         @endphp
                         
                         <div class="{{ $isRunOut ? 'unique-no-box-reverse' : 'unique-no-box' }}">
-                            
-                                <div class="unique-no-box-header">
-                                    <span>UNIQUE NO</span>
-                                </div>
-                            
+                            <div class="unique-no-box-header">
+                                <span>UNIQUE NO</span>
+                            </div>
                             <div class="{{ $isRunOut ? 'unique-no-content-reverse' : 'unique-no-content' }}">
                                 {{ $currentNote->unique_no ?? '-' }}
                             </div>
@@ -1110,17 +1177,15 @@
                         <div class="out-box-header">
                             <span>OUT</span>
                         </div>
-                      <div class="out-box-content">
+                        <div class="out-box-content">
                             @if($currentNote && $currentNote->out_time)
                                 @php
                                     $dt = \Carbon\Carbon::parse($currentNote->out_time);
                                 @endphp
-
                                 <strong style="font-size: 1.2em;">
                                     {{ $dt->format('d/m') }}&nbsp;
                                 </strong>
                                 {{ $dt->format(' Y-H:i') }}
-
                             @endif
                         </div>
                     </div>
@@ -1145,7 +1210,7 @@
                     <div class="cycle-box-header">
                         <span>CYCLE</span>
                     </div>
-                   <div class="cycle-content">{{ $currentNote->cycle ? sprintf('%02d', $currentNote->cycle) : '' }}</div>
+                    <div class="cycle-content">{{ $currentNote->cycle ? sprintf('%02d', $currentNote->cycle) : '' }}</div>
                 </div>
             </div>
 
@@ -1200,45 +1265,36 @@
     @endforeach
 
     <script>
-        // DEBUG: Log information
         console.log('=== BARCODE DEBUG INFO ===');
         console.log('Total items to process: {{ $itemsToProcess->count() }}');
+        console.log('Plant filter: {{ $plantFilter }}');
+        console.log('Show separator: {{ $showPlantSeparator ? "true" : "false" }}');
         
-        // Generate barcodes and QR codes
         window.onload = function() {
             setTimeout(function() {
                 console.log('Starting barcode and QR code generation...');
                 
                 @foreach($itemsToProcess as $barcodeIndex => $barcodeItem)
                     (function(index) {
-                        // Generate Barcode
                         try {
                             const canvas = document.getElementById('barcode-' + index);
                             if (canvas) {
                                 const addressValue = "{{ $barcodeItem->address ?? ($barcodeItem->dock_code . '-' . $barcodeItem->id) }}";
-                                console.log('Generating barcode ' + index + ' with value: ' + addressValue);
-                                
                                 JsBarcode("#barcode-" + index, addressValue, {
                                     format: "CODE128",
                                     width: 2,
                                     height: 40,
                                     displayValue: true
                                 });
-                                console.log('✓ Barcode ' + index + ' generated successfully');
-                            } else {
-                                console.error('✗ Canvas not found for barcode-' + index);
                             }
                         } catch (error) {
-                            console.error('✗ Error generating barcode ' + index + ':', error);
+                            console.error('Error generating barcode ' + index + ':', error);
                         }
                         
-                        // Generate QR Code
                         try {
                             const qrDiv = document.getElementById('qrcode-' + index);
                             if (qrDiv) {
                                 const qrValue = qrDiv.getAttribute('data-qr') || 'NO-QR';
-                                console.log('Generating QR code ' + index + ' with value: ' + qrValue);
-                                
                                 new QRCode(qrDiv, {
                                     text: qrValue,
                                     width: 55,
@@ -1247,33 +1303,112 @@
                                     colorLight: "#ffffff",
                                     correctLevel: QRCode.CorrectLevel.L
                                 });
-                                console.log('✓ QR code ' + index + ' generated successfully');
-                            } else {
-                                console.error('✗ QR Div not found for qrcode-' + index);
                             }
                         } catch (error) {
-                            console.error('✗ Error generating QR code ' + index + ':', error);
+                            console.error('Error generating QR code ' + index + ':', error);
                         }
                     })({{ $barcodeIndex }});
                 @endforeach
                 
-                // Print after a delay to ensure all barcodes and QR codes are generated
-                setTimeout(function() {
-                    console.log('All barcodes and QR codes generated, starting print...');
-                    @if($isMultipleItems)
-                        console.log('Multiple items print mode');
-                        console.log('Total items to print: {{ $itemsToProcess->count() }}');
-                        @if(isset($selectedDockCodes))
-                            console.log('Selected dock codes: {{ implode(", ", $selectedDockCodes) }}');
-                        @endif
-                    @else
-                        console.log('Single item print mode');
-                    @endif
-                    window.print();
-                }, 1500);
+                console.log('All barcodes and QR codes generated');
             }, 500);
         }
-        
+
+        // Auto print untuk Plant 2
+        @if($showPlantSeparator)
+            window.onload = function() {
+                setTimeout(function() {
+                    console.log('Starting barcode and QR code generation...');
+                    
+                    @foreach($itemsToProcess as $barcodeIndex => $barcodeItem)
+                        (function(index) {
+                            try {
+                                const canvas = document.getElementById('barcode-' + index);
+                                if (canvas) {
+                                    const addressValue = "{{ $barcodeItem->address ?? ($barcodeItem->dock_code . '-' . $barcodeItem->id) }}";
+                                    JsBarcode("#barcode-" + index, addressValue, {
+                                        format: "CODE128",
+                                        width: 2,
+                                        height: 40,
+                                        displayValue: true
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error generating barcode ' + index + ':', error);
+                            }
+                            
+                            try {
+                                const qrDiv = document.getElementById('qrcode-' + index);
+                                if (qrDiv) {
+                                    const qrValue = qrDiv.getAttribute('data-qr') || 'NO-QR';
+                                    new QRCode(qrDiv, {
+                                        text: qrValue,
+                                        width: 55,
+                                        height: 55,
+                                        colorDark: "#000000",
+                                        colorLight: "#ffffff",
+                                        correctLevel: QRCode.CorrectLevel.L
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error generating QR code ' + index + ':', error);
+                            }
+                        })({{ $barcodeIndex }});
+                    @endforeach
+                    
+                    console.log('All barcodes and QR codes generated');
+                    
+                    // Auto print untuk Plant 2
+                    setTimeout(function() {
+                        window.print();
+                    }, 1000);
+                }, 500);
+            }
+        @else
+            window.onload = function() {
+                setTimeout(function() {
+                    console.log('Starting barcode and QR code generation...');
+                    
+                    @foreach($itemsToProcess as $barcodeIndex => $barcodeItem)
+                        (function(index) {
+                            try {
+                                const canvas = document.getElementById('barcode-' + index);
+                                if (canvas) {
+                                    const addressValue = "{{ $barcodeItem->address ?? ($barcodeItem->dock_code . '-' . $barcodeItem->id) }}";
+                                    JsBarcode("#barcode-" + index, addressValue, {
+                                        format: "CODE128",
+                                        width: 2,
+                                        height: 40,
+                                        displayValue: true
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error generating barcode ' + index + ':', error);
+                            }
+                            
+                            try {
+                                const qrDiv = document.getElementById('qrcode-' + index);
+                                if (qrDiv) {
+                                    const qrValue = qrDiv.getAttribute('data-qr') || 'NO-QR';
+                                    new QRCode(qrDiv, {
+                                        text: qrValue,
+                                        width: 55,
+                                        height: 55,
+                                        colorDark: "#000000",
+                                        colorLight: "#ffffff",
+                                        correctLevel: QRCode.CorrectLevel.L
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error generating QR code ' + index + ':', error);
+                            }
+                        })({{ $barcodeIndex }});
+                    @endforeach
+                    
+                    console.log('All barcodes and QR codes generated');
+                }, 500);
+            }
+        @endif
     </script>
 </body>
 </html>
