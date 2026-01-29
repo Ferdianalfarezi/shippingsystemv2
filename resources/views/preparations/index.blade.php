@@ -1187,7 +1187,8 @@ $('.delete-form').on('submit', function(e) {
                             title: 'Berhasil!',
                             text: response.message,
                             icon: 'success',
-                            confirmButtonColor: '#059669'
+                            showConfirmButton: false,
+                            timer: 1000,
                         }).then(() => {
                             window.location.reload();
                         });

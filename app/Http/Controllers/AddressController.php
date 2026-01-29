@@ -6,6 +6,7 @@ use App\Models\Address;
 use Illuminate\Http\Request;
 use App\Imports\AddressesImport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\RackImport;
 
 class AddressController extends Controller
 {
@@ -271,5 +272,32 @@ class AddressController extends Controller
     public function importPage()
     {
         return view('addresses.import');
+    }
+
+    public function importRack(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls'
+        ]);
+
+        try {
+            $import = new RackImport();
+            Excel::import($import, $request->file('file'));
+            
+            $results = $import->getResults();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Update rack berhasil!",
+                'updated' => $results['updated'],
+                'not_found' => $results['not_found'],
+                'not_found_parts' => $results['not_found_parts'],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Import gagal: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

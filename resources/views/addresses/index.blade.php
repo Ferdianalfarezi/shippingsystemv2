@@ -51,6 +51,11 @@
                                     <i class="bi bi-file-earmark-excel text-success me-2"></i> Import Excel
                                 </a>
                             </li>
+                            <li>
+                                <a class="dropdown-item text-info" href="#" data-bs-toggle="modal" data-bs-target="#importRackModal">
+                                    <i class="bi bi-box-seam text-info me-2"></i> Update Rack (Excel)
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -136,6 +141,7 @@
     @include('addresses.create')
     @include('addresses.edit')
     @include('addresses.import')
+    @include('addresses.rack-import')
     
 @endsection
 

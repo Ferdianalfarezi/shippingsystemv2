@@ -98,7 +98,7 @@ class Milkrun extends Model
         $status = $this->arrival ? $this->calculateStatus() : $this->status;
         
         return match($status) {
-            'advance' => 'bg-info',
+            'advance' => 'bg-warning text-dark',
             'on_time' => 'bg-success',
             'delay' => 'bg-danger',
             'pending' => 'bg-secondary',

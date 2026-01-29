@@ -35,7 +35,7 @@ class DeliveryController extends Controller
         }
         
         // Order by scan_to_delivery (yang paling baru di atas)
-        $query->orderBy('scan_to_delivery', 'desc');
+        $query->orderBy('scan_to_delivery', 'asc');
         
         // Get data
         if ($perPage === 'all') {
@@ -146,7 +146,7 @@ class DeliveryController extends Controller
                 'dn_count' => $group->count(),
                 'scan_datetime' => $firstItem->scan_to_delivery,
             ];
-        })->sortByDesc('scan_datetime')->values();
+        })->sortBy('scan_datetime')->values();
         
          $recentScan = History::whereNotNull('completed_at')
             ->orderBy('completed_at', 'desc')

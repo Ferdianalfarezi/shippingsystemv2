@@ -45,7 +45,7 @@
                     <div>
                         <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Delay</small>
                         <h5 class="mb-0 fw-bold text-white">{{ $totalDelay }}</h5>
-                    </div>
+                    </div>q 
                 </div>
             </div>
         </div>

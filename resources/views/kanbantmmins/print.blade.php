@@ -943,118 +943,67 @@
                                     $currentSequence = 1;
                                     $totalSequence = 1;
                                     
-                                    // For single item printing, we need to query the database to get the actual sequence
-                                    if($isSingleItem && isset($currentNote->qr_code) && !empty($currentNote->qr_code)) {
-                                        $currentQrCode = $currentNote->qr_code;
+                                    $currentManifest = $currentNote->manifest_no ?? '';
+                                    $currentPartNo = $currentNote->part_no ?? '';
+                                    $currentPartAddress = $currentNote->part_address ?? '';
+                                    $currentQrCode = $currentNote->qr_code ?? '';
+                                    
+                                    // For single item printing
+                                    if($isSingleItem && !empty($currentManifest) && !empty($currentPartNo)) {
+                                        // Query database for group: manifest_no + part_no + part_address
+                                        $sameGroup = \App\Models\KanbanTmmins::where('manifest_no', $currentManifest)
+                                            ->where('part_no', $currentPartNo)
+                                            ->where('part_address', $currentPartAddress)
+                                            ->get();
                                         
-                                        // Check if QR code ends with a digit (indicating sequence)
-                                        if(preg_match('/^(.+)(\d)$/', $currentQrCode, $matches)) {
-                                            $baseQrCode = $matches[1];
-                                            $currentDigit = (int)$matches[2];
-                                            
-                                            // Query database for all items with similar QR code pattern
-                                            $relatedItems = \App\Models\KanbanTmmins::where('qr_code', 'LIKE', $baseQrCode . '%')->get();
-                                            
-                                            if($relatedItems->count() > 0) {
-                                                $allDigits = [];
-                                                foreach($relatedItems as $item) {
-                                                    if(preg_match('/(\d)$/', $item->qr_code, $digitMatches)) {
-                                                        $allDigits[] = (int)$digitMatches[1];
-                                                    }
-                                                }
-                                                
-                                                sort($allDigits);
-                                                
-                                                $currentSequence = array_search($currentDigit, $allDigits) + 1;
-                                                $totalSequence = count($allDigits);
-                                            } else {
-                                                $currentSequence = $currentDigit > 0 ? $currentDigit : 1;
-                                                $totalSequence = 1;
-                                            }
+                                        $totalSequence = $sameGroup->count();
+                                        
+                                        // Ambil semua 2 digit terakhir dari qr_code dalam grup
+                                        $allLastDigits = $sameGroup->map(function($item) {
+                                            $qr = $item->qr_code ?? '';
+                                            return !empty($qr) ? (int)substr($qr, -2) : 0;
+                                        })->unique()->values();
+                                        
+                                        // Kalau semua 2 digit terakhir sama, jadikan 1/1
+                                        if($allLastDigits->count() <= 1 || empty($currentQrCode)) {
+                                            $currentSequence = 1;
+                                            $totalSequence = 1;
                                         } else {
-                                            // If no digit pattern, check by part number
-                                            $currentPartNo = $currentNote->part_no ?? '';
+                                            $lastTwoDigits = substr($currentQrCode, -2);
+                                            $currentSequence = (int)$lastTwoDigits;
                                             
-                                            if(!empty($currentPartNo)) {
-                                                // Query database for all items with same part number
-                                                $samePartNumbers = \App\Models\KanbanTmmins::where('part_no', $currentPartNo)->get();
-                                                $totalSequence = $samePartNumbers->count();
-                                                
-                                                if($totalSequence > 1) {
-                                                    $sortedItems = $samePartNumbers->sortBy('qr_code');
-                                                    $currentSequence = 1;
-                                                    foreach($sortedItems as $idx => $item) {
-                                                        if($item->qr_code === $currentNote->qr_code) {
-                                                            $currentSequence = $idx + 1;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
+                                            if($currentSequence <= 0) {
+                                                $currentSequence = 1;
                                             }
                                         }
                                     }
-                                    // For multiple items, use the existing logic with $itemsToProcess
-                                    elseif($isMultipleItems && isset($currentNote->qr_code) && !empty($currentNote->qr_code)) {
-                                        $currentQrCode = $currentNote->qr_code;
+                                    // For multiple items
+                                    elseif($isMultipleItems && !empty($currentManifest) && !empty($currentPartNo)) {
+                                        // Group by manifest_no + part_no + part_address
+                                        $sameGroup = $itemsToProcess->filter(function($item) use ($currentManifest, $currentPartNo, $currentPartAddress) {
+                                            return ($item->manifest_no ?? '') === $currentManifest 
+                                                && ($item->part_no ?? '') === $currentPartNo
+                                                && ($item->part_address ?? '') === $currentPartAddress;
+                                        });
                                         
-                                        if(preg_match('/^(.+)(\d)$/', $currentQrCode, $matches)) {
-                                            $baseQrCode = $matches[1];
-                                            $currentDigit = (int)$matches[2];
-                                            
-                                            $relatedItems = $itemsToProcess->filter(function($item) use ($baseQrCode) {
-                                                if(isset($item->qr_code) && !empty($item->qr_code)) {
-                                                    return strpos($item->qr_code, $baseQrCode) === 0;
-                                                }
-                                                return false;
-                                            });
-                                            
-                                            if($relatedItems->count() > 0) {
-                                                $allDigits = [];
-                                                foreach($relatedItems as $item) {
-                                                    if(preg_match('/(\d)$/', $item->qr_code, $digitMatches)) {
-                                                        $allDigits[] = (int)$digitMatches[1];
-                                                    }
-                                                }
-                                                
-                                                sort($allDigits);
-                                                
-                                                $currentSequence = array_search($currentDigit, $allDigits) + 1;
-                                                $totalSequence = count($allDigits);
-                                            } else {
-                                                $currentSequence = $currentDigit > 0 ? $currentDigit : 1;
-                                                $totalSequence = 1;
-                                            }
+                                        $totalSequence = $sameGroup->count();
+                                        
+                                        // Ambil semua 2 digit terakhir dari qr_code dalam grup
+                                        $allLastDigits = $sameGroup->map(function($item) {
+                                            $qr = $item->qr_code ?? '';
+                                            return !empty($qr) ? (int)substr($qr, -2) : 0;
+                                        })->unique()->values();
+                                        
+                                        // Kalau semua 2 digit terakhir sama, jadikan 1/1
+                                        if($allLastDigits->count() <= 1 || empty($currentQrCode)) {
+                                            $currentSequence = 1;
+                                            $totalSequence = 1;
                                         } else {
-                                            $currentPartNo = $currentNote->part_no ?? '';
+                                            $lastTwoDigits = substr($currentQrCode, -2);
+                                            $currentSequence = (int)$lastTwoDigits;
                                             
-                                            if(!empty($currentPartNo)) {
-                                                $samePartNumbers = $itemsToProcess->where('part_no', $currentPartNo);
-                                                $totalSequence = $samePartNumbers->count();
-                                                
-                                                $sortedItems = $samePartNumbers->sortBy('qr_code')->values();
-                                                foreach($sortedItems as $idx => $item) {
-                                                    if($item->qr_code === $currentNote->qr_code) {
-                                                        $currentSequence = $idx + 1;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // Fallback for items without QR codes
-                                    elseif($isMultipleItems) {
-                                        $currentPartNo = $currentNote->part_no ?? '';
-                                        
-                                        if(!empty($currentPartNo)) {
-                                            $samePartNumbers = $itemsToProcess->where('part_no', $currentPartNo);
-                                            $totalSequence = $samePartNumbers->count();
-                                            
-                                            $sortedItems = $samePartNumbers->sortBy('id')->values();
-                                            foreach($sortedItems as $idx => $item) {
-                                                if($item->id === $currentNote->id) {
-                                                    $currentSequence = $idx + 1;
-                                                    break;
-                                                }
+                                            if($currentSequence <= 0) {
+                                                $currentSequence = 1;
                                             }
                                         }
                                     }

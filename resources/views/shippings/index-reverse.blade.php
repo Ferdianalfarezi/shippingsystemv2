@@ -329,7 +329,9 @@
                                 </div>
                             `,
                             icon: 'success',
-                            confirmButtonColor: '#198754'
+                            timer: 1500,
+                            timerProgressBar: true,
+                            showConfirmButton: false
                         }).then(() => {
                             window.location.reload();
                         });

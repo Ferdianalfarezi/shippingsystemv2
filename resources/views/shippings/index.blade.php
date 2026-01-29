@@ -577,7 +577,8 @@
                             title: 'Berhasil!',
                             text: response.message,
                             icon: 'success',
-                            confirmButtonColor: '#059669'
+                            showConfirmButton: false,
+                            timer: 1500,
                         }).then(() => {
                             window.location.reload();
                         });

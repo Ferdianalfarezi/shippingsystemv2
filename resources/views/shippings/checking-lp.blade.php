@@ -387,7 +387,8 @@ $(document).ready(function() {
                         </div>
                     `,
                     icon: 'success',
-                    confirmButtonColor: '#059669'
+                    showConfirmButton: false,
+                    timer: 1500,
                 }).then(() => {
                     // Clear input and reload
                     $('#routeInput').val('');
@@ -401,7 +402,8 @@ $(document).ready(function() {
                     title: 'Gagal!',
                     text: errorMessage,
                     icon: 'error',
-                    confirmButtonColor: '#dc2626'
+                    showConfirmButton: false,
+                    timer: 1500,
                 }).then(() => {
                     $('#routeInput').val('').focus();
                 });

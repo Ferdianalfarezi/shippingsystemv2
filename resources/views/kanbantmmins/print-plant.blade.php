@@ -4,36 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Print Delivery Note</title>
+    <title>Print Delivery Note - Plant Separated</title>
     <!-- Include JsBarcode library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <!-- Include QRCode.js library (qrcodejs) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     @php
-        $isPreviewMode = request()->get('preview') == '1';
+        // Prepare all items
+        $allItems = $kanbantmmins ?? collect([]);
         
-        // Use orderedItems from controller if available (already sorted by Plant)
-        // This is the PRIMARY data source - already ordered: Plant 1 first, then Plant 2
-        if (isset($orderedItems) && $orderedItems->count() > 0) {
-            $itemsToProcess = $orderedItems;
-        } elseif (isset($note) && !isset($groupedData)) {
-            // Single item mode
-            $itemsToProcess = collect([$note]);
-        } elseif (isset($groupedData)) {
-            // Fallback: flatten groupedData (old behavior)
-            $itemsToProcess = $groupedData->flatten();
-        } else {
-            $itemsToProcess = collect([]);
+        // Separate by plant
+        // Plant 2: Address starts with K (case-insensitive)
+        // Plant 1: Everything else
+        $plant1Items = $allItems->filter(function($item) {
+            $address = trim($item->address ?? '');
+            return !preg_match('/^K/i', $address);
+        })->values();
+        
+        $plant2Items = $allItems->filter(function($item) {
+            $address = trim($item->address ?? '');
+            return preg_match('/^K/i', $address);
+        })->values();
+        
+        // Check if separation is enabled
+        $separatePlant = $separatePlant ?? true;
+        
+        // If not separating, just use all items in order
+        if (!$separatePlant) {
+            $plant1Items = $allItems;
+            $plant2Items = collect([]);
         }
         
-        // Use separator info from controller if available
-        // These are set by controller when plantFilter === 'all' and both plants have data
-        $showSeparator = $showPlantSeparator ?? false;
-        $separatorIndex = $separatorAfterIndex ?? -1;
+        // Calculate total index for barcode/qr generation
+        $globalIndex = 0;
     @endphp
 
-    @if($itemsToProcess->isEmpty())
+    @if($allItems->isEmpty())
     <script>
         console.error('Error: No data to print');
         alert('No data available to print');
@@ -53,6 +60,34 @@
         /* Page break untuk multiple items */
         .page-break {
             page-break-before: always;
+        }
+
+        /* Separator page style */
+        .separator-page {
+            width: 794px;
+            height: 283px;
+            margin-left: 15px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+        }
+
+        .separator-content {
+            text-align: center;
+            color: #cccccc;
+        }
+
+        .separator-content h1 {
+            font-size: 48px;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .separator-content p {
+            font-size: 18px;
+            margin: 10px 0 0 0;
         }
 
         .border {
@@ -858,51 +893,34 @@
             font-weight: bold;
         }
 
-        /* Separator Page */
-        .separator-page {
-            width: 794px;
-            height: 283px;
-            background: white;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-left: 15px;
-            margin-top: 5px;
+        @media print {
+            .separator-page {
+                background-color: #ffffff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
-
-        .separator-text {
-            font-size: 72px;
-            font-weight: bold;
-            font-family: Arial, sans-serif;
-        }
-
-        .corner-block {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background: black;
-        }
-
-        .corner-top-left { top: 0; left: 0; }
-        .corner-top-right { top: 0; right: 0; }
-        .corner-bottom-left { bottom: 0; left: 0; }
-        .corner-bottom-right { bottom: 0; right: 0; }
     </style>
 </head>
 <body>
-    @foreach($itemsToProcess as $index => $currentNote)
-        @if($index > 0)
+    @php
+        $printIndex = 0;
+    @endphp
+
+    {{-- ==================== PLANT 1 ITEMS (Non-K Address) ==================== --}}
+    @foreach($plant1Items as $index => $currentNote)
+        @if($printIndex > 0)
             <div class="page-break"></div>
         @endif
+        @php $printIndex++; @endphp
 
+        {{-- Start of delivery note item --}}
         <div class="border">
             <div class="delivery-note-container">
                 <div class="supplier-box">
                     <div class="supplier-box-header">SUPPLIER</div>
                     <div class="supplier-box-content">
                         <div><div>{{$currentNote->supplier??'-'}}</div><div class="supplier-code">{{$currentNote->supplier_code??'5007-1'}}@if(!empty($currentNote->customer_address))-{{$currentNote->customer_address}}@endif</div></div>
-
                     </div>
                 </div>
 
@@ -973,43 +991,70 @@
                     <div class="part-no-box">
                         <div class="part-no-row">
                             <div class="part-no-box-content">{{ $currentNote->part_no ?? '-' }}</div>
-                           <div class="sequence">
+                            <div class="sequence">
                                 @php
                                     $currentSequence = 1;
                                     $totalSequence = 1;
                                     
-                                    $currentManifest = $currentNote->manifest_no ?? '';
-                                    $currentPartNo = $currentNote->part_no ?? '';
-                                    $currentPartAddress = $currentNote->part_address ?? '';
-                                    $currentQrCode = $currentNote->qr_code ?? '';
-                                    
-                                    if(!empty($currentManifest) && !empty($currentPartNo)) {
-                                        // Group by manifest_no + part_no + part_address
-                                        $sameGroup = $itemsToProcess->filter(function($item) use ($currentManifest, $currentPartNo, $currentPartAddress) {
-                                            return ($item->manifest_no ?? '') === $currentManifest 
-                                                && ($item->part_no ?? '') === $currentPartNo
-                                                && ($item->part_address ?? '') === $currentPartAddress;
-                                        });
+                                    if(isset($currentNote->qr_code) && !empty($currentNote->qr_code)) {
+                                        $currentQrCode = $currentNote->qr_code;
                                         
-                                        $totalSequence = $sameGroup->count();
-                                        
-                                        // Ambil semua 2 digit terakhir dari qr_code dalam grup
-                                        $allLastDigits = $sameGroup->map(function($item) {
-                                            $qr = $item->qr_code ?? '';
-                                            return !empty($qr) ? (int)substr($qr, -2) : 0;
-                                        })->unique()->values();
-                                        
-                                        // Kalau semua 2 digit terakhir sama (cuma 1 unique value), jadikan 1/1
-                                        if($allLastDigits->count() <= 1 || empty($currentQrCode)) {
-                                            $currentSequence = 1;
-                                            $totalSequence = 1;
-                                        } else {
-                                            // 2 digit terakhir beda-beda, pake sebagai sequence
-                                            $lastTwoDigits = substr($currentQrCode, -2);
-                                            $currentSequence = (int)$lastTwoDigits;
+                                        if(preg_match('/^(.+)(\d)$/', $currentQrCode, $matches)) {
+                                            $baseQrCode = $matches[1];
+                                            $currentDigit = (int)$matches[2];
                                             
-                                            if($currentSequence <= 0) {
-                                                $currentSequence = 1;
+                                            $relatedItems = $allItems->filter(function($item) use ($baseQrCode) {
+                                                if(isset($item->qr_code) && !empty($item->qr_code)) {
+                                                    return strpos($item->qr_code, $baseQrCode) === 0;
+                                                }
+                                                return false;
+                                            });
+                                            
+                                            if($relatedItems->count() > 0) {
+                                                $allDigits = [];
+                                                foreach($relatedItems as $item) {
+                                                    if(preg_match('/(\d)$/', $item->qr_code, $digitMatches)) {
+                                                        $allDigits[] = (int)$digitMatches[1];
+                                                    }
+                                                }
+                                                
+                                                sort($allDigits);
+                                                
+                                                $currentSequence = array_search($currentDigit, $allDigits) + 1;
+                                                $totalSequence = count($allDigits);
+                                            } else {
+                                                $currentSequence = $currentDigit > 0 ? $currentDigit : 1;
+                                                $totalSequence = 1;
+                                            }
+                                        } else {
+                                            $currentPartNo = $currentNote->part_no ?? '';
+                                            
+                                            if(!empty($currentPartNo)) {
+                                                $samePartNumbers = $allItems->where('part_no', $currentPartNo);
+                                                $totalSequence = $samePartNumbers->count();
+                                                
+                                                $sortedItems = $samePartNumbers->sortBy('qr_code')->values();
+                                                foreach($sortedItems as $idx => $item) {
+                                                    if($item->qr_code === $currentNote->qr_code) {
+                                                        $currentSequence = $idx + 1;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        $currentPartNo = $currentNote->part_no ?? '';
+                                        
+                                        if(!empty($currentPartNo)) {
+                                            $samePartNumbers = $allItems->where('part_no', $currentPartNo);
+                                            $totalSequence = $samePartNumbers->count();
+                                            
+                                            $sortedItems = $samePartNumbers->sortBy('id')->values();
+                                            foreach($sortedItems as $idx => $item) {
+                                                if($item->id === $currentNote->id) {
+                                                    $currentSequence = $idx + 1;
+                                                    break;
+                                                }
                                             }
                                         }
                                     }
@@ -1033,11 +1078,9 @@
                         @endphp
                         
                         <div class="{{ $isRunOut ? 'unique-no-box-reverse' : 'unique-no-box' }}">
-                            
                                 <div class="unique-no-box-header">
                                     <span>UNIQUE NO</span>
                                 </div>
-                            
                             <div class="{{ $isRunOut ? 'unique-no-content-reverse' : 'unique-no-content' }}">
                                 {{ $currentNote->unique_no ?? '-' }}
                             </div>
@@ -1048,7 +1091,7 @@
                         </div>
                         
                         <div class="qr-code">
-                            <div id="qrcode-{{ $index }}" data-qr="{{ $currentNote->qr_code ?? 'NO-QR' }}"></div>
+                            <div id="qrcode-{{ $printIndex - 1 }}" data-qr="{{ $currentNote->qr_code ?? 'NO-QR' }}"></div>
                         </div>
                         
                         <div class="conveyance-box">
@@ -1108,7 +1151,7 @@
                 <div class="supplier-data-box-header">SUPPLIER DATA</div>
                 <div class="supplier-data-box-content">
                     <div class="barcode-container">
-                        <canvas id="barcode-{{ $index }}"></canvas>
+                        <canvas id="barcode-{{ $printIndex - 1 }}"></canvas>
                     </div>
                 </div>
             </div>
@@ -1152,94 +1195,395 @@
                 </div>
             </div>
         </div>
+        {{-- End of delivery note item --}}
+    @endforeach
 
-        {{-- Separator Page for Plant 2 - Shows AFTER last Plant 1 item --}}
-        @if($showSeparator && $index == $separatorIndex)
-            <div class="page-break"></div>
-            <div class="separator-page">
-                <div class="corner-block corner-top-left"></div>
-                <div class="corner-block corner-top-right"></div>
-                <div class="corner-block corner-bottom-left"></div>
-                <div class="corner-block corner-bottom-right"></div>
-                <div class="separator-text">PLANT 2</div>
+    {{-- ==================== SEPARATOR PAGE ==================== --}}
+    @if($separatePlant && $plant1Items->count() > 0 && $plant2Items->count() > 0)
+        <div class="page-break"></div>
+        <div class="separator-page">
+            <div class="separator-content">
+                {{-- Kosong / blank page sebagai pemisah --}}
             </div>
+        </div>
+        @php $printIndex++; @endphp
+    @endif
+
+    {{-- ==================== PLANT 2 ITEMS (K* Address) ==================== --}}
+    @foreach($plant2Items as $index => $currentNote)
+        @if($printIndex > 0)
+            <div class="page-break"></div>
         @endif
+        @php $printIndex++; @endphp
+
+        {{-- Start of delivery note item --}}
+        <div class="border">
+            <div class="delivery-note-container">
+                <div class="supplier-box">
+                    <div class="supplier-box-header">SUPPLIER</div>
+                    <div class="supplier-box-content">
+                        <div><div>{{$currentNote->supplier??'-'}}</div><div class="supplier-code">{{$currentNote->supplier_code??'5007-1'}}@if(!empty($currentNote->customer_address))-{{$currentNote->customer_address}}@endif</div></div>
+                    </div>
+                </div>
+
+                <div class="company-box">
+                    <div class="box-content">
+                        <div>
+                            <div>PT. TOYOTA MOTOR</div>
+                            <div>MANUFACTURING INDONESIA</div>
+                        </div>
+                        <div class="plant-name">{{ $currentNote->dock ?? '-' }}</div>
+                    </div>
+                </div>
+
+                <div class="dock-code-box">
+                    <div class="dock-box-header">
+                        <span>DOCK CODE</span>
+                    </div>
+                    <div class="dock-box-content">
+                        <div>
+                            <div class="dock-code-content">{{ $currentNote->dock_code ?? '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="progress-line-box">
+                    <div class="progress-line-box-header">
+                        <span>PROGRESS LINE NO</span>
+                    </div>
+                    <div class="progress-line-content">{{ $currentNote->plo !== null ? sprintf('%02d', $currentNote->plo) : '' }}</div>
+                </div>
+            </div>
+
+            <div class="departure-arrival-container">
+                <div class="daparture-box">
+                    <div class="daparture-box-header">DAPARTURE TIME</div>
+                    <div class="daparture-box-content">
+                        <div>
+                        <div class="date-time-value">
+                                @if($currentNote && $currentNote->departure_time)
+                                    @php
+                                        $dt = \Carbon\Carbon::parse($currentNote->departure_time);
+                                    @endphp
+
+                                    <strong style="font-size: 1.2em;">{{ $dt->format('d/m') }}</strong>
+                                    {{ $dt->format(' Y-H:i') }}
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="arrival-box">
+                    <div class="arrival-box-header">ARRIVAL TIME</div>
+                    <div class="arrival-box-content">
+                        <div>
+                           @if($currentNote && $currentNote->arrival_time)
+                                @php
+                                    $dt = \Carbon\Carbon::parse($currentNote->arrival_time);
+                                @endphp
+
+                                <strong style="font-size: 1.2em;">{{ $dt->format('d/m') }}</strong>
+                                {{ $dt->format(' Y-H:i') }}
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="part-no-container">
+                    <div class="part-no-box">
+                        <div class="part-no-row">
+                            <div class="part-no-box-content">{{ $currentNote->part_no ?? '-' }}</div>
+                            <div class="sequence">
+                                @php
+                                    $currentSequence = 1;
+                                    $totalSequence = 1;
+                                    
+                                    if(isset($currentNote->qr_code) && !empty($currentNote->qr_code)) {
+                                        $currentQrCode = $currentNote->qr_code;
+                                        
+                                        if(preg_match('/^(.+)(\d)$/', $currentQrCode, $matches)) {
+                                            $baseQrCode = $matches[1];
+                                            $currentDigit = (int)$matches[2];
+                                            
+                                            $relatedItems = $allItems->filter(function($item) use ($baseQrCode) {
+                                                if(isset($item->qr_code) && !empty($item->qr_code)) {
+                                                    return strpos($item->qr_code, $baseQrCode) === 0;
+                                                }
+                                                return false;
+                                            });
+                                            
+                                            if($relatedItems->count() > 0) {
+                                                $allDigits = [];
+                                                foreach($relatedItems as $item) {
+                                                    if(preg_match('/(\d)$/', $item->qr_code, $digitMatches)) {
+                                                        $allDigits[] = (int)$digitMatches[1];
+                                                    }
+                                                }
+                                                
+                                                sort($allDigits);
+                                                
+                                                $currentSequence = array_search($currentDigit, $allDigits) + 1;
+                                                $totalSequence = count($allDigits);
+                                            } else {
+                                                $currentSequence = $currentDigit > 0 ? $currentDigit : 1;
+                                                $totalSequence = 1;
+                                            }
+                                        } else {
+                                            $currentPartNo = $currentNote->part_no ?? '';
+                                            
+                                            if(!empty($currentPartNo)) {
+                                                $samePartNumbers = $allItems->where('part_no', $currentPartNo);
+                                                $totalSequence = $samePartNumbers->count();
+                                                
+                                                $sortedItems = $samePartNumbers->sortBy('qr_code')->values();
+                                                foreach($sortedItems as $idx => $item) {
+                                                    if($item->qr_code === $currentNote->qr_code) {
+                                                        $currentSequence = $idx + 1;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        $currentPartNo = $currentNote->part_no ?? '';
+                                        
+                                        if(!empty($currentPartNo)) {
+                                            $samePartNumbers = $allItems->where('part_no', $currentPartNo);
+                                            $totalSequence = $samePartNumbers->count();
+                                            
+                                            $sortedItems = $samePartNumbers->sortBy('id')->values();
+                                            foreach($sortedItems as $idx => $item) {
+                                                if($item->id === $currentNote->id) {
+                                                    $currentSequence = $idx + 1;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    echo $currentSequence . '/' . $totalSequence;
+                                @endphp
+                            </div>
+                        </div>
+                        <div class="part-no-box-content-2">{{ $currentNote->part_name ?? '-' }}</div>
+                    </div>
+                    
+                    <div class="unique-qr-container">
+                        @php
+                            // Check if unique_no exists in run_outs table
+                            $isRunOut = false;
+                            if (isset($currentNote->unique_no) && !empty($currentNote->unique_no)) {
+                                $isRunOut = \DB::table('run_outs')
+                                    ->where('unique_no', $currentNote->unique_no)
+                                    ->exists();
+                            }
+                        @endphp
+                        
+                        <div class="{{ $isRunOut ? 'unique-no-box-reverse' : 'unique-no-box' }}">
+                                <div class="unique-no-box-header">
+                                    <span>UNIQUE NO</span>
+                                </div>
+                            <div class="{{ $isRunOut ? 'unique-no-content-reverse' : 'unique-no-content' }}">
+                                {{ $currentNote->unique_no ?? '-' }}
+                            </div>
+                        </div>
+                        
+                        <div class="keterangan-box">
+                            <div class="keterangan-text">{{ $currentNote->keterangan ?? '' }}</div>
+                        </div>
+                        
+                        <div class="qr-code">
+                            @php
+                                $itemIndex = $plant1Items->count() + ($separatePlant && $plant1Items->count() > 0 && $plant2Items->count() > 0 ? 1 : 0) + $index;
+                            @endphp
+                            <div id="qrcode-{{ $itemIndex }}" data-qr="{{ $currentNote->qr_code ?? 'NO-QR' }}"></div>
+                        </div>
+                        
+                        <div class="conveyance-box">
+                            <div class="conveyance-box-header">
+                                <span>CONVEYANCE NO</span>
+                            </div>
+                            <div class="conveyance-content">{{ $currentNote->conveyance_no ?? '' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="out-manifest-container">
+                    <div class="out-box">
+                        <div class="out-box-header">
+                            <span>OUT</span>
+                        </div>
+                      <div class="out-box-content">
+                            @if($currentNote && $currentNote->out_time)
+                                @php
+                                    $dt = \Carbon\Carbon::parse($currentNote->out_time);
+                                @endphp
+
+                                <strong style="font-size: 1.2em;">
+                                    {{ $dt->format('d/m') }}&nbsp;
+                                </strong>
+                                {{ $dt->format(' Y-H:i') }}
+
+                            @endif
+                        </div>
+                    </div>
+                    
+                    <div class="manifest-box">
+                        <div class="manifest-box-header">MANIFEST NO</div>
+                        <div class="manifest-box-content">
+                            <div class="manifest-number">{{ $currentNote->manifest_no ?? '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="route-cycle-container">
+                <div class="route-box">
+                    <div class="route-box-header">
+                        <span>ROUTE</span>
+                    </div>
+                    <div class="route-content">{{ $currentNote->route ?? '' }}</div>
+                </div>
+                <div class="cycle-box">
+                    <div class="cycle-box-header">
+                        <span>CYCLE</span>
+                    </div>
+                   <div class="cycle-content">{{ $currentNote->cycle ? sprintf('%02d', $currentNote->cycle) : '' }}</div>
+                </div>
+            </div>
+
+            <div class="supplier-data-box">
+                <div class="supplier-data-box-header">SUPPLIER DATA</div>
+                <div class="supplier-data-box-content">
+                    <div class="barcode-container">
+                        @php
+                            $itemIndex = $plant1Items->count() + ($separatePlant && $plant1Items->count() > 0 && $plant2Items->count() > 0 ? 1 : 0) + $index;
+                        @endphp
+                        <canvas id="barcode-{{ $itemIndex }}"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pcs-box">
+                <div class="pcs-box-header">PCS/KBN</div>
+                <div class="pcs-box-content">
+                    {{ $currentNote->pcs ?? '0' }}
+                </div>
+            </div>
+
+            <div class="order-no-box">
+                <div class="order-no-box-header">
+                    <span style="font-size: 10px;">ORDER NO</span>
+                </div>
+                <div class="order-no-box-content">
+                    @if(isset($currentNote->order_no))
+                        @php
+                            $orderNo = $currentNote->order_no;
+                            if(strlen($orderNo) >= 8) {
+                                $prefix = substr($orderNo, 0, 4);
+                                $highlight = substr($orderNo, 4, 4);
+                                $suffix = substr($orderNo, 8);
+                                echo $prefix . '<span class="highlight-digits">' . $highlight . '</span>' . $suffix;
+                            } else {
+                                echo $orderNo;
+                            }
+                        @endphp
+                    @else
+                        -
+                    @endif
+                </div>
+            </div>
+
+            <div class="part-address-box">
+                <div class="part-address-box-header">
+                    <span>PART ADDRESS</span>
+                </div>
+                <div class="part-address-box-content">
+                    {{ $currentNote->part_address ?? '-' }}
+                </div>
+            </div>
+        </div>
+        {{-- End of delivery note item --}}
     @endforeach
 
     <script>
         // DEBUG: Log information
-        console.log('=== BARCODE DEBUG INFO ===');
-        console.log('Total items to process: {{ $itemsToProcess->count() }}');
-        console.log('Show Separator: {{ $showSeparator ? "true" : "false" }}');
-        console.log('Separator After Index: {{ $separatorIndex }}');
-        @if(isset($plant1Items))
-        console.log('Plant 1 Items: {{ $plant1Items->count() }}');
-        @endif
-        @if(isset($plant2Items))
-        console.log('Plant 2 Items: {{ $plant2Items->count() }}');
-        @endif
+        console.log('=== PLANT SEPARATED PRINT DEBUG ===');
+        console.log('Total items: {{ $allItems->count() }}');
+        console.log('Plant 1 items (Non-K): {{ $plant1Items->count() }}');
+        console.log('Plant 2 items (K*): {{ $plant2Items->count() }}');
+        console.log('Separate Plant: {{ $separatePlant ? "YES" : "NO" }}');
         
         // Generate barcodes and QR codes
         window.onload = function() {
             setTimeout(function() {
                 console.log('Starting barcode and QR code generation...');
                 
-                @foreach($itemsToProcess as $barcodeIndex => $barcodeItem)
+                // Process Plant 1 items
+                @foreach($plant1Items as $barcodeIndex => $barcodeItem)
                     (function(index) {
-                        // Generate Barcode
-                        try {
-                            const canvas = document.getElementById('barcode-' + index);
-                            if (canvas) {
-                                const addressValue = "{{ $barcodeItem->address ?? ($barcodeItem->dock_code . '-' . $barcodeItem->id) }}";
-                                console.log('Generating barcode ' + index + ' with value: ' + addressValue);
-                                
-                                JsBarcode("#barcode-" + index, addressValue, {
-                                    format: "CODE128",
-                                    width: 2,
-                                    height: 40,
-                                    displayValue: true
-                                });
-                                console.log('✓ Barcode ' + index + ' generated successfully');
-                            } else {
-                                console.error('✗ Canvas not found for barcode-' + index);
-                            }
-                        } catch (error) {
-                            console.error('✗ Error generating barcode ' + index + ':', error);
-                        }
-                        
-                        // Generate QR Code
-                        try {
-                            const qrDiv = document.getElementById('qrcode-' + index);
-                            if (qrDiv) {
-                                const qrValue = qrDiv.getAttribute('data-qr') || 'NO-QR';
-                                console.log('Generating QR code ' + index + ' with value: ' + qrValue);
-                                
-                                new QRCode(qrDiv, {
-                                    text: qrValue,
-                                    width: 55,
-                                    height: 55,
-                                    colorDark: "#000000",
-                                    colorLight: "#ffffff",
-                                    correctLevel: QRCode.CorrectLevel.L
-                                });
-                                console.log('✓ QR code ' + index + ' generated successfully');
-                            } else {
-                                console.error('✗ QR Div not found for qrcode-' + index);
-                            }
-                        } catch (error) {
-                            console.error('✗ Error generating QR code ' + index + ':', error);
-                        }
+                        generateBarcodeAndQR(index, "{{ $barcodeItem->address ?? ($barcodeItem->dock_code . '-' . $barcodeItem->id) }}", "{{ $barcodeItem->qr_code ?? 'NO-QR' }}");
                     })({{ $barcodeIndex }});
                 @endforeach
                 
-                // Print after a delay to ensure all barcodes and QR codes are generated
+                // Process Plant 2 items (with offset for index)
+                @php $plant2StartIndex = $plant1Items->count() + ($separatePlant && $plant1Items->count() > 0 && $plant2Items->count() > 0 ? 1 : 0); @endphp
+                @foreach($plant2Items as $barcodeIndex => $barcodeItem)
+                    (function(index) {
+                        generateBarcodeAndQR(index, "{{ $barcodeItem->address ?? ($barcodeItem->dock_code . '-' . $barcodeItem->id) }}", "{{ $barcodeItem->qr_code ?? 'NO-QR' }}");
+                    })({{ $plant2StartIndex + $barcodeIndex }});
+                @endforeach
+                
+                // Print after a delay
                 setTimeout(function() {
                     console.log('All barcodes and QR codes generated, starting print...');
-                    @if(!$isPreviewMode)
-                        window.print();
-                    @endif
+                    window.print();
                 }, 1500);
             }, 500);
+        }
+        
+        function generateBarcodeAndQR(index, addressValue, qrValue) {
+            // Generate Barcode
+            try {
+                const canvas = document.getElementById('barcode-' + index);
+                if (canvas) {
+                    console.log('Generating barcode ' + index + ' with value: ' + addressValue);
+                    
+                    JsBarcode("#barcode-" + index, addressValue, {
+                        format: "CODE128",
+                        width: 2,
+                        height: 40,
+                        displayValue: true
+                    });
+                    console.log('✓ Barcode ' + index + ' generated successfully');
+                } else {
+                    console.error('✗ Canvas not found for barcode-' + index);
+                }
+            } catch (error) {
+                console.error('✗ Error generating barcode ' + index + ':', error);
+            }
+            
+            // Generate QR Code
+            try {
+                const qrDiv = document.getElementById('qrcode-' + index);
+                if (qrDiv) {
+                    console.log('Generating QR code ' + index + ' with value: ' + qrValue);
+                    
+                    new QRCode(qrDiv, {
+                        text: qrValue,
+                        width: 55,
+                        height: 55,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.L
+                    });
+                    console.log('✓ QR code ' + index + ' generated successfully');
+                } else {
+                    console.error('✗ QR Div not found for qrcode-' + index);
+                }
+            } catch (error) {
+                console.error('✗ Error generating QR code ' + index + ':', error);
+            }
         }
     </script>
 </body>
