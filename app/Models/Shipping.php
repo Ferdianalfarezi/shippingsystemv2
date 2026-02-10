@@ -45,26 +45,26 @@ class Shipping extends Model
 
         // Update status setiap kali model di-retrieve (kecuali sudah ON LOADING)
         static::retrieved(function ($model) {
-            if ($model->status !== 'on_loading' && $model->arrival === null) {
+            if ($model->arrival === null) {
                 $newStatus = $model->calculateStatus();
                 if ($newStatus !== $model->status) {
                     $model->status = $newStatus;
-                    $model->saveQuietly(); // Save tanpa trigger events
+                    $model->saveQuietly();
                 }
             }
         });
     }
 
     /**
-     * Calculate status based on delivery time
-     * - ADVANCE: lebih dari 15 menit sebelum delivery time
-     * - NORMAL: dalam 15 menit sebelum delivery time sampai delivery time
-     * - DELAY: sudah melewati delivery time
+     * Calculate status based on arrival and delivery time
      * - ON LOADING: sudah di-scan (arrival terisi)
+     * - DELAY: delivery datetime sudah lewat (belum scan)
+     * - NORMAL: dalam 4 jam sebelum delivery time (belum scan)
+     * - ADVANCE: lebih dari 4 jam sebelum delivery time (belum scan)
      */
     public function calculateStatus(): string
     {
-        // Jika sudah ada arrival, berarti ON LOADING
+        // Jika sudah ada arrival = ON LOADING
         if ($this->arrival !== null) {
             return 'on_loading';
         }
@@ -73,20 +73,20 @@ class Shipping extends Model
             $deliveryDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
             $now = Carbon::now();
             
-            // 15 menit sebelum delivery time
-            $normalStartTime = $deliveryDateTime->copy()->subMinutes(15);
+            // 4 jam sebelum delivery time
+            $normalStartTime = $deliveryDateTime->copy()->subHours(4);
             
             // Jika sudah melewati delivery time = DELAY
             if ($now->greaterThan($deliveryDateTime)) {
                 return 'delay';
             }
             
-            // Jika dalam range 15 menit sebelum delivery time = NORMAL
+            // Jika dalam range 4 jam sebelum delivery time = NORMAL
             if ($now->greaterThanOrEqualTo($normalStartTime)) {
                 return 'normal';
             }
             
-            // Jika masih lebih dari 15 menit sebelum delivery time = ADVANCE
+            // Jika lebih dari 4 jam sebelum delivery time = ADVANCE
             return 'advance';
             
         } catch (\Exception $e) {
@@ -107,7 +107,7 @@ class Shipping extends Model
      */
     public function getStatusBadgeAttribute(): string
     {
-        $status = $this->arrival !== null ? 'on_loading' : $this->calculateStatus();
+        $status = $this->calculateStatus();
         
         return match($status) {
             'advance' => 'bg-warning text-dark',
@@ -123,7 +123,7 @@ class Shipping extends Model
      */
     public function getStatusLabelAttribute(): string
     {
-        $status = $this->arrival !== null ? 'on_loading' : $this->calculateStatus();
+        $status = $this->calculateStatus();
         
         return match($status) {
             'advance' => 'ADVANCE',
@@ -148,10 +148,8 @@ class Shipping extends Model
             $now = Carbon::now();
             
             if ($now->greaterThan($deliveryDateTime)) {
-                // Delay duration
                 return 'Terlambat ' . $now->diffForHumans($deliveryDateTime, true);
             } else {
-                // Time remaining
                 return 'Sisa ' . $now->diffForHumans($deliveryDateTime, true);
             }
         } catch (\Exception $e) {
@@ -168,22 +166,6 @@ class Shipping extends Model
     }
 
     /**
-     * Scope untuk filter yang belum di-scan (arrival null)
-     */
-    public function scopeNotScanned($query)
-    {
-        return $query->whereNull('arrival');
-    }
-
-    /**
-     * Scope untuk filter yang sudah di-scan (on loading)
-     */
-    public function scopeOnLoading($query)
-    {
-        return $query->whereNotNull('arrival');
-    }
-
-    /**
      * Scope untuk filter by route
      */
     public function scopeByRoute($query, string $route)
@@ -192,12 +174,38 @@ class Shipping extends Model
     }
 
     /**
-     * Mark as on loading (scan arrival)
+     * Scope untuk filter ADVANCE (belum scan DAN > 4 jam sebelum delivery)
      */
-    public function markAsOnLoading(): bool
+    public function scopeAdvance($query)
     {
-        $this->arrival = Carbon::now();
-        $this->status = 'on_loading';
-        return $this->save();
+        return $query->whereNull('arrival')
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) > DATE_ADD(NOW(), INTERVAL 4 HOUR)");
+    }
+
+    /**
+     * Scope untuk filter NORMAL (belum scan DAN <= 4 jam sebelum delivery DAN belum lewat)
+     */
+    public function scopeNormal($query)
+    {
+        return $query->whereNull('arrival')
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) <= DATE_ADD(NOW(), INTERVAL 4 HOUR)")
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) >= NOW()");
+    }
+
+    /**
+     * Scope untuk filter DELAY (belum scan DAN delivery datetime sudah lewat)
+     */
+    public function scopeDelay($query)
+    {
+        return $query->whereNull('arrival')
+            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) < NOW()");
+    }
+
+    /**
+     * Scope untuk filter ON LOADING (sudah scan / arrival terisi)
+     */
+    public function scopeOnLoading($query)
+    {
+        return $query->whereNotNull('arrival');
     }
 }

@@ -166,7 +166,10 @@
             </thead>
             <tbody>
                 @forelse($groupedShippings as $group)
-                    <tr class="fs-4 {{ !$group['has_arrival'] && $group['status_label'] === 'Delay' ? 'table-danger-subtle blink-row' : '' }}">
+                    @php
+                        $currentStatus = strtolower($group['status_label']);
+                    @endphp
+                    <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle blink-row' : '' }}">
                         <td><strong>{{ $group['route'] }}</strong></td>
                         <td>{{ Str::limit($group['logistic_partners'], 20) }}</td>
                         <td>{{ Str::limit($group['customers'], 30) }}</td>
@@ -175,9 +178,7 @@
                         <td>{{ $group['delivery_time'] }}</td>
                         <td>
                             @if($group['arrival'])
-                                <span>
-                                    {{ $group['arrival'] }}
-                                </span>
+                                <span>{{ $group['arrival'] }}</span>
                             @else
                                 <span class="text-white">-</span>
                             @endif
@@ -199,7 +200,8 @@
                             </span>
                         </td>
                         <td>
-                            <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 {{ $group['status_label'] === 'Delay' ? 'blink-badge' : '' }}">
+                            <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 mb-1 mt-1
+                                {{ $currentStatus === 'delay' ? 'blink-badge' : '' }}">
                                 {{ $group['status_label'] }}
                             </span>
                         </td>

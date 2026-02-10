@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        <!-- Status Filter -->
+        <!-- Status Filter - Advance, Normal, Delay, On Loading -->
         <div class="card border-0 shadow-sm">
             <div class="card-body p-1">
                 <select class="form-select form-select-sm border-0" id="statusFilter" style="width: auto;">
@@ -80,7 +80,6 @@
                                     <i class="bi bi-qr-code-scan me-2"></i> Checking LP
                                 </a>
                             </li>
-                            
                         </ul>
                     </div>
                 </div>
@@ -139,7 +138,7 @@
                             <i class="bi bi-truck text-white fs-5"></i>
                         </div>
                         <div>
-                            <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">On Load</small>
+                            <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">On Loading</small>
                             <h5 class="mb-0 fw-bold text-white">{{ $totalOnLoading }}</h5>
                         </div>
                     </div>
@@ -253,7 +252,7 @@
             <tbody>
                 @forelse($shippings as $index => $ship)
                     @php
-                        $currentStatus = $ship->arrival !== null ? 'on_loading' : $ship->calculateStatus();
+                        $currentStatus = $ship->calculateStatus();
                     @endphp
                     <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle' : '' }}">
                         <td><strong>{{ $ship->route }}</strong></td>

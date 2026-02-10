@@ -8,10 +8,10 @@
     <!-- Stats Badges dan Controls -->
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
         
-        <!-- Toggle View Button with Spin Animation -->
+        <!-- Toggle View Button -->
         <div class="card border-0 shadow-sm p-1 bg-warning">
             <a href="{{ route('shippings.index') }}" class="btn btn-warning" title="Switch to Normal View">
-                <i class="bi bi-list-ul spin-on-hover"></i>
+                <i class="bi bi-list-ul"></i>
             </a>
         </div>
         
@@ -27,6 +27,19 @@
             </div>
         </div>
 
+        <!-- Status Filter -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-1">
+                <select class="form-select form-select-sm border-0" id="statusFilter" style="width: auto;">
+                    <option value="all" {{ request('status') == 'all' || !request('status') ? 'selected' : '' }}>All Status</option>
+                    <option value="advance" {{ request('status') == 'advance' ? 'selected' : '' }}>Advance</option>
+                    <option value="normal" {{ request('status') == 'normal' ? 'selected' : '' }}>Normal</option>
+                    <option value="delay" {{ request('status') == 'delay' ? 'selected' : '' }}>Delay</option>
+                    <option value="on_loading" {{ request('status') == 'on_loading' ? 'selected' : '' }}>On Loading</option>
+                </select>
+            </div>
+        </div>
+
         <!-- Search Bar -->
         <div class="input-group" style="width: 300px;">
             <input type="text" class="form-control" id="searchInput" placeholder="Cari Route, LP, Customer..." value="{{ request('search') }}">
@@ -35,7 +48,7 @@
             </button>
         </div>
 
-        <!-- Statistics Badges - SAMA SEPERTI INDEX BIASA -->
+        <!-- Statistics Badges -->
         <div class="d-flex align-items-center gap-2">
             <!-- Advance Badge -->
             <div class="bg-warning card border-0 shadow-sm">
@@ -118,7 +131,10 @@
             </thead>
             <tbody>
                 @forelse($groupedShippings as $index => $group)
-                    <tr class="fs-4 {{ !$group['has_arrival'] && $group['status_label'] === 'Delay' ? 'table-danger-subtle' : '' }}">
+                    @php
+                        $currentStatus = strtolower($group['status_label']);
+                    @endphp
+                    <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle' : '' }}">
                         <td><strong>{{ $group['route'] }}</strong></td>
                         <td>{{ $group['logistic_partners'] }}</td>
                         <td>{{ Str::limit($group['customers'], 30) }}</td>
@@ -133,7 +149,6 @@
                             @endif
                         </td>
                         <td><strong>{{ $group['cycle'] }}</strong></td>
-                        
                         <td>
                             @php
                                 $addresses = explode(',', $group['address']);
@@ -142,14 +157,12 @@
                                 }, $addresses);
                                 $formattedAddress = 'S- ' . implode(',', $numbers);
                             @endphp
-
                             {{ $formattedAddress }}
                         </td>
-
-                       <td>
-                            <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 text-uppercase mt-1 mb-1
-                                {{ strtolower($group['status_label']) === 'delay' ? 'blink-badge' : '' }}">
-                                
+                        <td>
+                            <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 mb-1 mt-1 
+                                {{ $currentStatus === 'delay' ? 'badge-delay' : '' }}"
+                                title="{{ $group['time_info'] ?? '' }}">
                                 {{ $group['status_label'] }}
                             </span>
                         </td>
@@ -193,19 +206,6 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-@push('styles')
-<style>
-    /* Spin animation on hover */
-    .spin-on-hover {
-        transition: transform 0.3s ease;
-    }
-    
-    .btn:hover .spin-on-hover {
-        transform: rotate(180deg);
-    }
-</style>
-@endpush
-
 @push('scripts')
 <script>
     $(document).ready(function() {
@@ -225,6 +225,11 @@
             updateUrl();
         });
 
+        // Handle Status Filter Change
+        $('#statusFilter').on('change', function() {
+            updateUrl();
+        });
+
         function performSearch() {
             updateUrl();
         }
@@ -233,6 +238,7 @@
             const url = new URL(window.location.href);
             const perPage = $('#perPageSelect').val();
             const search = $('#searchInput').val();
+            const status = $('#statusFilter').val();
             
             if (perPage && perPage !== '50') {
                 url.searchParams.set('per_page', perPage);
@@ -244,6 +250,12 @@
                 url.searchParams.set('search', search);
             } else {
                 url.searchParams.delete('search');
+            }
+
+            if (status && status !== 'all') {
+                url.searchParams.set('status', status);
+            } else {
+                url.searchParams.delete('status');
             }
             
             window.location.href = url.toString();
@@ -298,7 +310,6 @@
             reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
-                // Show loading
                 Swal.fire({
                     title: 'Memproses...',
                     html: `Memindahkan ${dnCount} data ke Delivery`,
