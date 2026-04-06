@@ -13,6 +13,112 @@ use Carbon\Carbon;
 class ShippingController extends Controller
 {
     /**
+     * Get mirrored preparations (yang delivery_time <= 4 jam dari sekarang)
+     * Data ini belum di-scan, hanya ditampilkan di halaman shipping
+     * Status mirror: PLANNING (belum lewat) atau DELAY (sudah lewat)
+     */
+    private function getMirroredPreparations()
+    {
+        $now = Carbon::now();
+        $fourHoursLater = $now->copy()->addHours(4);
+        
+        // Ambil preparations yang delivery datetime <= 4 jam dari sekarang
+        // DAN belum ada di tabel shippings (berdasarkan no_dn)
+        return Preparation::whereRaw(
+            "CONCAT(delivery_date, ' ', delivery_time) <= ?",
+            [$fourHoursLater->format('Y-m-d H:i:s')]
+        )
+        ->whereNotIn('no_dn', function($query) {
+            $query->select('no_dn')->from('shippings')->whereNull('deleted_at');
+        })
+        ->get()
+        ->map(function ($prep) {
+            // Hitung status untuk mirror: PLANNING atau DELAY
+            $deliveryDateTime = Carbon::parse($prep->delivery_date->format('Y-m-d') . ' ' . $prep->delivery_time);
+            $now = Carbon::now();
+            
+            if ($now->greaterThan($deliveryDateTime)) {
+                // Sudah lewat delivery time = DELAY
+                $status = 'delay';
+                $statusLabel = 'DELAY';
+                $statusBadge = 'bg-danger';
+            } else {
+                // Belum lewat = PLANNING (tidak masuk summary card)
+                $status = 'planning';
+                $statusLabel = 'PLANNING';
+                $statusBadge = 'bg-secondary';
+            }
+            
+            // Return sebagai object dengan struktur mirip Shipping
+            return (object) [
+                'id' => $prep->id,
+                'route' => $prep->route,
+                'logistic_partners' => $prep->logistic_partners,
+                'no_dn' => $prep->no_dn,
+                'customers' => $prep->customers,
+                'dock' => $prep->dock,
+                'delivery_date' => $prep->delivery_date,
+                'delivery_time' => $prep->delivery_time,
+                'arrival' => null,
+                'cycle' => $prep->cycle,
+                'address' => null, // Belum ada address
+                'status' => $status,
+                'status_label' => $statusLabel,
+                'status_badge' => $statusBadge,
+                'time_info' => $now->greaterThan($deliveryDateTime) 
+                    ? 'Terlambat ' . $now->diffForHumans($deliveryDateTime, true)
+                    : 'Sisa ' . $now->diffForHumans($deliveryDateTime, true),
+                'is_mirror' => true, // Flag untuk identifikasi data mirror
+                'pulling_date' => $prep->pulling_date,
+                'pulling_time' => $prep->pulling_time,
+                'scan_to_shipping' => null,
+                'moved_by' => null,
+            ];
+        });
+    }
+
+    /**
+     * Calculate status for shipping item
+     */
+    private function calculateShippingStatus($item)
+    {
+        if ($item->arrival !== null) {
+            return [
+                'status' => 'on_loading',
+                'status_label' => 'ON LOADING',
+                'status_badge' => 'bg-primary',
+            ];
+        }
+        
+        $deliveryDateTime = Carbon::parse(
+            (is_string($item->delivery_date) ? $item->delivery_date : $item->delivery_date->format('Y-m-d')) 
+            . ' ' . $item->delivery_time
+        );
+        $now = Carbon::now();
+        $normalStartTime = $deliveryDateTime->copy()->subHours(4);
+        
+        if ($now->greaterThan($deliveryDateTime)) {
+            return [
+                'status' => 'delay',
+                'status_label' => 'DELAY',
+                'status_badge' => 'bg-danger',
+            ];
+        } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+            return [
+                'status' => 'normal',
+                'status_label' => 'NORMAL',
+                'status_badge' => 'bg-success',
+            ];
+        } else {
+            return [
+                'status' => 'advance',
+                'status_label' => 'ADVANCE',
+                'status_badge' => 'bg-warning text-dark',
+            ];
+        }
+    }
+
+    /**
      * Display shipping list
      */
     public function index(Request $request)
@@ -21,11 +127,11 @@ class ShippingController extends Controller
         $search = $request->get('search');
         $statusFilter = $request->get('status');
         
-        $query = Shipping::query();
+        // Get real shippings
+        $shippingsQuery = Shipping::query();
         
-        // Search filter
         if ($search) {
-            $query->where(function($q) use ($search) {
+            $shippingsQuery->where(function($q) use ($search) {
                 $q->where('route', 'like', "%{$search}%")
                   ->orWhere('logistic_partners', 'like', "%{$search}%")
                   ->orWhere('no_dn', 'like', "%{$search}%")
@@ -35,53 +141,74 @@ class ShippingController extends Controller
             });
         }
         
-        // Status filter - advance, normal, delay, on_loading
-        if ($statusFilter && $statusFilter !== 'all') {
-            if ($statusFilter === 'advance') {
-                $query->whereNull('arrival')
-                    ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) > DATE_ADD(NOW(), INTERVAL 4 HOUR)");
-            } elseif ($statusFilter === 'normal') {
-                $query->whereNull('arrival')
-                    ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) <= DATE_ADD(NOW(), INTERVAL 4 HOUR)")
-                    ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) >= NOW()");
-            } elseif ($statusFilter === 'delay') {
-                $query->whereNull('arrival')
-                    ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) < NOW()");
-            } elseif ($statusFilter === 'on_loading') {
-                $query->whereNotNull('arrival');
-            }
+        $realShippings = $shippingsQuery->get()->map(function ($ship) {
+            $statusInfo = $this->calculateShippingStatus($ship);
+            $ship->status = $statusInfo['status'];
+            $ship->status_label = $statusInfo['status_label'];
+            $ship->status_badge = $statusInfo['status_badge'];
+            $ship->is_mirror = false;
+            return $ship;
+        });
+        
+        // Get mirrored preparations
+        $mirroredPreparations = $this->getMirroredPreparations();
+        
+        // Filter mirrored by search
+        if ($search) {
+            $mirroredPreparations = $mirroredPreparations->filter(function ($item) use ($search) {
+                return str_contains(strtolower($item->route), strtolower($search))
+                    || str_contains(strtolower($item->logistic_partners), strtolower($search))
+                    || str_contains(strtolower($item->no_dn), strtolower($search))
+                    || str_contains(strtolower($item->customers), strtolower($search))
+                    || str_contains(strtolower($item->dock), strtolower($search));
+            });
         }
         
-        // Order by delivery datetime (yang paling dekat di atas)
-        $query->orderByRaw("CONCAT(delivery_date, ' ', delivery_time) ASC");
+        // Combine both collections
+        $combined = $realShippings->concat($mirroredPreparations);
+        
+        // Apply status filter
+        if ($statusFilter && $statusFilter !== 'all') {
+            $combined = $combined->filter(function ($item) use ($statusFilter) {
+                return $item->status === $statusFilter;
+            });
+        }
+        
+        // Sort by delivery datetime ASC
+        $combined = $combined->sortBy(function ($item) {
+            $date = is_string($item->delivery_date) ? $item->delivery_date : $item->delivery_date->format('Y-m-d');
+            return $date . ' ' . $item->delivery_time;
+        })->values();
+        
+        // Calculate statistics from combined data - PLANNING tidak masuk summary
+        $totalAll = $combined->count();
+        $totalAdvance = $combined->where('status', 'advance')->count();
+        $totalNormal = $combined->where('status', 'normal')->count();
+        $totalDelay = $combined->where('status', 'delay')->count();
+        $totalOnLoading = $combined->where('status', 'on_loading')->count();
         
         // Pagination
         if ($perPage === 'all') {
-            $shippings = $query->get();
             $shippings = new \Illuminate\Pagination\LengthAwarePaginator(
-                $shippings,
-                $shippings->count(),
-                $shippings->count(),
+                $combined,
+                $combined->count(),
+                $combined->count(),
                 1,
                 ['path' => request()->url(), 'query' => request()->query()]
             );
         } else {
-            $shippings = $query->paginate((int)$perPage)->withQueryString();
+            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+            $perPageInt = (int)$perPage;
+            $currentPageItems = $combined->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
+            
+            $shippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $currentPageItems,
+                $combined->count(),
+                $perPageInt,
+                $currentPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
         }
-        
-        // Statistics - ADVANCE, NORMAL, DELAY, ON LOADING
-        $totalAll = Shipping::count();
-        $totalAdvance = Shipping::whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) > DATE_ADD(NOW(), INTERVAL 4 HOUR)")
-            ->count();
-        $totalNormal = Shipping::whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) <= DATE_ADD(NOW(), INTERVAL 4 HOUR)")
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) >= NOW()")
-            ->count();
-        $totalDelay = Shipping::whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) < NOW()")
-            ->count();
-        $totalOnLoading = Shipping::whereNotNull('arrival')->count();
         
         // Get recent scan untuk display
         $recentScan = Delivery::whereNotNull('scan_to_delivery')
@@ -96,6 +223,181 @@ class ShippingController extends Controller
             'totalDelay',
             'totalOnLoading',
             'recentScan'
+        ));
+    }
+
+    /**
+     * Display shipping list in reverse view (grouped by route & cycle)
+     */
+    public function indexReverse(Request $request)
+    {
+        $perPage = $request->get('per_page', 50);
+        $search = $request->get('search');
+        
+        // Get real shippings
+        $shippingsQuery = Shipping::query();
+        
+        if ($search) {
+            $shippingsQuery->where(function($q) use ($search) {
+                $q->where('route', 'like', "%{$search}%")
+                  ->orWhere('logistic_partners', 'like', "%{$search}%")
+                  ->orWhere('customers', 'like', "%{$search}%")
+                  ->orWhere('dock', 'like', "%{$search}%");
+            });
+        }
+        
+        $realShippings = $shippingsQuery->get()->map(function ($ship) {
+            $ship->is_mirror = false;
+            return $ship;
+        });
+        
+        // Get mirrored preparations
+        $mirroredPreparations = $this->getMirroredPreparations();
+        
+        // Filter mirrored by search
+        if ($search) {
+            $mirroredPreparations = $mirroredPreparations->filter(function ($item) use ($search) {
+                return str_contains(strtolower($item->route), strtolower($search))
+                    || str_contains(strtolower($item->logistic_partners), strtolower($search))
+                    || str_contains(strtolower($item->customers), strtolower($search))
+                    || str_contains(strtolower($item->dock), strtolower($search));
+            });
+        }
+        
+        // Combine both collections
+        $allShippings = $realShippings->concat($mirroredPreparations);
+        
+        // Group by route and cycle
+        $grouped = $allShippings->groupBy(function($item) {
+            return $item->route . '|' . $item->cycle;
+        })->map(function($group) {
+            $firstItem = $group->first();
+            
+            // Check if any item has arrival (real shipping with arrival)
+            $hasArrival = $group->contains(function ($item) {
+                return $item->arrival !== null;
+            });
+            
+            // Check if all items are mirror
+            $allMirror = $group->every(function ($item) {
+                return $item->is_mirror ?? false;
+            });
+            
+            // Calculate status for the group
+            if ($hasArrival) {
+                $statusLabel = 'ON LOADING';
+                $statusBadge = 'bg-primary';
+                $status = 'on_loading';
+            } elseif ($allMirror) {
+                // Semua data adalah mirror - gunakan PLANNING atau DELAY
+                $deliveryDate = is_string($firstItem->delivery_date) 
+                    ? $firstItem->delivery_date 
+                    : $firstItem->delivery_date->format('Y-m-d');
+                $deliveryDateTime = Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time);
+                $now = Carbon::now();
+                
+                if ($now->greaterThan($deliveryDateTime)) {
+                    $statusLabel = 'DELAY';
+                    $statusBadge = 'bg-danger';
+                    $status = 'delay';
+                } else {
+                    $statusLabel = 'PLANNING';
+                    $statusBadge = 'bg-secondary';
+                    $status = 'planning';
+                }
+            } else {
+                // Ada data real shipping - gunakan logic normal
+                $deliveryDate = is_string($firstItem->delivery_date) 
+                    ? $firstItem->delivery_date 
+                    : $firstItem->delivery_date->format('Y-m-d');
+                $deliveryDateTime = Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time);
+                $now = Carbon::now();
+                $normalStartTime = $deliveryDateTime->copy()->subHours(4);
+                
+                if ($now->greaterThan($deliveryDateTime)) {
+                    $statusLabel = 'DELAY';
+                    $statusBadge = 'bg-danger';
+                    $status = 'delay';
+                } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+                    $statusLabel = 'NORMAL';
+                    $statusBadge = 'bg-success';
+                    $status = 'normal';
+                } else {
+                    $statusLabel = 'ADVANCE';
+                    $statusBadge = 'bg-warning text-dark';
+                    $status = 'advance';
+                }
+            }
+            
+            // Get arrival from first item that has it
+            $arrivalItem = $group->first(function ($item) {
+                return $item->arrival !== null;
+            });
+            
+            $deliveryDate = is_string($firstItem->delivery_date) 
+                ? $firstItem->delivery_date 
+                : $firstItem->delivery_date->format('Y-m-d');
+            
+            return [
+                'route' => $firstItem->route,
+                'logistic_partners' => $group->pluck('logistic_partners')->unique()->filter()->implode(', '),
+                'cycle' => $firstItem->cycle,
+                'customers' => $group->pluck('customers')->unique()->filter()->implode(', '),
+                'dock' => $group->pluck('dock')->unique()->filter()->implode(', '),
+                'delivery_date' => Carbon::parse($deliveryDate)->format('d-m-y'),
+                'delivery_time' => date('H:i:s', strtotime($firstItem->delivery_time)),
+                'arrival' => $arrivalItem && $arrivalItem->arrival 
+                    ? (is_string($arrivalItem->arrival) ? $arrivalItem->arrival : $arrivalItem->arrival->format('d-m-y H:i')) 
+                    : null,
+                'address' => $group->pluck('address')->filter()->unique()->implode(', ') ?: null,
+                'status' => $status,
+                'status_label' => $statusLabel,
+                'status_badge' => $statusBadge,
+                'no_dns' => $group->pluck('no_dn')->toArray(),
+                'dn_count' => $group->count(),
+                'delivery_datetime' => Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time),
+                'is_all_mirror' => $allMirror,
+                'has_mirror' => $group->contains(function ($item) {
+                    return $item->is_mirror ?? false;
+                }),
+            ];
+        })->sortBy('delivery_datetime')->values();
+        
+        // Calculate statistics
+        $totalAdvance = $grouped->where('status', 'advance')->count();
+        $totalNormal = $grouped->where('status', 'normal')->count();
+        $totalDelay = $grouped->where('status', 'delay')->count();
+        $totalOnLoading = $grouped->where('status', 'on_loading')->count();
+        
+        // Pagination manual
+        if ($perPage === 'all') {
+            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $grouped,
+                $grouped->count(),
+                $grouped->count(),
+                1,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
+            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+            $perPageInt = (int)$perPage;
+            $currentPageItems = $grouped->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
+            
+            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $currentPageItems,
+                $grouped->count(),
+                $perPageInt,
+                $currentPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        }
+        
+        return view('shippings.index-reverse', compact(
+            'groupedShippings',
+            'totalAdvance',
+            'totalNormal',
+            'totalDelay',
+            'totalOnLoading'
         ));
     }
 
@@ -912,143 +1214,61 @@ class ShippingController extends Controller
         ]);
     }
 
-    /**
-     * Display shipping list in reverse view (grouped by route & cycle)
-     */
-    public function indexReverse(Request $request)
+    public function andon(Request $request)
     {
         $perPage = $request->get('per_page', 50);
-        $search = $request->get('search');
         
-        $query = Shipping::query();
+        // Get real shippings
+        $realShippings = Shipping::all()->map(function ($ship) {
+            $statusInfo = $this->calculateShippingStatus($ship);
+            $ship->status = $statusInfo['status'];
+            $ship->status_label = $statusInfo['status_label'];
+            $ship->status_badge = $statusInfo['status_badge'];
+            $ship->is_mirror = false;
+            return $ship;
+        });
         
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('route', 'like', "%{$search}%")
-                ->orWhere('logistic_partners', 'like', "%{$search}%")
-                ->orWhere('customers', 'like', "%{$search}%")
-                ->orWhere('dock', 'like', "%{$search}%");
-            });
-        }
+        // Get mirrored preparations
+        $mirroredPreparations = $this->getMirroredPreparations();
         
-        $allShippings = $query->get();
+        // Combine both collections
+        $combined = $realShippings->concat($mirroredPreparations);
         
-        // Group by route and cycle
-        $grouped = $allShippings->groupBy(function($item) {
-            return $item->route . '|' . $item->cycle;
-        })->map(function($group) {
-            $firstItem = $group->first();
-            
-            // Calculate status for the group - 4 status
-            if ($firstItem->arrival !== null) {
-                $statusLabel = 'ON LOADING';
-                $statusBadge = 'bg-primary';
-            } else {
-                $deliveryDateTime = Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time);
-                $now = Carbon::now();
-                $normalStartTime = $deliveryDateTime->copy()->subHours(4);
-                
-                if ($now->greaterThan($deliveryDateTime)) {
-                    $statusLabel = 'DELAY';
-                    $statusBadge = 'bg-danger';
-                } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
-                    $statusLabel = 'NORMAL';
-                    $statusBadge = 'bg-success';
-                } else {
-                    $statusLabel = 'ADVANCE';
-                    $statusBadge = 'bg-warning text-dark';
-                }
-            }
-            
-            return [
-                'route' => $firstItem->route,
-                'logistic_partners' => $group->pluck('logistic_partners')->unique()->filter()->implode(', '),
-                'cycle' => $firstItem->cycle,
-                'customers' => $group->pluck('customers')->unique()->filter()->implode(', '),
-                'dock' => $group->pluck('dock')->unique()->filter()->implode(', '),
-                'delivery_date' => $firstItem->delivery_date->format('d-m-y'),
-                'delivery_time' => date('H:i:s', strtotime($firstItem->delivery_time)),
-                'arrival' => $firstItem->arrival ? $firstItem->arrival->format('d-m-y H:i') : null,
-                'address' => $group->pluck('address')->unique()->filter()->implode(', '),
-                'status_label' => $statusLabel,
-                'status_badge' => $statusBadge,
-                'no_dns' => $group->pluck('no_dn')->toArray(),
-                'dn_count' => $group->count(),
-                'delivery_datetime' => Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time),
-            ];
-        })->sortBy('delivery_datetime')->values();
+        // Sort by delivery datetime ASC
+        $combined = $combined->sortBy(function ($item) {
+            $date = is_string($item->delivery_date) ? $item->delivery_date : $item->delivery_date->format('Y-m-d');
+            return $date . ' ' . $item->delivery_time;
+        })->values();
         
-        // Pagination manual
+        // Calculate statistics from combined data - PLANNING tidak masuk summary
+        $totalAll = $combined->count();
+        $totalAdvance = $combined->where('status', 'advance')->count();
+        $totalNormal = $combined->where('status', 'normal')->count();
+        $totalDelay = $combined->where('status', 'delay')->count();
+        $totalOnLoading = $combined->where('status', 'on_loading')->count();
+        
+        // Pagination
         if ($perPage === 'all') {
-            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
-                $grouped,
-                $grouped->count(),
-                $grouped->count(),
+            $shippings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $combined,
+                $combined->count(),
+                $combined->count(),
                 1,
                 ['path' => request()->url(), 'query' => request()->query()]
             );
         } else {
             $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
             $perPageInt = (int)$perPage;
-            $currentPageItems = $grouped->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
+            $currentPageItems = $combined->slice(($currentPage - 1) * $perPageInt, $perPageInt)->values();
             
-            $groupedShippings = new \Illuminate\Pagination\LengthAwarePaginator(
+            $shippings = new \Illuminate\Pagination\LengthAwarePaginator(
                 $currentPageItems,
-                $grouped->count(),
+                $combined->count(),
                 $perPageInt,
                 $currentPage,
                 ['path' => request()->url(), 'query' => request()->query()]
             );
         }
-        
-        // Statistics - 4 status
-        $totalAdvance = $grouped->where('status_label', 'ADVANCE')->count();
-        $totalNormal = $grouped->where('status_label', 'NORMAL')->count();
-        $totalDelay = $grouped->where('status_label', 'DELAY')->count();
-        $totalOnLoading = $grouped->where('status_label', 'ON LOADING')->count();
-        
-        return view('shippings.index-reverse', compact(
-            'groupedShippings',
-            'totalAdvance',
-            'totalNormal',
-            'totalDelay',
-            'totalOnLoading'
-        ));
-    }
-
-    public function andon(Request $request)
-    {
-        $perPage = $request->get('per_page', 50);
-        
-        $query = Shipping::query();
-        $query->orderByRaw("CONCAT(delivery_date, ' ', delivery_time) ASC");
-        
-        if ($perPage === 'all') {
-            $shippings = $query->get();
-            $shippings = new \Illuminate\Pagination\LengthAwarePaginator(
-                $shippings,
-                $shippings->count(),
-                $shippings->count(),
-                1,
-                ['path' => request()->url(), 'query' => request()->query()]
-            );
-        } else {
-            $shippings = $query->paginate((int)$perPage)->withQueryString();
-        }
-        
-        // Statistics - ADVANCE, NORMAL, DELAY, ON LOADING
-        $totalAll = Shipping::count();
-        $totalAdvance = Shipping::whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) > DATE_ADD(NOW(), INTERVAL 4 HOUR)")
-            ->count();
-        $totalNormal = Shipping::whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) <= DATE_ADD(NOW(), INTERVAL 4 HOUR)")
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) >= NOW()")
-            ->count();
-        $totalDelay = Shipping::whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) < NOW()")
-            ->count();
-        $totalOnLoading = Shipping::whereNotNull('arrival')->count();
         
         $recentScan = \App\Models\Delivery::whereNotNull('scan_to_delivery')
             ->orderBy('scan_to_delivery', 'desc')
@@ -1069,8 +1289,17 @@ class ShippingController extends Controller
     {
         $perPage = $request->get('per_page', 50);
         
-        $query = Shipping::query();
-        $allShippings = $query->get();
+        // Get real shippings
+        $realShippings = Shipping::all()->map(function ($ship) {
+            $ship->is_mirror = false;
+            return $ship;
+        });
+        
+        // Get mirrored preparations
+        $mirroredPreparations = $this->getMirroredPreparations();
+        
+        // Combine both collections
+        $allShippings = $realShippings->concat($mirroredPreparations);
         
         // Group by route and cycle
         $grouped = $allShippings->groupBy(function($item) {
@@ -1078,26 +1307,68 @@ class ShippingController extends Controller
         })->map(function($group) {
             $firstItem = $group->first();
             
-            // Calculate status - 4 status
-            if ($firstItem->arrival !== null) {
+            // Check if any item has arrival
+            $hasArrival = $group->contains(function ($item) {
+                return $item->arrival !== null;
+            });
+            
+            // Check if all items are mirror
+            $allMirror = $group->every(function ($item) {
+                return $item->is_mirror ?? false;
+            });
+            
+            // Calculate status
+            if ($hasArrival) {
                 $statusLabel = 'ON LOADING';
                 $statusBadge = 'bg-primary';
+                $status = 'on_loading';
+            } elseif ($allMirror) {
+                // Semua data adalah mirror - gunakan PLANNING atau DELAY
+                $deliveryDate = is_string($firstItem->delivery_date) 
+                    ? $firstItem->delivery_date 
+                    : $firstItem->delivery_date->format('Y-m-d');
+                $deliveryDateTime = Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time);
+                $now = Carbon::now();
+                
+                if ($now->greaterThan($deliveryDateTime)) {
+                    $statusLabel = 'DELAY';
+                    $statusBadge = 'bg-danger';
+                    $status = 'delay';
+                } else {
+                    $statusLabel = 'PLANNING';
+                    $statusBadge = 'bg-secondary';
+                    $status = 'planning';
+                }
             } else {
-                $deliveryDateTime = Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time);
+                $deliveryDate = is_string($firstItem->delivery_date) 
+                    ? $firstItem->delivery_date 
+                    : $firstItem->delivery_date->format('Y-m-d');
+                $deliveryDateTime = Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time);
                 $now = Carbon::now();
                 $normalStartTime = $deliveryDateTime->copy()->subHours(4);
                 
                 if ($now->greaterThan($deliveryDateTime)) {
                     $statusLabel = 'DELAY';
                     $statusBadge = 'bg-danger';
+                    $status = 'delay';
                 } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
                     $statusLabel = 'NORMAL';
                     $statusBadge = 'bg-success';
+                    $status = 'normal';
                 } else {
                     $statusLabel = 'ADVANCE';
                     $statusBadge = 'bg-warning text-dark';
+                    $status = 'advance';
                 }
             }
+            
+            $arrivalItem = $group->first(function ($item) {
+                return $item->arrival !== null;
+            });
+            
+            $deliveryDate = is_string($firstItem->delivery_date) 
+                ? $firstItem->delivery_date 
+                : $firstItem->delivery_date->format('Y-m-d');
             
             return [
                 'route' => $firstItem->route,
@@ -1105,17 +1376,26 @@ class ShippingController extends Controller
                 'cycle' => $firstItem->cycle,
                 'customers' => $group->pluck('customers')->unique()->filter()->implode(', '),
                 'dock' => $group->pluck('dock')->unique()->filter()->implode(', '),
-                'delivery_date' => $firstItem->delivery_date->format('d-m-y'),
+                'delivery_date' => Carbon::parse($deliveryDate)->format('d-m-y'),
                 'delivery_time' => date('H:i:s', strtotime($firstItem->delivery_time)),
-                'arrival' => $firstItem->arrival ? $firstItem->arrival->format('d-m-y H:i') : null,
-                'address' => $group->pluck('address')->unique()->filter()->implode(', '),
+                'arrival' => $arrivalItem && $arrivalItem->arrival 
+                    ? (is_string($arrivalItem->arrival) ? $arrivalItem->arrival : $arrivalItem->arrival->format('d-m-y H:i')) 
+                    : null,
+                'address' => $group->pluck('address')->filter()->unique()->implode(', ') ?: null,
+                'status' => $status,
                 'status_label' => $statusLabel,
                 'status_badge' => $statusBadge,
                 'no_dns' => $group->pluck('no_dn')->toArray(),
                 'dn_count' => $group->count(),
-                'delivery_datetime' => Carbon::parse($firstItem->delivery_date->format('Y-m-d') . ' ' . $firstItem->delivery_time),
+                'delivery_datetime' => Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time),
             ];
         })->sortBy('delivery_datetime')->values();
+        
+        // Statistics
+        $totalAdvance = $grouped->where('status', 'advance')->count();
+        $totalNormal = $grouped->where('status', 'normal')->count();
+        $totalDelay = $grouped->where('status', 'delay')->count();
+        $totalOnLoading = $grouped->where('status', 'on_loading')->count();
         
         // Pagination manual
         if ($perPage === 'all') {
@@ -1139,12 +1419,6 @@ class ShippingController extends Controller
                 ['path' => request()->url(), 'query' => request()->query()]
             );
         }
-        
-        // Statistics - 4 status
-        $totalAdvance = $grouped->where('status_label', 'ADVANCE')->count();
-        $totalNormal = $grouped->where('status_label', 'NORMAL')->count();
-        $totalDelay = $grouped->where('status_label', 'DELAY')->count();
-        $totalOnLoading = $grouped->where('status_label', 'ON LOADING')->count();
         
         $recentScan = \App\Models\Delivery::whereNotNull('scan_to_delivery')
             ->orderBy('scan_to_delivery', 'desc')

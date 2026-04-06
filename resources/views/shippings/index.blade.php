@@ -252,56 +252,78 @@
             <tbody>
                 @forelse($shippings as $index => $ship)
                     @php
-                        $currentStatus = $ship->calculateStatus();
+                        $isMirror = $ship->is_mirror ?? false;
+                        $currentStatus = $ship->status ?? 'normal';
+                        $deliveryDate = is_string($ship->delivery_date) ? $ship->delivery_date : $ship->delivery_date->format('d-m-y');
                     @endphp
-                    <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle' : '' }}">
+                    <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle' : '' }} {{ $isMirror ? 'table-secondary' : '' }}">
                         <td><strong>{{ $ship->route }}</strong></td>
                         <td>{{ $ship->logistic_partners }}</td>
                         <td>{{ $ship->no_dn }}</td>
                         <td>{{ $ship->customers }}</td>
                         <td><strong>{{ $ship->dock }}</strong></td>
-                        <td>{{ $ship->delivery_date->format('d-m-y') }}</td>
+                        <td>{{ $deliveryDate }}</td>
                         <td>{{ date('H:i:s', strtotime($ship->delivery_time)) }}</td>
                         <td>
                             @if($ship->arrival)
-                                <span>{{ $ship->arrival->format('d-m-y H:i') }}</span>
+                                <span>{{ is_string($ship->arrival) ? $ship->arrival : $ship->arrival->format('d-m-y H:i') }}</span>
                             @else
                                 <span>-</span>
                             @endif
                         </td>
                         <td><strong>{{ $ship->cycle }}</strong></td>
-                        <td>{{ $ship->address }}</td>
+                        <td>
+                            @if($isMirror || empty($ship->address))
+                                <span class="text-white">-</span>
+                            @else
+                                {{ $ship->address }}
+                            @endif
+                        </td>
                         <td>
                             <span class="badge {{ $ship->status_badge }} fw-bold px-3 py-2 mb-1 mt-1 
                                 {{ $currentStatus === 'delay' ? 'badge-delay' : '' }}"
-                                title="{{ $ship->time_info }}">
+                                title="{{ $ship->time_info ?? '' }}">
                                 {{ $ship->status_label }}
                             </span>
                         </td>
                         <td>
-                            <div class="d-flex justify-content-center" style="gap: 0;">
-                                @if(auth()->user()->role === 'superadmin')
-                                    <button onclick="openEditModal({{ $ship->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
+                            @if($isMirror)
+                                {{-- Data Mirror: Hanya bisa scan ke shipping (isi address) --}}
+                                <div class="d-flex justify-content-center" style="gap: 0;">
+                                    <a href="javascript:void(0)" onclick="showQrCode('{{ $ship->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="QR Code">
+                                        <i class="bi bi-qr-code"></i>
+                                    </a>
                                     
-                                    <form action="{{ route('shippings.destroy', $ship->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
-                                            <i class="bi bi-trash-fill"></i>
+                                    <button onclick="scanMirrorToShipping({{ $ship->id }}, '{{ $ship->no_dn }}')" class="btn btn-success btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Scan to Shipping (Isi Address)">
+                                        <i class="bi bi-box-arrow-in-right"></i>
+                                    </button>
+                                </div>
+                            @else
+                                {{-- Data Real: Full action --}}
+                                <div class="d-flex justify-content-center" style="gap: 0;">
+                                    @if(auth()->user()->role === 'superadmin')
+                                        <button onclick="openEditModal({{ $ship->id }})" class="btn btn-warning btn-sm btn-action-square" style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
+                                            <i class="bi bi-pencil-fill"></i>
                                         </button>
-                                    </form>
-                                @endif
+                                        
+                                        <form action="{{ route('shippings.destroy', $ship->id) }}" method="POST" class="d-inline delete-form" style="margin: 0;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="Hapus">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    @endif
 
-                                <a href="javascript:void(0)" onclick="showQrCode('{{ $ship->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: 0; margin: 0;" title="QR Code">
-                                    <i class="bi bi-qr-code"></i>
-                                </a>
-                                
-                                <button onclick="moveToDelivery({{ $ship->id }}, '{{ $ship->no_dn }}')" class="btn btn-primary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Move to Delivery">
-                                    <i class="bi bi-arrow-right"></i>
-                                </button>
-                            </div>
+                                    <a href="javascript:void(0)" onclick="showQrCode('{{ $ship->no_dn }}')" class="btn btn-secondary btn-sm btn-action-square" style="border-radius: {{ auth()->user()->role === 'superadmin' ? '0' : '6px 0 0 6px' }}; margin: 0;" title="QR Code">
+                                        <i class="bi bi-qr-code"></i>
+                                    </a>
+                                    
+                                    <button onclick="moveToDelivery({{ $ship->id }}, '{{ $ship->no_dn }}')" class="btn btn-primary btn-sm btn-action-square" style="border-radius: 0 6px 6px 0; margin: 0;" title="Move to Delivery">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                </div>
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -544,6 +566,91 @@
                     confirmButtonColor: '#dc2626'
                 }).then(() => {
                     $('#scanDnInput').val('').focus();
+                });
+            }
+        });
+    }
+
+    // Scan Mirror to Shipping (untuk data yang masih di preparation tapi sudah muncul di shipping)
+    function scanMirrorToShipping(preparationId, noDn) {
+        Swal.fire({
+            title: 'Scan to Shipping',
+            html: `
+                <div class="mb-3 text-center">
+                    <div class="py-2">
+                        <small><strong>DN:</strong> ${noDn}</small>
+                    </div>
+                </div>
+                <p class="text-muted mb-3">Pilih lokasi shipping:</p>
+                <div class="container">
+                    <div class="row g-2 mb-2">
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 1">1</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 2">2</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 3">3</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 4">4</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 5">5</button></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 6">6</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 7">7</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 8">8</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 9">9</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 10">10</button></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 1">Ex 1</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 2">Ex 2</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 3">Ex 3</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 4">Ex 4</button></div>
+                        <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 5">Ex 5</button></div>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancel',
+            cancelButtonColor: '#6c757d',
+            width: 500,
+            didOpen: () => {
+                document.querySelectorAll('.address-select-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const address = this.getAttribute('data-address');
+                        Swal.close();
+                        executeMoveFromPreparation(preparationId, address, noDn);
+                    });
+                });
+            }
+        });
+    }
+
+    // Execute move from preparation to shipping
+    function executeMoveFromPreparation(preparationId, address, noDn) {
+        $.ajax({
+            url: '{{ route("shippings.moveFromPreparation") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                preparation_id: preparationId,
+                address: address
+            },
+            success: function(response) {
+                Swal.fire({
+                    title: 'Berhasil!',
+                    html: `DN <strong>${noDn}</strong> dipindahkan ke <strong>${address}</strong>`,
+                    icon: 'success',
+                    confirmButtonColor: '#059669',
+                    timer: 2000,
+                    timerProgressBar: true
+                }).then(() => {
+                    window.location.reload();
+                });
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    title: 'Gagal!',
+                    text: xhr.responseJSON?.message || 'Terjadi kesalahan saat memindahkan data',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
                 });
             }
         });

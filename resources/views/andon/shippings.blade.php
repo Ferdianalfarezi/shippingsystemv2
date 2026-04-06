@@ -176,7 +176,7 @@
                         <td>{{ $ship->delivery_date->format('d-m-y') }}</td>
                         <td>{{ date('H:i:s', strtotime($ship->delivery_time)) }}</td>
                         <td><strong>{{ $ship->cycle }}</strong></td>
-                        <td>{{ $ship->address }}</td>
+                        <td>{{ $ship->address ?: '-' }}</td>
                         <td>
                             @if($ship->arrival)
                                 <span>

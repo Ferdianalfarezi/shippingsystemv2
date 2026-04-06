@@ -133,8 +133,10 @@
                 @forelse($groupedShippings as $index => $group)
                     @php
                         $currentStatus = strtolower($group['status_label']);
+                        $isAllMirror = $group['is_all_mirror'] ?? false;
+                        $hasMirror = $group['has_mirror'] ?? false;
                     @endphp
-                    <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle' : '' }}">
+                    <tr class="fs-4 {{ $currentStatus === 'delay' ? 'table-danger-subtle' : '' }} {{ $isAllMirror ? 'table-secondary' : '' }}">
                         <td><strong>{{ $group['route'] }}</strong></td>
                         <td>{{ $group['logistic_partners'] }}</td>
                         <td>{{ Str::limit($group['customers'], 30) }}</td>
@@ -150,14 +152,18 @@
                         </td>
                         <td><strong>{{ $group['cycle'] }}</strong></td>
                         <td>
-                            @php
-                                $addresses = explode(',', $group['address']);
-                                $numbers = array_map(function($addr) {
-                                    return trim(str_replace('Shipping', '', $addr));
-                                }, $addresses);
-                                $formattedAddress = 'S- ' . implode(',', $numbers);
-                            @endphp
-                            {{ $formattedAddress }}
+                            @if(empty($group['address']))
+                                <span class="text-white">-</span>
+                            @else
+                                @php
+                                    $addresses = explode(',', $group['address']);
+                                    $numbers = array_map(function($addr) {
+                                        return trim(str_replace('Shipping', '', $addr));
+                                    }, $addresses);
+                                    $formattedAddress = 'S- ' . implode(',', $numbers);
+                                @endphp
+                                {{ $formattedAddress }}
+                            @endif
                         </td>
                         <td>
                             <span class="badge {{ $group['status_badge'] }} fw-bold px-3 py-2 mb-1 mt-1 
@@ -169,17 +175,26 @@
                         <td>
                             <div class="btn-group" role="group">
                                 <button 
-                                    onclick="showDnList('{{ $group['route'] }}', {{ $group['cycle'] }}, {{ json_encode($group['no_dns']) }})" 
+                                    onclick="showDnList('{{ $group['route'] }}', {{ $group['cycle'] }}, {{ json_encode($group['no_dns']) }}, {{ $isAllMirror ? 'true' : 'false' }})" 
                                     class="btn btn-info btn-sm" 
                                     title="Lihat Daftar DN">
                                     <i class="bi bi-list-ul"></i> {{ $group['dn_count'] }}
                                 </button>
-                                <button 
-                                    onclick="moveGroupToDelivery('{{ $group['route'] }}', {{ $group['cycle'] }}, {{ $group['dn_count'] }})" 
-                                    class="btn btn-primary btn-sm btn-action-square" 
-                                    title="Move All to Delivery">
-                                    <i class="bi bi-arrow-right"></i>
-                                </button>
+                                @if(!$isAllMirror)
+                                    <button 
+                                        onclick="moveGroupToDelivery('{{ $group['route'] }}', {{ $group['cycle'] }}, {{ $group['dn_count'] }})" 
+                                        class="btn btn-primary btn-sm btn-action-square" 
+                                        title="Move All to Delivery">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                @else
+                                    <button 
+                                        class="btn btn-secondary btn-sm btn-action-square" 
+                                        disabled
+                                        title="Semua data masih mirror (belum di-scan address)">
+                                        <i class="bi bi-arrow-right"></i>
+                                    </button>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -263,12 +278,20 @@
     });
 
     // Show DN List Function
-    function showDnList(route, cycle, dnList) {
+    function showDnList(route, cycle, dnList, isAllMirror) {
         let dnListHtml = '<ul class="list-group list-group-flush text-start">';
         dnList.forEach((dn, index) => {
             dnListHtml += `<li class="list-group-item"><strong>${index + 1}.</strong> ${dn}</li>`;
         });
         dnListHtml += '</ul>';
+
+        let infoHtml = '';
+        if (isAllMirror) {
+            infoHtml = `<div class="alert alert-warning mt-3 mb-0">
+                <i class="bi bi-info-circle"></i> Semua DN dalam group ini masih mirror (belum di-scan address). 
+                Scan individual dari halaman normal view untuk mengisi address.
+            </div>`;
+        }
 
         Swal.fire({
             title: `<strong>Daftar DN</strong>`,
@@ -278,6 +301,7 @@
                     <p class="mb-3"><strong>Cycle:</strong> ${cycle}</p>
                 </div>
                 ${dnListHtml}
+                ${infoHtml}
             `,
             width: 600,
             showCloseButton: true,
@@ -300,6 +324,7 @@
                 </div>
                 <hr>
                 <p class="text-muted mb-0">Semua data DN dalam group ini akan dipindahkan ke Delivery</p>
+                <p class="text-warning small mb-0"><i class="bi bi-exclamation-triangle"></i> Data mirror (belum di-scan address) akan dilewati</p>
             `,
             icon: 'question',
             showCancelButton: true,
@@ -312,7 +337,7 @@
             if (result.isConfirmed) {
                 Swal.fire({
                     title: 'Memproses...',
-                    html: `Memindahkan ${dnCount} data ke Delivery`,
+                    html: `Memindahkan data ke Delivery`,
                     allowOutsideClick: false,
                     allowEscapeKey: false,
                     didOpen: () => {

@@ -186,14 +186,22 @@
                         <td><strong>{{ $group['cycle'] }}</strong></td>
                         <td>
                             @php
-                                $addresses = explode(',', $group['address']);
-                                $numbers = array_map(function($addr) {
-                                    return trim(str_replace('Shipping', '', $addr));
-                                }, $addresses);
-                                $formattedAddress = 'S-' . implode(',', $numbers);
+                                $formattedAddress = '-';
+
+                                if (!empty($group['address'])) {
+                                    $addresses = explode(',', $group['address']);
+                                    $numbers = array_filter(array_map(function ($addr) {
+                                        return trim(str_replace('Shipping', '', $addr));
+                                    }, $addresses));
+
+                                    if (!empty($numbers)) {
+                                        $formattedAddress = 'S-' . implode(',', $numbers);
+                                    }
+                                }
                             @endphp
                             {{ $formattedAddress }}
                         </td>
+
                         <td>
                             <span class="badge bg-secondary fw-bold px-3 py-2 mb-1">
                                 {{ $group['dn_count'] }} DN
