@@ -555,8 +555,22 @@
                 <div class="menu-item">
                     <a href="{{ route('histories.index') }}">History</a>
                 </div>
-                <div class="menu-item">
-                    <a href="{{ route('kanbantmmins.index') }}">Kanban</a>
+                <div class="menu-item dropdown">
+                    <a href="#" class="dropdown-toggle" data-bs-toggle="dropdown">
+                        Kanban
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanbantmmins.index') }}">
+                                TMMIN
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanbanhpms.index') }}">
+                                HPM
+                            </a>
+                        </li>
+                    </ul>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
                     <div class="menu-item" id="settingsMenu">

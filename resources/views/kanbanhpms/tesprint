@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Kanban HPM</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: #fff;
+            color: #000;
+        }
+
+        /* ===== PAGE SETUP ===== */
+        @page {
+            size: A5 landscape;
+            margin: 4mm;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* ===== PRINT BUTTON (no-print) ===== */
+        .print-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            display: flex;
+            gap: 8px;
+        }
+        .btn-print {
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+        }
+        .btn-back {
+            background: #6c757d;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            text-decoration: none;
+            display: inline-block;
+            line-height: 1.4;
+        }
+
+        /* ===== CARD WRAPPER ===== */
+        .card-wrapper {
+            width: 200mm;
+            height: 128mm;
+            margin: 0 auto 6mm;
+            border: 1.5px solid #000;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            overflow: hidden;
+        }
+
+        /* ===== HEADER ROW ===== */
+        .card-header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            border-bottom: 1px solid #000;
+            padding: 1.5mm 2mm;
+            align-items: center;
+        }
+        .card-title {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 13pt;
+            font-style: italic;
+            font-weight: normal;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+        .card-page {
+            font-size: 7.5pt;
+            text-align: right;
+            white-space: nowrap;
+            padding-left: 4mm;
+        }
+        .card-page span {
+            font-size: 9pt;
+            font-weight: bold;
+        }
+
+        /* ===== BODY: 3 COLUMNS ===== */
+        .card-body {
+            display: grid;
+            grid-template-columns: 44mm 1fr 42mm;
+            border-bottom: 1px solid #000;
+        }
+
+        /* ===== LEFT COLUMN ===== */
+        .col-left {
+            border-right: 1px solid #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* FROM / TO */
+        .from-to-section {
+            border-bottom: 1px solid #000;
+            padding: 1mm;
+        }
+        .from-row, .to-row {
+            display: flex;
+            align-items: center;
+            padding: 0.5mm 1mm;
+            min-height: 7mm;
+        }
+        .from-row {
+            border-bottom: 0.5px solid #000;
+        }
+        .label-small {
+            font-size: 5.5pt;
+            min-width: 8mm;
+            color: #000;
+        }
+        .value-from-to {
+            font-size: 8pt;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        /* Supply / M_S / Inventory */
+        .info-table {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            border-bottom: 0.5px solid #000;
+            min-height: 6.5mm;
+            padding: 0 1.5mm;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-size: 5.5pt;
+            min-width: 22mm;
+            color: #000;
+        }
+        .info-value {
+            font-size: 7.5pt;
+            font-weight: bold;
+        }
+
+        /* Split row (Inventory + Part weight) */
+        .info-row-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-bottom: 0.5px solid #000;
+            min-height: 6.5mm;
+        }
+        .info-split-cell {
+            display: flex;
+            flex-direction: column;
+            padding: 0.5mm 1.5mm;
+        }
+        .info-split-cell:first-child {
+            border-right: 0.5px solid #000;
+        }
+        .info-split-label {
+            font-size: 5pt;
+            color: #000;
+        }
+        .info-split-value {
+            font-size: 7pt;
+            font-weight: bold;
+        }
+
+        /* HPM footer left */
+        .hpm-footer {
+            padding: 1.5mm 2mm;
+            margin-top: auto;
+        }
+        .hpm-footer .hpm-bold {
+            font-size: 9pt;
+            font-weight: bold;
+            letter-spacing: 0.3px;
+        }
+        .hpm-footer .hpm-sub {
+            font-size: 7pt;
+        }
+
+        /* ===== CENTER COLUMN ===== */
+        .col-center {
+            border-right: 1px solid #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Part No + Part Name area */
+        .part-header {
+            border-bottom: 1px solid #000;
+            padding: 1.5mm 2mm;
+        }
+        .part-no {
+            font-size: 14pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+            line-height: 1.2;
+        }
+        .part-name {
+            font-size: 8.5pt;
+            margin-top: 1mm;
+            letter-spacing: 0.3px;
+        }
+        .part-color-code {
+            font-size: 6pt;
+            color: #000;
+            margin-top: 1mm;
+        }
+
+        /* P/S Code, Order Class, SP Order No */
+        .psc-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            border-bottom: 0.5px solid #000;
+        }
+        .psc-cell {
+            padding: 0.5mm 1.5mm;
+            border-right: 0.5px solid #000;
+            min-height: 8mm;
+        }
+        .psc-cell:last-child {
+            border-right: none;
+        }
+        .psc-label {
+            font-size: 5.5pt;
+            color: #000;
+            display: block;
+        }
+        .psc-value {
+            font-size: 8.5pt;
+            font-weight: bold;
+            display: block;
+            margin-top: 0.5mm;
+        }
+
+        /* Production SEQ No */
+        .seq-row {
+            border-bottom: 0.5px solid #000;
+            padding: 0.5mm 1.5mm;
+            min-height: 7mm;
+        }
+        .seq-label {
+            font-size: 5.5pt;
+            color: #000;
+            display: block;
+        }
+        .seq-value {
+            font-size: 8.5pt;
+            font-weight: bold;
+            display: block;
+            margin-top: 0.3mm;
+        }
+
+        /* KD Lot No */
+        .kdlot-row {
+            border-bottom: 0.5px solid #000;
+            padding: 0.5mm 1.5mm;
+            min-height: 9mm;
+        }
+        .kdlot-label {
+            font-size: 5.5pt;
+            color: #000;
+            display: block;
+        }
+        .kdlot-value {
+            font-size: 13pt;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-top: 0.3mm;
+        }
+
+        /* Barcode area */
+        .barcode-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5mm;
+        }
+        .barcode-area img {
+            max-width: 100%;
+            height: 12mm;
+        }
+        .barcode-text {
+            font-size: 6.5pt;
+            margin-top: 0.5mm;
+            letter-spacing: 1px;
+        }
+
+        /* ===== RIGHT COLUMN ===== */
+        .col-right {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Ship */
+        .ship-box {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            border-bottom: 1px solid #000;
+            padding: 1mm 2mm;
+            min-height: 9mm;
+        }
+        .ship-label {
+            font-size: 6pt;
+        }
+        .ship-value {
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        /* Date / Time */
+        .datetime-section {
+            border-bottom: 1px solid #000;
+            padding: 1mm 2mm;
+        }
+        .dt-row {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 1mm;
+        }
+        .dt-label {
+            font-size: 5.5pt;
+            min-width: 10mm;
+        }
+        .dt-value {
+            font-size: 13pt;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        /* HNS / Production grid */
+        .hns-grid {
+            border-bottom: 0.5px solid #000;
+        }
+        .hns-header-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            border-bottom: 0.5px solid #000;
+        }
+        .hns-header-cell {
+            font-size: 5pt;
+            padding: 0.5mm 1mm;
+            border-right: 0.5px solid #000;
+            text-align: center;
+        }
+        .hns-header-cell:last-child { border-right: none; }
+        .hns-body-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        .hns-body-cell {
+            font-size: 7pt;
+            font-weight: bold;
+            padding: 0.5mm 1mm;
+            border-right: 0.5px solid #000;
+            min-height: 7mm;
+            text-align: center;
+        }
+        .hns-body-cell:last-child { border-right: none; }
+
+        /* DCC Date / DCC Time */
+        .dcc-grid {
+            border-bottom: 0.5px solid #000;
+        }
+        .dcc-header-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-bottom: 0.5px solid #000;
+        }
+        .dcc-header-cell {
+            font-size: 5pt;
+            padding: 0.5mm 1mm;
+            border-right: 0.5px solid #000;
+            text-align: center;
+        }
+        .dcc-header-cell:last-child { border-right: none; }
+        .dcc-body-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        .dcc-body-cell {
+            font-size: 7pt;
+            padding: 0.5mm 1mm;
+            border-right: 0.5px solid #000;
+            min-height: 7mm;
+        }
+        .dcc-body-cell:last-child { border-right: none; }
+
+        /* Ship Quantity */
+        .ship-qty-row {
+            padding: 0.5mm 1mm;
+            min-height: 7mm;
+        }
+        .ship-qty-label {
+            font-size: 5pt;
+        }
+
+        /* ===== DASHED BOXES (fill area) ===== */
+        .dashed-box {
+            border: 1px dashed #999;
+            min-height: 6mm;
+            margin: 0.5mm;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Print Controls -->
+    <div class="print-controls no-print">
+        <a href="{{ route('kanbanhpms.index') }}" class="btn-back">← Kembali</a>
+        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+
+    @foreach($kanbanhpms as $index => $item)
+    <div class="card-wrapper {{ !$loop->last ? 'page-break' : '' }}">
+
+        {{-- ===== HEADER ===== --}}
+        <div class="card-header">
+            <div></div>
+            <div class="card-title">Parts Contents Card</div>
+            <div class="card-page">PAGE : <span>{{ $loop->iteration }}</span></div>
+        </div>
+
+        {{-- ===== BODY ===== --}}
+        <div class="card-body">
+
+            {{-- LEFT COLUMN --}}
+            <div class="col-left">
+
+                {{-- FROM / TO --}}
+                <div class="from-to-section">
+                    <div class="from-row">
+                        <span class="label-small">FROM:</span>
+                        <span class="value-from-to">&nbsp;&nbsp;{{ $item->from }}</span>
+                    </div>
+                    <div class="to-row">
+                        <span class="label-small">TO:</span>
+                        <span class="value-from-to">&nbsp;&nbsp;&nbsp;{{ $item->to }}</span>
+                    </div>
+                </div>
+
+                {{-- Supply Address, M/S ID, Inventory Category --}}
+                <div class="info-table">
+                    <div class="info-row">
+                        <span class="info-label">Supply Address</span>
+                        <span class="info-value">{{ $item->supply_address }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Next Supply Address</span>
+                        <span class="info-value"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">M/S ID</span>
+                        <span class="info-value">{{ $item->ms_id }}</span>
+                    </div>
+                    <div class="info-row-split">
+                        <div class="info-split-cell">
+                            <span class="info-split-label">Inventory Category</span>
+                            <span class="info-split-value">{{ $item->inventory_category }}</span>
+                        </div>
+                        <div class="info-split-cell">
+                            <span class="info-split-label">Part weight</span>
+                            <span class="info-split-value"></span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- HPM footer --}}
+                <div class="hpm-footer">
+                    <div class="hpm-bold">HPM</div>
+                    <div class="hpm-sub">Honda Prospect Motor</div>
+                </div>
+
+            </div>
+
+            {{-- CENTER COLUMN --}}
+            <div class="col-center">
+
+                {{-- Part No + Name --}}
+                <div class="part-header">
+                    <div class="part-no">{{ $item->part_no }}</div>
+                    <div class="part-name">{{ $item->part_name }}</div>
+                    <div class="part-color-code">Part Color Code:</div>
+                </div>
+
+                {{-- P/S Code | Order Class | SP Order No. --}}
+                <div class="psc-row">
+                    <div class="psc-cell">
+                        <span class="psc-label">P/S Code</span>
+                        <span class="psc-value">{{ $item->ps_code }}</span>
+                    </div>
+                    <div class="psc-cell" style="min-width: 18mm;">
+                        <span class="psc-label">Order Class</span>
+                        <span class="psc-value" style="text-align:center;">{{ $item->order_class }}</span>
+                    </div>
+                    <div class="psc-cell" style="min-width: 22mm;">
+                        <span class="psc-label">SP Order No.</span>
+                        <span class="psc-value"></span>
+                    </div>
+                </div>
+
+                {{-- Production SEQ No. --}}
+                <div class="seq-row">
+                    <span class="seq-label">Production SEQ No.</span>
+                    <span class="seq-value">{{ $item->seq_no }}</span>
+                </div>
+
+                {{-- KD Lot No. --}}
+                <div class="kdlot-row">
+                    <span class="kdlot-label">KD Lot No.</span>
+                    <span class="kdlot-value">{{ $item->kd_lot_no }}</span>
+                </div>
+
+                {{-- Barcode --}}
+                <div class="barcode-area">
+                    @if($item->barcode)
+                        <img src="data:image/png;base64,{{ $item->barcode }}" alt="barcode">
+                        @php
+                            // Format: DI261610013582 -> 261610013582, lalu item_seq + 00001000015
+                            $cleanDi = str_replace('DI', '', $item->di_no);
+                            $barcodeText = $cleanDi . $item->item_seq . '00001000015';
+                        @endphp
+                        <div class="barcode-text">{{ $barcodeText }}</div>
+                    @else
+                        <div style="font-size:7pt; color:#999;">No barcode</div>
+                    @endif
+                </div>
+
+            </div>
+
+            {{-- RIGHT COLUMN --}}
+            <div class="col-right">
+
+                {{-- Ship --}}
+                <div class="ship-box">
+                    <span class="ship-label">Ship</span>
+                    <span class="ship-value">{{ $item->ship ?? '' }}</span>
+                </div>
+
+                {{-- Date / Time --}}
+                <div class="datetime-section">
+                    @php
+                        $dtParts = explode(' ', $item->datetime ?? '');
+                        $dateVal = $dtParts[0] ?? '';
+                        $timeVal = $dtParts[1] ?? '';
+                    @endphp
+                    <div class="dt-row">
+                        <span class="dt-label">Date:</span>
+                    </div>
+                    <div style="margin-left: 2mm; margin-bottom: 1mm;">
+                        <span class="dt-value">{{ $dateVal }}</span>
+                    </div>
+                    <div class="dt-row">
+                        <span class="dt-label">Time:</span>
+                    </div>
+                    <div style="margin-left: 2mm;">
+                        <span class="dt-value">{{ $timeVal }}</span>
+                    </div>
+                </div>
+
+                {{-- HNS / Production Day / Production --}}
+                <div class="hns-grid">
+                    <div class="hns-header-row">
+                        <div class="hns-header-cell">HNS</div>
+                        <div class="hns-header-cell">Production day</div>
+                        <div class="hns-header-cell">Production</div>
+                    </div>
+                    <div class="hns-body-row">
+                        <div class="hns-body-cell">*</div>
+                        <div class="hns-body-cell"></div>
+                        <div class="hns-body-cell"></div>
+                    </div>
+                </div>
+
+                {{-- DCC Date / DCC Time --}}
+                <div class="dcc-grid">
+                    <div class="dcc-header-row">
+                        <div class="dcc-header-cell">DCC Date</div>
+                        <div class="dcc-header-cell">DCC Time</div>
+                    </div>
+                    <div class="dcc-body-row">
+                        <div class="dcc-body-cell"></div>
+                        <div class="dcc-body-cell"></div>
+                    </div>
+                </div>
+
+                {{-- Ship Quantity --}}
+                <div class="ship-qty-row">
+                    <div class="ship-qty-label">Ship Quantity</div>
+                    <div class="dashed-box"></div>
+                </div>
+
+            </div>
+
+        </div>{{-- end card-body --}}
+
+    </div>{{-- end card-wrapper --}}
+    @endforeach
+
+</body>
+</html>
