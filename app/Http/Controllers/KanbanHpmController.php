@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Picqer\Barcode\BarcodeGeneratorPNG;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class KanbanHpmController extends Controller
 {
@@ -15,7 +17,7 @@ class KanbanHpmController extends Controller
      */
     public function index()
     {
-        $kanbanhpms = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
+        $kanbanhpms      = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
         $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
 
         return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo'));
@@ -48,76 +50,42 @@ class KanbanHpmController extends Controller
             $generator     = new BarcodeGeneratorPNG();
 
             foreach ($lines as $rawLine) {
-                // Normalkan line ending (CRLF -> strip CR)
                 $line = rtrim($rawLine, "\r\n");
 
-                // Hanya proses baris data (dimulai dengan "DI")
                 if (!str_starts_with($line, 'DI')) {
                     continue;
                 }
 
-                // Pastikan panjang minimal
                 if (strlen($line) < 298) {
                     $line = str_pad($line, 300);
                 }
 
-                /* =============================================
-                 *  FIELD PARSING - Fixed-Width Position Map
-                 * =============================================
-                 *  [0:16]    di_no            DI261610013582
-                 *  [16:21]   item_seq         00001
-                 *  [28:40]   from_raw         1S017 00
-                 *  [56:84]   to_part1         2SAF01
-                 *  [84:98]   to_part2         1S017 AE02
-                 *  [98:112]  supply_address   EG001 / SETBLS / CH001L
-                 *  [112:134] ms_id+inv_cat    REC02+MEAE02 / ***+MEAF02 / LOGKDEXPORTMP+KD71
-                 *  [134:157] part_no_raw      11941-5R0 -0001
-                 *  [180:221] part_name        STAY COMP, CONVERTER
-                 *  [221:245] ps_code + oc     HPM 024AE  1
-                 *  [245:257] seq_no           202604130020
-                 *  [257:275] kd_lot_no        HPM 00202603005301
-                 *  [257+]    ship             2 digit tepat sebelum date (dd-mm)
-                 *  [257+]    datetime         dd-mm HH:mm
-                 * ============================================= */
-
                 $di_no    = trim(substr($line, 0, 16));
                 $item_seq = trim(substr($line, 16, 5));
 
-                // from: "1S017 00" -> "1S017-00"
                 $from_raw = trim(substr($line, 28, 12));
                 $from     = preg_replace('/\s+/', '-', $from_raw);
 
-                // to: gabungan AE02 (dari to_part2) + 2SAF01 (dari to_part1)
                 $to_part1 = trim(substr($line, 56, 28));
                 $to_part2 = trim(substr($line, 84, 14));
                 $to_code  = preg_replace('/^1S017\s*/', '', $to_part2);
                 $to       = trim($to_code) . '-' . trim($to_part1);
 
-                // supply_address: pos 98, length 14
                 $supply_address = trim(substr($line, 98, 14));
 
-                // ms_id + inventory_category: area [112:134]
-                // Ada 3 format:
-                //   1. Normal     : "REC02      MEAE02     " -> ms_id=REC02, inv_cat=MEAE02
-                //   2. Bintang    : "***********MEAF02     " -> ms_id='',    inv_cat=MEAF02
-                //   3. Nyambung   : "LOGKDEXPORTMPKD71     " -> ms_id=LOGKDEXPORTMP, inv_cat=KD71
                 $mid_area = trim(substr($line, 112, 22));
 
                 if (str_starts_with($mid_area, '*')) {
-                    // ms_id diisi raw bintangnya, inv_cat setelah bintang
-                    $ms_id              = preg_replace('/[^*].*/', '', $mid_area); // ambil bintang saja
+                    $ms_id              = preg_replace('/[^*].*/', '', $mid_area);
                     $after_stars        = ltrim($mid_area, '*');
                     $inventory_category = explode(' ', trim($after_stars))[0] ?? '';
-
                 } else {
                     $mid_tokens = preg_split('/\s+/', $mid_area);
 
                     if (count($mid_tokens) > 1) {
-                        // Format normal: token terakhir = inv_cat, sisanya = ms_id
                         $inventory_category = trim(end($mid_tokens));
                         $ms_id              = trim(implode('', array_slice($mid_tokens, 0, -1)));
                     } else {
-                        // Format nyambung (LOGKDEXPORTMPKD71): inv_cat = 4 char terakhir pola [A-Z]{2}\d{2}
                         $single = $mid_tokens[0] ?? '';
                         if (preg_match('/([A-Z]{2}\d{2})$/', $single, $m)) {
                             $inventory_category = $m[1];
@@ -129,26 +97,19 @@ class KanbanHpmController extends Controller
                     }
                 }
 
-                // part_no: remove spaces -> "11941-5R0-0001"
                 $part_no_raw = substr($line, 134, 23);
                 $part_no     = preg_replace('/\s+/', '', $part_no_raw);
 
-                // part_name
                 $part_name = trim(substr($line, 180, 41));
 
-                // ps_code & order_class
                 $ps_area = substr($line, 221, 24);
                 preg_match('/(HPM\s+\d+[A-Z]+)\s+(\d+)/', $ps_area, $pMatch);
                 $ps_code     = isset($pMatch[1]) ? trim($pMatch[1]) : trim(substr($ps_area, 0, 12));
                 $order_class = isset($pMatch[2]) ? trim($pMatch[2]) : '';
 
-                // seq_no: 12 digit
-                $seq_no = trim(substr($line, 245, 12));
-
-                // kd_lot_no
+                $seq_no    = trim(substr($line, 245, 12));
                 $kd_lot_no = trim(substr($line, 257, 18));
 
-                // ship & datetime: cari posisi date (dd-mm) di area setelah kd_lot_no
                 $dt_area  = substr($line, 257, 50);
                 $ship     = '';
                 $datetime = '';
@@ -156,14 +117,11 @@ class KanbanHpmController extends Controller
                 preg_match('/(\d{2}-\d{2})\s+(\d{2}:\d{2})/', $dt_area, $dtMatch);
                 if (isset($dtMatch[1])) {
                     $datetime = trim($dtMatch[1] . ' ' . $dtMatch[2]);
-
-                    // ship: 2 digit tepat sebelum posisi date ditemukan
                     $datePos  = strpos($dt_area, $dtMatch[1]);
                     $ship_raw = substr($dt_area, $datePos - 2, 2);
                     $ship     = ltrim($ship_raw, '0') ?: '0';
                 }
 
-                // Barcode: generate dari part_no
                 $barcode = null;
                 if (!empty($part_no)) {
                     try {
@@ -228,6 +186,290 @@ class KanbanHpmController extends Controller
     }
 
     /**
+     * Adjust Weekly - Update datetime dari Excel Adjust Weekly
+     *
+     * 1 file Excel, 1 sheet (sheet pertama, apapun namanya).
+     * KD Lot=col16, AdjDate=col10, AdjTime=col12, header=row5
+     *
+     * Jika Adjustment Date/Time = null -> SKIP (datetime di DB tidak berubah)
+     * Match key: trim(kanbanhpms.kd_lot_no) == trim(excel.KD Lot Number)
+     */
+    public function adjustWeekly(Request $request)
+    {
+        $request->validate([
+            'file_weekly' => 'required|mimes:xlsx,xls|max:20480',
+        ]);
+
+        try {
+            $path        = $request->file('file_weekly')->getRealPath();
+            $spreadsheet = IOFactory::load($path);
+
+            // Ambil active sheet (sheet yang aktif saat file disave)
+            // Lebih reliable dari getSheetNames()[0] yang bisa return sheet tersembunyi/helper
+            $sheet     = $spreadsheet->getActiveSheet();
+            $sheetName = $sheet->getTitle();
+
+            $adjustMap = $this->parseAdjustExcel($path, [$sheetName], 16, 10, 12, 5);
+
+            Log::info("AdjustWeekly: parsed sheet='{$sheetName}', entries=" . count($adjustMap));
+            if (empty($adjustMap)) {
+                return redirect()->route('kanbanhpms.index')->with([
+                    'sweet_alert' => [
+                        'type'              => 'warning',
+                        'title'             => 'Tidak Ada Data',
+                        'text'              => 'Tidak ditemukan data adjustment (semua kolom Adjustment Date/Time kosong).',
+                        'showConfirmButton' => true,
+                    ],
+                ]);
+            }
+
+            // ── 3. Update DB ──────────────────────────────────────────────────
+            $updated   = 0;
+            $sameValue = 0;
+            $noAdj     = 0;
+            $mapCount  = count($adjustMap);
+
+            $kanbanhpms = KanbanHpm::all();
+
+            foreach ($kanbanhpms as $item) {
+                $key = trim($item->kd_lot_no);
+
+                if (isset($adjustMap[$key])) {
+                    $adj         = $adjustMap[$key];
+                    $newDatetime = $adj['date'] . ' ' . $adj['time'];
+
+                    if ($item->datetime !== $newDatetime) {
+                        $item->datetime = $newDatetime;
+                        $item->save();
+                        $updated++;
+                    } else {
+                        $sameValue++;
+                    }
+                } else {
+                    $noAdj++;
+                }
+            }
+
+            Log::info("AdjustWeekly done. MapSize={$mapCount}, Updated={$updated}, SameValue={$sameValue}, NoAdj={$noAdj}");
+
+            return redirect()->route('kanbanhpms.index')->with([
+                'sweet_alert' => [
+                    'type'              => 'success',
+                    'title'             => 'Adjust Weekly Berhasil!',
+                    'text'              => "{$updated} data diupdate, {$sameValue} data sudah sama, {$noAdj} data tidak ada di Excel (datetime tidak berubah).",
+                    'showConfirmButton' => true,
+                    'timer'             => 7000,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('AdjustWeekly failed: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+
+            return redirect()->route('kanbanhpms.index')->with([
+                'sweet_alert' => [
+                    'type'              => 'error',
+                    'title'             => 'Adjust Weekly Gagal!',
+                    'text'              => 'Error: ' . $e->getMessage(),
+                    'showConfirmButton' => true,
+                ],
+            ]);
+        }
+    }
+
+    /**
+     * Parse Excel dan return mapping kd_lot_no => [date, time]
+     * Hanya row yang punya Adjustment Date DAN Time yang dimasukkan.
+     *
+     * @param  string  $path        Path file Excel
+     * @param  array   $sheetNames  Nama-nama sheet yang dibaca
+     * @param  int     $colKd       Index kolom KD Lot Number (0-based)
+     * @param  int     $colAdjDate  Index kolom Adj Ship Date (0-based)
+     * @param  int     $colAdjTime  Index kolom Adj Ship Time (0-based)
+     * @param  int     $headerRow   Baris header (1-based); data mulai baris berikutnya
+     * @return array
+     */
+    private function parseAdjustExcel(
+        string $path,
+        array  $sheetNames,
+        int    $colKd,
+        int    $colAdjDate,
+        int    $colAdjTime,
+        int    $headerRow
+    ): array {
+        $map         = [];
+        $spreadsheet = IOFactory::load($path);
+
+        foreach ($sheetNames as $sheetName) {
+            $sheet = $spreadsheet->getSheetByName($sheetName);
+            if (!$sheet) {
+                Log::warning("AdjustWeekly: sheet '{$sheetName}' tidak ditemukan, skip.");
+                continue;
+            }
+
+            $highestRow = $sheet->getHighestDataRow();
+            $debugSamples = 0;
+
+            // Iterate per row, baca cell langsung (lebih reliable dari toArray)
+            for ($rowIdx = $headerRow + 1; $rowIdx <= $highestRow; $rowIdx++) {
+                // +1 karena $headerRow adalah baris header (1-based), data mulai baris berikutnya
+                $kdRaw   = trim((string) ($sheet->getCellByColumnAndRow($colKd + 1, $rowIdx)->getValue() ?? ''));
+                $adjDate = $sheet->getCellByColumnAndRow($colAdjDate + 1, $rowIdx)->getValue();
+                $adjTime = $sheet->getCellByColumnAndRow($colAdjTime + 1, $rowIdx)->getValue();
+
+                // Debug log untuk 3 baris pertama
+                if ($debugSamples < 3) {
+                    Log::debug("AdjustWeekly row {$rowIdx}: KD=" . var_export($kdRaw, true)
+                        . " | Date=" . var_export($adjDate, true) . " (" . gettype($adjDate) . ")"
+                        . " | Time=" . var_export($adjTime, true) . " (" . gettype($adjTime) . ")");
+                    $debugSamples++;
+                }
+
+                if ($kdRaw === '') continue;
+                if ($adjDate === null || $adjTime === null) continue;
+
+                $dateStr = $this->formatExcelDate($adjDate);
+                $timeStr = $this->formatExcelTime($adjTime);
+
+                if ($dateStr === null || $timeStr === null) {
+                    Log::debug("AdjustWeekly SKIP row {$rowIdx}: KD={$kdRaw}"
+                        . " dateStr=" . var_export($dateStr, true)
+                        . " timeStr=" . var_export($timeStr, true)
+                        . " | rawDate=" . var_export($adjDate, true) . " (" . gettype($adjDate) . ")"
+                        . " | rawTime=" . var_export($adjTime, true) . " (" . gettype($adjTime) . ")");
+                    continue;
+                }
+
+                $map[$kdRaw] = [
+                    'date' => $dateStr,
+                    'time' => $timeStr,
+                ];
+            }
+
+            Log::info("AdjustWeekly: sheet='{$sheetName}' rows=" . ($highestRow - $headerRow) . " mapped=" . count($map));
+        }
+
+        return $map;
+    }
+
+    /**
+     * Format nilai date dari Excel menjadi "dd-mm"
+     *
+     * formatData=false -> PhpSpreadsheet return float serial (misal 46118.0 = 06-04-2026)
+     * Konversi manual dari epoch Excel (1899-12-30 UTC) tanpa ExcelDate::excelToDateTimeObject()
+     * agar bebas dari timezone offset PHP server.
+     */
+    private function formatExcelDate($value): ?string
+    {
+        if ($value === null) return null;
+
+        // DateTime object (fallback jika PhpSpreadsheet return object)
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('d-m');
+        }
+
+        if (is_string($value)) {
+            $value = trim($value);
+            if ($value === '') return null;
+
+            // Format "YYYYMMDD" integer string (e.g. "20260410" dari EXPORT_CALC)
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $value, $m)) {
+                return $m[3] . '-' . $m[2];
+            }
+
+            // Format ISO "2026-03-30"
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $value, $m)) {
+                return $m[3] . '-' . $m[2];
+            }
+
+            return null;
+        }
+
+        // Integer YYYYMMDD (e.g. 20260410 dari EXPORT_CALC)
+        // Integer atau float: bisa YYYYMMDD atau Excel serial date
+        if (is_int($value) || is_float($value)) {
+            $num = (int) $value;
+            // Format YYYYMMDD (e.g. 20260410 dari EXPORT_CALC)
+            if ($num > 19000101 && $num < 21001231 && strlen((string) $num) === 8) {
+                $str = (string) $num;
+                return substr($str, 6, 2) . '-' . substr($str, 4, 2);
+            }
+            // Excel serial date (e.g. 46118 = 2026-04-06)
+            // PhpSpreadsheet formatData=false return INTEGER untuk date cell
+            // Konversi manual epoch 1899-12-30 UTC -> bebas timezone & locale
+            if ($num >= 1 && $num < 100000) {
+                $epoch = \Carbon\Carbon::create(1899, 12, 30, 0, 0, 0, 'UTC');
+                $dt    = $epoch->addDays($num);
+                return $dt->format('d-m');
+            }
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Format nilai time dari Excel menjadi "HH:MM"
+     *
+     * formatData=false -> PhpSpreadsheet return float fraksi hari (misal 0.625 = 15:00)
+     */
+    private function formatExcelTime($value): ?string
+    {
+        if ($value === null) return null;
+
+        // DateTime object
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('H:i');
+        }
+
+        if (is_string($value)) {
+            $value = trim($value);
+            if ($value === '') return null;
+
+            // Format "HH:MM" atau "HH:MM:SS"
+            if (preg_match('/^(\d{1,2}):(\d{2})/', $value, $m)) {
+                return str_pad($m[1], 2, '0', STR_PAD_LEFT) . ':' . $m[2];
+            }
+
+            // Integer string HHMMSS (e.g. "90000" dari EXPORT_CALC)
+            if (preg_match('/^\d{5,6}$/', $value)) {
+                $str = str_pad($value, 6, '0', STR_PAD_LEFT);
+                return substr($str, 0, 2) . ':' . substr($str, 2, 2);
+            }
+
+            return null;
+        }
+
+        // Float fraksi hari (0.625 = 15:00) - output formatData=false untuk time cell
+        if (is_float($value) && $value >= 0 && $value < 1) {
+            $totalSecs = (int) round($value * 86400);
+            $h = intdiv($totalSecs, 3600);
+            $i = intdiv($totalSecs % 3600, 60);
+            return str_pad($h, 2, '0', STR_PAD_LEFT) . ':' . str_pad($i, 2, '0', STR_PAD_LEFT);
+        }
+
+        // Integer HHMMSS
+        if (is_int($value)) {
+            $str = str_pad((string) $value, 6, '0', STR_PAD_LEFT);
+            return substr($str, 0, 2) . ':' . substr($str, 2, 2);
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse Excel dan return mapping kd_lot_no => [date, time]
+     * Hanya row yang punya Adjustment Date DAN Time yang dimasukkan.
+     *
+     * @param  string  $path        Path file Excel
+     * @param  array   $sheetNames  Nama-nama sheet yang dibaca
+     * @param  int     $colKd       Index kolom KD Lot Number (0-based)
+     * @param  int     $colAdjDate  Index kolom Adj Ship Date (0-based)
+     * @param  int     $colAdjTime  Index kolom Adj Ship Time (0-based)
+     * @param  int     $headerRow   Baris header (1-based); data mulai baris berikutnya
+     * @return array
+     */
+    /**
      * Print All records
      */
     public function printAll(Request $request)
@@ -240,7 +482,7 @@ class KanbanHpmController extends Controller
                     ->with('error', 'Tidak ada data untuk diprint.');
             }
 
-            return view('kanbanhpms.printall', compact('kanbanhpms'));
+            return view('kanbanhpms.printnew', compact('kanbanhpms'));
 
         } catch (\Exception $e) {
             Log::error('KanbanHpm printAll error: ' . $e->getMessage());

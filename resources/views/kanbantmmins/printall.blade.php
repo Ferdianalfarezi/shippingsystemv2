@@ -464,7 +464,7 @@
             font-weight: bold;
             font-size: 10px;
             padding: 2px;
-            border-right: 2px solid #000; 
+            border-right: 2px solid #000000; 
             box-sizing: border-box;
             display: flex;
             align-items: center;
@@ -565,7 +565,7 @@
             font-weight: bold;
             font-size: 5px;
             padding: 2px;
-            border-right: 2px solid #000; 
+            border-right: 2px solid #000000; 
             box-sizing: border-box;
             display: flex;
             align-items: center;
@@ -616,7 +616,7 @@
             font-weight: bold;
             font-size: 7px;
             padding: 2px;
-            border-right: 2px solid #000; 
+            border-right: 2px solid #000000; 
             box-sizing: border-box;
             display: flex;
             align-items: center;
@@ -698,7 +698,7 @@
             font-weight: bold;
             font-size: 12px;
             padding: 2px;
-            border-bottom: 2px solid #000;
+            border-bottom: 2px solid #000000;
             box-sizing: border-box;
             display: flex;
             align-items: center;

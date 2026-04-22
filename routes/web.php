@@ -171,6 +171,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import', [KanbanHpmController::class, 'importTxt'])->name('import');
         Route::get('/printall', [KanbanHpmController::class, 'printAll'])->name('printall');
         Route::delete('/{id}', [KanbanHpmController::class, 'destroy'])->name('destroy');
+        Route::post('/adjust-weekly', [KanbanHpmController::class, 'adjustWeekly'])->name('adjustWeekly');
     });
  
     Route::prefix('advertisements')->name('advertisements.')->group(function () {
@@ -185,6 +186,8 @@ Route::middleware(['auth'])->group(function () {
     // Import Excel
     Route::get('addresses/import', [AddressController::class, 'importPage'])->name('addresses.import.page');
     Route::post('addresses/import', [AddressController::class, 'import'])->name('addresses.import');
+    Route::post('addresses/import-rack', [AddressController::class, 'importRack'])
+    ->name('addresses.import-rack');
 
     // Address CRUD (tanpa show)
     Route::resource('addresses', AddressController::class)->except(['show']);

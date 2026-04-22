@@ -6,18 +6,12 @@
     <title>Print All - Kanban HPM</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <style>
-        /* ============================================================
-           GLOBAL FONT — semua text pakai Courier New
-           ============================================================ */
         .frame-1,
         .frame-1 * {
             box-sizing: border-box;
             font-family: 'Courier New', Courier, monospace;
         }
 
-        /* ============================================================
-           FRAME
-           ============================================================ */
         .frame-1 {
             background: #ffffff;
             width: 850px;
@@ -32,12 +26,7 @@
                 padding: 0;
                 size: 850px 310px;
             }
-
-            body {
-                margin: 0;
-                padding: 0;
-            }
-
+            body { margin: 0; padding: 0; }
             .frame-1 {
                 page-break-after: always;
                 page-break-inside: avoid;
@@ -45,15 +34,9 @@
                 padding: 0 !important;
                 position: relative;
             }
-
-            .no-print {
-                display: none !important;
-            }
+            .no-print { display: none !important; }
         }
 
-        /* ============================================================
-           LABEL — teks kecil penanda kolom
-           ============================================================ */
         .lbl {
             color: #000000;
             font-size: 9px;
@@ -62,9 +45,6 @@
             white-space: nowrap;
         }
 
-        /* ============================================================
-           VALUE — isi data dari database
-           ============================================================ */
         .val {
             color: #000000;
             font-size: 10px;
@@ -75,9 +55,6 @@
             text-overflow: ellipsis;
         }
 
-        /* ============================================================
-           POSISI LABEL
-           ============================================================ */
         .from-lbl                { left: 30px;  top: 42px; }
         .to-lbl                  { left: 30px;  top: 82px; }
         .supply-address-lbl      { left: 30px;  top: 133px; }
@@ -108,18 +85,14 @@
             width: 246px;
         }
 
-        /* ============================================================
-           POSISI VALUE
-           ============================================================ */
         .from-val                { left: 100px; top: 40px;  width: 155px; font-size: 12px; }
         .to-val                  { left: 100px; top: 82px;  width: 155px; font-size: 12px; }
         .supply-address-val      { left: 150px; top: 133px; width: 155px; font-size: 13px; }
         .next-supply-address-val { left: 31px;  top: 163px; width: 110px; font-size: 9px; }
-        .ms-id-val               { left: 150px;  top: 175px; width: 110px; font-size: 13px; }
+        .ms-id-val               { left: 150px; top: 175px; width: 110px; font-size: 13px; }
         .inventory-category-val  { left: 30px;  top: 207px; width: 110px; font-size: 15px; }
         .part-weight-val         { left: 146px; top: 207px; width: 100px; font-size: 9px; }
 
-        /* Part name & no — area tengah atas */
         .part-name-val {
             left: 287px; top: 42px;
             width: 340px;
@@ -150,7 +123,6 @@
         .ship-quantity-val       { left: 660px; top: 263px; width: 150px; font-size: 10px; font-weight: 400; }
         .page-val                { left: 756px; top: 18px;  font-size: 12px; }
 
-        /* HPM header tetap pakai Arial biar beda / branding */
         .hpm-honda-prospect-motor {
             color: #000000;
             text-align: left;
@@ -165,15 +137,12 @@
             line-height: 1.3;
         }
 
-        /* ============================================================
-           BARCODE
-           ============================================================ */
-        .barcode-svg {
+        .barcode-canvas {
             position: absolute;
             left: 277px;
             top: 220px;
             width: 308px;
-            height: 48px;
+            height: 38px;
             display: block;
         }
 
@@ -189,169 +158,34 @@
             letter-spacing: 0.5px;
         }
 
-        /* ============================================================
-           BORDERS & RECTANGLES
-           ============================================================ */
-        .rectangle-1 {
-            background: rgba(217,217,217,0);
-            border: 2px solid #000;
-            width: 824px; height: 275px;
-            position: absolute; left: 13px; top: 12px;
-        }
-        .rectangle-2 {
-            background: rgba(217,217,217,0);
-            border-radius: 3px; border: 1px solid #000;
-            width: 243px; height: 79px;
-            position: absolute; left: 21px; top: 37px;
-        }
-        .rectangle-4 {
-            background: rgba(217,217,217,0);
-            border-radius: 3px; border: 1px solid #000;
-            width: 352px; height: 70px;
-            position: absolute; left: 277px; top: 37px;
-        }
-        .rectangle-5 {
-            background: rgba(217,217,217,0);
-            border-radius: 3px; border: 1px solid #000;
-            width: 306px; height: 99px;
-            position: absolute; left: 277px; top: 116px;
-        }
-        .rectangle-3 {
-            background: rgba(217,217,217,0);
-            border-radius: 3px; border: 1px solid #000;
-            width: 243px; height: 100px;
-            position: absolute; left: 21px; top: 126px;
-        }
-        .rectangle-6 {
-            background: rgba(217,217,217,0);
-            border-radius: 3px; border: 1px solid #000;
-            width: 184px; height: 25px;
-            position: absolute; left: 641px; top: 38px;
-        }
-        .rectangle-7 {
-            background: rgba(217,217,217,0);
-            border: 1px dashed #000;
-            width: 165px; height: 30px;
-            position: absolute; left: 659px; top: 68px;
-        }
-        .rectangle-8 {
-            background: rgba(217,217,217,0);
-            border: 1px dashed #000;
-            width: 112px; height: 31px;
-            position: absolute; left: 712px; top: 136px;
-        }
-        .rectangle-9 {
-            background: rgba(217,217,217,0);
-            border-radius: 3px; border: 1px solid #000;
-            width: 231px; height: 31px;
-            position: absolute; left: 594px; top: 171px;
-        }
-        .rectangle-10 {
-            background: rgba(217,217,217,0);
-            border: 1px dashed #000;
-            width: 112px; height: 31px;
-            position: absolute; left: 595px; top: 217px;
-        }
-        .rectangle-11 {
-            background: rgba(217,217,217,0);
-            border: 1px dashed #000;
-            width: 112px; height: 31px;
-            position: absolute; left: 713px; top: 217px;
-        }
-        .rectangle-12 {
-            background: rgba(217,217,217,0);
-            border: 1px dashed #000;
-            width: 112px; height: 31px;
-            position: absolute; left: 712px; top: 102px;
-        }
-        .rectangle-102 {
-            background: rgba(217,217,217,0);
-            border: 1px dashed #000;
-            width: 165px; height: 30px;
-            position: absolute; left: 660px; top: 250px;
-        }
+        .rectangle-1  { background: rgba(217,217,217,0); border: 2px solid #000; width: 824px; height: 275px; position: absolute; left: 13px; top: 12px; }
+        .rectangle-2  { background: rgba(217,217,217,0); border-radius: 3px; border: 1px solid #000; width: 243px; height: 79px; position: absolute; left: 21px; top: 37px; }
+        .rectangle-4  { background: rgba(217,217,217,0); border-radius: 3px; border: 1px solid #000; width: 352px; height: 70px; position: absolute; left: 277px; top: 37px; }
+        .rectangle-5  { background: rgba(217,217,217,0); border-radius: 3px; border: 1px solid #000; width: 306px; height: 99px; position: absolute; left: 277px; top: 116px; }
+        .rectangle-3  { background: rgba(217,217,217,0); border-radius: 3px; border: 1px solid #000; width: 243px; height: 100px; position: absolute; left: 21px; top: 126px; }
+        .rectangle-6  { background: rgba(217,217,217,0); border-radius: 3px; border: 1px solid #000; width: 184px; height: 25px; position: absolute; left: 641px; top: 38px; }
+        .rectangle-7  { background: rgba(217,217,217,0); border: 1px dashed #000; width: 165px; height: 30px; position: absolute; left: 659px; top: 68px; }
+        .rectangle-8  { background: rgba(217,217,217,0); border: 1px dashed #000; width: 112px; height: 31px; position: absolute; left: 712px; top: 136px; }
+        .rectangle-9  { background: rgba(217,217,217,0); border-radius: 3px; border: 1px solid #000; width: 231px; height: 31px; position: absolute; left: 594px; top: 171px; }
+        .rectangle-10 { background: rgba(217,217,217,0); border: 1px dashed #000; width: 112px; height: 31px; position: absolute; left: 595px; top: 217px; }
+        .rectangle-11 { background: rgba(217,217,217,0); border: 1px dashed #000; width: 112px; height: 31px; position: absolute; left: 713px; top: 217px; }
+        .rectangle-12 { background: rgba(217,217,217,0); border: 1px dashed #000; width: 112px; height: 31px; position: absolute; left: 712px; top: 102px; }
+        .rectangle-102{ background: rgba(217,217,217,0); border: 1px dashed #000; width: 165px; height: 30px; position: absolute; left: 660px; top: 250px; }
 
-        /* ============================================================
-           SOLID LINES
-           ============================================================ */
-        .line-1 {
-            border-top: 1px solid #000;
-            width: 242px; height: 0;
-            position: absolute; left: 22px; top: 79px;
-        }
-        .line-2 {
-            border-top: 1px solid #000;
-            width: 242px; height: 0;
-            position: absolute; left: 22px; top: 150px;
-        }
-        .line-3 {
-            border-top: 1px solid #000;
-            width: 242px; height: 0;
-            position: absolute; left: 22px; top: 172px;
-        }
-        .line-4 {
-            border-top: 1px solid #000;
-            width: 242px; height: 0;
-            position: absolute; left: 22px; top: 193px;
-        }
-        .line-5 {
-            border-top: 1px solid #000;
-            width: 33px; height: 0;
-            position: absolute; left: 142px; top: 193px;
-            transform-origin: 0 0; transform: rotate(90deg);
-        }
-        .line-6 {
-            border-top: 1px solid #000;
-            width: 350px; height: 0;
-            position: absolute; left: 278px; top: 86px;
-            transform-origin: 0 0; transform: rotate(0.164deg);
-        }
-        .line-33 {
-            border-top: 1px solid #000;
-            width: 351px; height: 0;
-            position: absolute; left: 277px; top: 64px;
-            transform-origin: 0 0; transform: rotate(0.164deg);
-        }
-        .line-34 {
-            border-top: 1px solid #000;
-            width: 306px; height: 0;
-            position: absolute; left: 277px; top: 150.64px;
-            transform-origin: 0 0; transform: rotate(0.136deg);
-        }
-        .line-39 {
-            border-top: 1px solid #000;
-            width: 305.01px; height: 0;
-            position: absolute; left: 277px; top: 183px;
-            transform-origin: 0 0; transform: rotate(0.136deg);
-        }
-        .line-31 {
-            border-top: 1px solid #000;
-            width: 35px; height: 0;
-            position: absolute; left: 398px; top: 117px;
-            transform-origin: 0 0; transform: rotate(90deg);
-        }
-        .line-32 {
-            border-top: 1px solid #000;
-            width: 35px; height: 0;
-            position: absolute; left: 484px; top: 117px;
-            transform-origin: 0 0; transform: rotate(90deg);
-        }
-        .line-18 {
-            border-top: 1px solid #000;
-            width: 30px; height: 0;
-            position: absolute; left: 632px; top: 171px;
-            transform-origin: 0 0; transform: rotate(90deg);
-        }
-        .line-19 {
-            border-top: 1px solid #000;
-            width: 30px; height: 0;
-            position: absolute; left: 712px; top: 171px;
-            transform-origin: 0 0; transform: rotate(90deg);
-        }
+        .line-1  { border-top: 1px solid #000; width: 242px; height: 0; position: absolute; left: 22px;   top: 79px; }
+        .line-2  { border-top: 1px solid #000; width: 242px; height: 0; position: absolute; left: 22px;   top: 150px; }
+        .line-3  { border-top: 1px solid #000; width: 242px; height: 0; position: absolute; left: 22px;   top: 172px; }
+        .line-4  { border-top: 1px solid #000; width: 242px; height: 0; position: absolute; left: 22px;   top: 193px; }
+        .line-5  { border-top: 1px solid #000; width: 33px;  height: 0; position: absolute; left: 142px;  top: 193px; transform-origin: 0 0; transform: rotate(90deg); }
+        .line-6  { border-top: 1px solid #000; width: 350px; height: 0; position: absolute; left: 278px;  top: 86px; }
+        .line-33 { border-top: 1px solid #000; width: 351px; height: 0; position: absolute; left: 277px;  top: 64px; }
+        .line-34 { border-top: 1px solid #000; width: 306px; height: 0; position: absolute; left: 277px;  top: 150.64px; }
+        .line-39 { border-top: 1px solid #000; width: 305.01px; height: 0; position: absolute; left: 277px; top: 183px; }
+        .line-31 { border-top: 1px solid #000; width: 35px;  height: 0; position: absolute; left: 398px;  top: 117px; transform-origin: 0 0; transform: rotate(90deg); }
+        .line-32 { border-top: 1px solid #000; width: 35px;  height: 0; position: absolute; left: 484px;  top: 117px; transform-origin: 0 0; transform: rotate(90deg); }
+        .line-18 { border-top: 1px solid #000; width: 30px;  height: 0; position: absolute; left: 632px;  top: 171px; transform-origin: 0 0; transform: rotate(90deg); }
+        .line-19 { border-top: 1px solid #000; width: 30px;  height: 0; position: absolute; left: 712px;  top: 171px; transform-origin: 0 0; transform: rotate(90deg); }
 
-        /* ============================================================
-           DASHED LINES
-           ============================================================ */
         .line-7  { border-top: 1px dashed #000; width: 30px; height: 0; position: absolute; left: 686px; top: 68px;  transform-origin: 0 0; transform: rotate(90deg); }
         .line-8  { border-top: 1px dashed #000; width: 30px; height: 0; position: absolute; left: 713px; top: 68px;  transform-origin: 0 0; transform: rotate(90deg); }
         .line-9  { border-top: 1px dashed #000; width: 30px; height: 0; position: absolute; left: 741px; top: 68px;  transform-origin: 0 0; transform: rotate(90deg); }
@@ -375,31 +209,13 @@
         .line-29 { border-top: 1px dashed #000; width: 30px; height: 0; position: absolute; left: 769px; top: 250px; transform-origin: 0 0; transform: rotate(90deg); }
         .line-30 { border-top: 1px dashed #000; width: 30px; height: 0; position: absolute; left: 797px; top: 250px; transform-origin: 0 0; transform: rotate(90deg); }
 
-        /* ============================================================
-           PRINT BUTTON (tidak ikut print)
-           ============================================================ */
-        .print-btn-wrap {
-            text-align: center;
-            padding: 16px 0 8px;
-        }
-        .print-btn {
-            background: #1a56db;
-            color: #fff;
-            border: none;
-            padding: 10px 32px;
-            font-size: 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-family: Arial, sans-serif;
-        }
-        .print-btn:hover {
-            background: #1e429f;
-        }
+        .print-btn-wrap { text-align: center; padding: 16px 0 8px; }
+        .print-btn { background: #1a56db; color: #fff; border: none; padding: 10px 32px; font-size: 15px; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; }
+        .print-btn:hover { background: #1e429f; }
     </style>
 </head>
 <body>
 
-{{-- Tombol print, tidak ikut print --}}
 <div class="print-btn-wrap no-print">
     <button class="print-btn" onclick="window.print()">🖨️ Print All</button>
 </div>
@@ -410,21 +226,14 @@
     }
 @endphp
 
-
 @foreach($kanbanhpms as $index => $item)
 
 @php
-    // BARCODE VALUE = di_no (tanpa prefix "DI") + item_seq (5 digit)
-    //               + "0000" + ship (2 digit zero-padded)
-    // Contoh: DI261610013582 + 00001 + 0000 + 15
-    //      => 261610013582 + 00001 + 0000 + 15
-    //      => 26161001358200001000015
     $diPart       = preg_replace('/^DI/', '', $item->di_no);
     $seqPart      = str_pad($item->item_seq, 5, '0', STR_PAD_LEFT);
     $shipPart     = str_pad($item->ship, 2, '0', STR_PAD_LEFT);
     $barcodeValue = $diPart . $seqPart . '0000' . $shipPart;
 
-    // Date & Time dari field datetime "dd-mm HH:mm"
     $dateDisplay = '';
     $timeDisplay = '';
     if (!empty($item->datetime)) {
@@ -436,7 +245,6 @@
 
 <div class="frame-1">
 
-    {{-- ====== LABEL TEXTS ====== --}}
     <div class="lbl from-lbl">FROM:</div>
     <div class="lbl to-lbl">TO:</div>
     <div class="lbl supply-address-lbl">Supply Address</div>
@@ -462,7 +270,6 @@
     <div class="lbl ship-lbl">Ship</div>
     <div class="lbl parts-contents-card-lbl">Parts Contents Card</div>
 
-    {{-- ====== VALUE TEXTS ====== --}}
     <div class="val from-val">{{ fmtAddr($item->from) }}</div>
     <div class="val to-val">{{ fmtAddr($item->to) }}</div>
     <div class="val supply-address-val">{{ $item->supply_address }}</div>
@@ -488,19 +295,14 @@
     <div class="val ship-quantity-val">{{ $item->ship_quantity }}</div>
     <div class="val page-val">{{ $item->page ?? ($index + 1) }}</div>
 
-    {{-- HPM Header --}}
-    <div class="hpm-honda-prospect-motor">
-        HPM<br />Honda Prospect Motor
-    </div>
+    <div class="hpm-honda-prospect-motor">HPM<br>Honda Prospect Motor</div>
 
-    {{-- ====== BARCODE ====== --}}
-    <svg class="barcode-svg"
-         id="barcode-{{ $index }}"
-         data-barcode="{{ $barcodeValue }}">
-    </svg>
+    <canvas class="barcode-canvas"
+            id="barcode-{{ $index }}"
+            data-barcode="{{ $barcodeValue }}">
+    </canvas>
     <div class="barcode-text-val">{{ $barcodeValue }}</div>
 
-    {{-- ====== BORDERS & LINES ====== --}}
     <div class="rectangle-1"></div>
     <div class="rectangle-2"></div>
     <div class="rectangle-4"></div>
@@ -553,27 +355,39 @@
 </div>
 @endforeach
 
-{{-- ====== JSBARCODE — render setelah semua card selesai ====== --}}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('svg[data-barcode]').forEach(function (el) {
-            var val = el.getAttribute('data-barcode');
-            if (!val) return;
-            try {
-                JsBarcode(el, val, {
-                    format:       'CODE128',
-                    displayValue: false,   // teks sudah ada di .barcode-text-val
-                    margin:       0,
-                    width:        1.7,
-                    height:       40,
-                    background:   '#ffffff',
-                    lineColor:    '#000000',
-                });
-            } catch (e) {
-                console.warn('Barcode error for', val, e);
-            }
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('canvas[data-barcode]').forEach(function (canvas) {
+        var val = canvas.getAttribute('data-barcode');
+        if (!val) return;
+
+        var dpr = window.devicePixelRatio || 2;
+
+        // Render ke temp canvas dengan resolusi tinggi
+        var temp = document.createElement('canvas');
+        JsBarcode(temp, val, {
+            format:       'CODE39',
+            displayValue: false,
+            margin:       0,
+            width:        1,
+            height:       45 * dpr,
+            background:   '#ffffff',
+            lineColor:    '#000000',
         });
+
+        // Set canvas internal resolution tinggi (dpr x lipat)
+        canvas.width  = 308 * dpr;
+        canvas.height = 48  * dpr;
+
+        // CSS size tetap 308x48
+        canvas.style.width  = '308px';
+        canvas.style.height = '43px';
+
+        var ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false; // matikan anti-alias = bar lebih tajam
+        ctx.drawImage(temp, 0, 0, 308 * dpr, 48 * dpr);
     });
+});
 </script>
 
 </body>

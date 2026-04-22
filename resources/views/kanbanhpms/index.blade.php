@@ -70,6 +70,13 @@
                                     <i class="bi bi-file-earmark-text text-primary me-2"></i> Import TXT
                                 </a>
                             </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-success" href="#"
+                                   data-bs-toggle="modal" data-bs-target="#adjustWeeklyModal">
+                                    <i class="bi bi-calendar-check text-success me-2"></i> Adjust Weekly
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -121,7 +128,7 @@
                         <td><input type="checkbox" class="form-check-input row-select" value="{{ $item->id }}"></td>
                         <td><strong>{{ $item->di_no }}</strong></td>
                         <td>{{ $item->item_seq }}</td>
-                        <td>{{ $item->part_no }}</span></td>
+                        <td>{{ $item->part_no }}</td>
                         <td>{{ Str::limit($item->part_name, 30) }}</td>
                         <td>{{ $item->from }}</td>
                         <td>{{ $item->to }}</td>
@@ -146,7 +153,7 @@
                     </tr>
                 @empty
                     <tr class="empty-row">
-                        <td colspan="14" class="text-center py-4">
+                        <td colspan="13" class="text-center py-4">
                             <div class="text-muted">
                                 <i class="bi bi-inbox" style="font-size: 3rem;"></i>
                                 <p class="mt-2">Belum ada data kanban HPM. Silakan import file TXT.</p>
@@ -170,7 +177,8 @@
         </nav>
     </div>
 
-    <!-- ==================== MODAL: Import TXT ==================== -->
+
+    {{-- ==================== MODAL: Import TXT ==================== --}}
     <div class="modal fade" id="importTxtModal" tabindex="-1" aria-labelledby="importTxtModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -204,6 +212,78 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                         <button type="submit" class="btn btn-primary" id="importButton">
                             <i class="bi bi-upload me-2"></i>Import
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    {{-- ==================== MODAL: Adjust Weekly ==================== --}}
+    <div class="modal fade" id="adjustWeeklyModal" tabindex="-1"
+         aria-labelledby="adjustWeeklyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-dark" id="adjustWeeklyModalLabel">
+                        <i class="bi bi-calendar-check me-2 text-success"></i>Adjust Weekly
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('kanbanhpms.adjustWeekly') }}" method="POST"
+                      enctype="multipart/form-data" id="adjustWeeklyForm">
+                    @csrf
+                    <div class="modal-body">
+
+                        {{-- Info --}}
+                        <div class="alert alert-info d-flex align-items-start gap-2 mb-4">
+                            <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
+                            <div>
+                                <strong>Adjust Weekly</strong> akan mengupdate kolom <strong>Datetime</strong>
+                                berdasarkan kolom <em>Adjustment Delivery Schedule Ship Date</em> dan
+                                <em>Adjustment Delivery Schedule Ship Time</em> dari file Excel, dicocokkan lewat
+                                <strong>KD Lot Number</strong>.<br>
+                                <small class="text-muted">
+                                    Jika kolom Adjustment kosong di Excel, datetime tidak akan diubah (tetap dari TXT).
+                                </small>
+                            </div>
+                        </div>
+
+                        {{-- File Weekly --}}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-dark">
+                                <i class="bi bi-file-earmark-excel text-success me-1"></i>
+                                File Weekly
+                            </label>
+                            <input type="file" class="form-control" id="fileWeekly"
+                                   name="file_weekly" accept=".xlsx,.xls" required>
+                            <div class="form-text">
+                                Format: 1 file Excel dengan 1 sheet &mdash; kolom <strong>KD Lot Number</strong>,
+                                <strong>Adjustment Delivery Schedule Ship Date</strong> &amp;
+                                <strong>Adjustment Delivery Schedule Ship Time</strong>
+                            </div>
+                            <div id="fileWeeklyPreview" class="mt-2 d-none">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span id="fileWeeklyName"></span>
+                                </span>
+                            </div>
+                        </div>
+
+                        {{-- Progress --}}
+                        <div class="progress d-none mt-3" id="adjustWeeklyProgress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                 role="progressbar" style="width: 100%"></div>
+                        </div>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-lg me-1"></i>Batal
+                        </button>
+                        <button type="submit" class="btn btn-success" id="adjustWeeklyButton">
+                            <i class="bi bi-calendar-check me-2"></i>Proses Adjust
                         </button>
                     </div>
                 </form>
@@ -306,7 +386,7 @@ $(document).ready(function () {
 
     // ===================== FILTER =====================
     function filterTable() {
-        const search      = $('#searchInput').val().toLowerCase();
+        const search       = $('#searchInput').val().toLowerCase();
         const supplyFilter = $('#supplyFilterSelect').val();
 
         filteredRows = allRows.filter(function (row) {
@@ -392,7 +472,7 @@ $(document).ready(function () {
         });
     });
 
-    // ===================== IMPORT =====================
+    // ===================== IMPORT TXT =====================
     $('#importTxtForm').on('submit', function (e) {
         e.preventDefault();
         const formData  = new FormData(this);
@@ -411,6 +491,8 @@ $(document).ready(function () {
             confirmButtonColor: '#3085d6',
             cancelButtonColor: '#d33',
             confirmButtonText: 'Ya, Import!',
+            cancelButtonText: 'Batal',
+            reverseButtons: true,
         }).then((result) => {
             if (result.isConfirmed) {
                 $('#importProgress').removeClass('d-none');
@@ -444,6 +526,68 @@ $(document).ready(function () {
                         });
                     },
                 });
+            }
+        });
+    });
+
+    // Reset modal import saat ditutup
+    $('#importTxtModal').on('hidden.bs.modal', function () {
+        $('#txtFile').val('');
+        $('#importProgress').addClass('d-none');
+        $('#importButton').prop('disabled', false);
+    });
+
+    // ===================== ADJUST WEEKLY =====================
+
+    // File preview
+    $('#fileWeekly').on('change', function () {
+        const file = this.files[0];
+        if (file) {
+            $('#fileWeeklyName').text(file.name);
+            $('#fileWeeklyPreview').removeClass('d-none');
+        } else {
+            $('#fileWeeklyPreview').addClass('d-none');
+        }
+    });
+
+    // Reset modal saat ditutup
+    $('#adjustWeeklyModal').on('hidden.bs.modal', function () {
+        $('#fileWeekly').val('');
+        $('#fileWeeklyPreview').addClass('d-none');
+        $('#adjustWeeklyProgress').addClass('d-none');
+        $('#adjustWeeklyButton').prop('disabled', false);
+    });
+
+    // Submit
+    $('#adjustWeeklyForm').on('submit', function (e) {
+        e.preventDefault();
+
+        if ($('#fileWeekly')[0].files.length === 0) {
+            Swal.fire({
+                title: 'Perhatian!',
+                text: 'Pilih file Excel Weekly terlebih dahulu.',
+                icon: 'warning',
+                confirmButtonColor: '#3085d6',
+            });
+            return;
+        }
+
+        Swal.fire({
+            title: 'Proses Adjust Weekly?',
+            html: 'Datetime pada data yang match dengan KD Lot Number di Excel akan diupdate.<br>' +
+                  '<small class="text-muted">Data yang tidak ada di Excel tidak akan berubah.</small>',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="bi bi-calendar-check me-1"></i> Ya, Proses!',
+            cancelButtonText: 'Batal',
+            reverseButtons: true,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $('#adjustWeeklyProgress').removeClass('d-none');
+                $('#adjustWeeklyButton').prop('disabled', true);
+                $('#adjustWeeklyForm')[0].submit();
             }
         });
     });
