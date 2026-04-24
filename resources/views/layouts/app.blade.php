@@ -594,6 +594,10 @@
                                 <i class="fas fa-address-book"></i> TMMIN Address
                             </a>
 
+                            <a href="{{ route('hpm-addresses.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> HPM Address
+                            </a>
+
                             {{-- MENU ANDON UTAMA (klik untuk collapse) --}}
                             <a href="#" class="andon-toggle d-flex justify-content-between align-items-center fs-6">
                                 <span><i class="fas fa-desktop"></i> Andon</span>

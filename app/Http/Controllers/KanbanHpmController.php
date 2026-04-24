@@ -16,12 +16,19 @@ class KanbanHpmController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-    {
-        $kanbanhpms      = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
-        $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
+{
+    $kanbanhpms       = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
+    $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
 
-        return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo'));
-    }
+    $kanbanPrintData = $kanbanhpms->map(function ($i) {
+        return [
+            'date' => !empty($i->datetime) ? explode(' ', trim($i->datetime))[0] : '',
+            'dock' => !empty($i->ps_code)  ? substr(trim($i->ps_code), -2) : '',
+        ];
+    })->values();
+
+    return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'kanbanPrintData'));
+}
 
     /**
      * Import TXT file (HPM format - fixed-width)
@@ -185,15 +192,6 @@ class KanbanHpmController extends Controller
         }
     }
 
-    /**
-     * Adjust Weekly - Update datetime dari Excel Adjust Weekly
-     *
-     * 1 file Excel, 1 sheet (sheet pertama, apapun namanya).
-     * KD Lot=col16, AdjDate=col10, AdjTime=col12, header=row5
-     *
-     * Jika Adjustment Date/Time = null -> SKIP (datetime di DB tidak berubah)
-     * Match key: trim(kanbanhpms.kd_lot_no) == trim(excel.KD Lot Number)
-     */
     public function adjustWeekly(Request $request)
     {
         $request->validate([
@@ -513,4 +511,46 @@ class KanbanHpmController extends Controller
             ], 500);
         }
     }
+
+   public function printFiltered(Request $request)
+{
+    try {
+        $dates = $request->input('dates', []);
+        $docks = $request->input('docks', []);
+
+        $query = KanbanHpm::orderBy('di_no')->orderBy('item_seq');
+
+        if (!empty($dates)) {
+            $query->where(function ($q) use ($dates) {
+                foreach ($dates as $date) {
+                    $q->orWhere('datetime', 'LIKE', $date . '%');
+                }
+            });
+        }
+
+        if (!empty($docks)) {
+            $query->where(function ($q) use ($docks) {
+                foreach ($docks as $dock) {
+                    $q->orWhereRaw("RIGHT(TRIM(ps_code), 2) = ?", [$dock]);
+                }
+            });
+        }
+
+        $kanbanhpms = $query->get();
+
+        if ($kanbanhpms->isEmpty()) {
+            return response('<div style="font-family:Arial;padding:40px;text-align:center;color:#888;">
+                <h3>Tidak ada data yang sesuai filter.</h3></div>', 200)
+                ->header('Content-Type', 'text/html');
+        }
+
+        return view('kanbanhpms.printnew', compact('kanbanhpms'));
+
+    } catch (\Exception $e) {
+        Log::error('KanbanHpm printFiltered error: ' . $e->getMessage());
+        return response('<div style="font-family:Arial;padding:40px;color:red;">Error: '
+            . e($e->getMessage()) . '</div>', 500)
+            ->header('Content-Type', 'text/html');
+    }
+}
 }

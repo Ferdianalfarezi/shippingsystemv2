@@ -18,6 +18,7 @@ use App\Http\Controllers\KanbanTmminsController;
 use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\KanbanHpmController;
+use App\Http\Controllers\HpmAddressController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -167,12 +168,13 @@ Route::middleware(['auth'])->group(function () {
     });
     
     Route::prefix('kanbanhpms')->name('kanbanhpms.')->group(function () {
-        Route::get('/', [KanbanHpmController::class, 'index'])->name('index');
-        Route::post('/import', [KanbanHpmController::class, 'importTxt'])->name('import');
-        Route::get('/printall', [KanbanHpmController::class, 'printAll'])->name('printall');
-        Route::delete('/{id}', [KanbanHpmController::class, 'destroy'])->name('destroy');
-        Route::post('/adjust-weekly', [KanbanHpmController::class, 'adjustWeekly'])->name('adjustWeekly');
-    });
+    Route::get('/', [KanbanHpmController::class, 'index'])->name('index');
+    Route::post('/import', [KanbanHpmController::class, 'importTxt'])->name('import');
+    Route::get('/printall', [KanbanHpmController::class, 'printAll'])->name('printall');
+    Route::delete('/{id}', [KanbanHpmController::class, 'destroy'])->name('destroy');
+    Route::post('/adjust-weekly', [KanbanHpmController::class, 'adjustWeekly'])->name('adjustWeekly');
+    Route::match(['get', 'post'], '/print-filtered', [KanbanHpmController::class, 'printFiltered'])->name('printFiltered');
+});
  
     Route::prefix('advertisements')->name('advertisements.')->group(function () {
         Route::get('/', [AdvertisementController::class, 'index'])->name('index');
@@ -191,6 +193,15 @@ Route::middleware(['auth'])->group(function () {
 
     // Address CRUD (tanpa show)
     Route::resource('addresses', AddressController::class)->except(['show']);
+
+    Route::prefix('hpm-addresses')->name('hpm-addresses.')->group(function () {
+        Route::get('/', [HpmAddressController::class, 'index'])->name('index');
+        Route::post('/', [HpmAddressController::class, 'store'])->name('store');
+        Route::get('/{hpmAddress}/edit', [HpmAddressController::class, 'edit'])->name('edit');
+        Route::put('/{hpmAddress}', [HpmAddressController::class, 'update'])->name('update');
+        Route::delete('/{hpmAddress}', [HpmAddressController::class, 'destroy'])->name('destroy');
+        Route::post('/import', [HpmAddressController::class, 'import'])->name('import');
+    });
 
     // Running Text Routes
     Route::get('/running-text/data', [RunningTextController::class, 'getData'])->name('running-text.data');
