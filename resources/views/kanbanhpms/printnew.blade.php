@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -29,6 +28,48 @@
         .frame-1 {
             background: #ffffff; width: 645px; height: 491px;
             position: relative; overflow: hidden; margin-bottom: 8px;
+        }
+
+        /* ── Separator Page ── */
+        .separator-page {
+            background: #ffffff;
+            width: 645px;
+            height: 491px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #000;
+        }
+        .separator-inner {
+            text-align: center;
+        }
+        .separator-plant-label {
+            font-size: 90px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            color: #000;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+        .separator-sub {
+            font-size: 20px;
+            color: #444;
+            margin-top: 16px;
+            letter-spacing: 2px;
+        }
+        .separator-line {
+            width: 400px;
+            height: 4px;
+            background: #000;
+            margin: 20px auto;
+        }
+        .separator-count {
+            font-size: 16px;
+            color: #666;
+            margin-top: 8px;
         }
 
         .rectangle-1 {
@@ -90,7 +131,7 @@
 
         .from-val            { left: 29px;  top: 68px;  width: 110px; font-size: 13px; font-weight: bold; }
         .to-val              { left: 28px;  top: 127px; width: 110px; font-size: 13px; font-weight: bold; }
-        .part-no-val         { left: 183px; top: 42px;  width: 340px; font-size: 35px; font-weight: 700; }
+        .part-no-val         {left: 142px; width: 361px; top: 42px; font-size: 35px; font-weight: 700; text-align: center; }
         .part-name-val       { left: 220px; top: 95px;  width: 340px; font-size: 16px; font-weight: 700; }
         .ship-val            { left: 530px; top: 73px;  width: 110px; font-size: 55px; font-weight: 700; }
         .part-color-val      { left: 210px; top: 122px; width: 150px; font-size: 11px; }
@@ -105,7 +146,7 @@
         .part-weight-val     { left: 270px; top: 310px; width: 108px; font-size: 11px; }
         .hns-val             { left: 391px; top: 310px; width: 108px; font-size: 11px; }
         .prod-day-val        { left: 510px; top: 310px; width: 108px; font-size: 11px; }
-        .ms-id-val           { left: 28px;  top: 325px; width: 108px; font-size: 13px; font-weight: 700; }
+        .ms-id-val           { left: 28px;  top: 325px; width: 108px; font-size: 11px; font-weight: 700; }
         .schedule-val        { left: 28px;  top: 345px; width: 228px; font-size: 11px; }
         .adjusment-val       { left: 270px; top: 345px; width: 228px; font-size: 11px; }
         .check-val           { left: 510px; top: 355px; width: 108px; font-size: 11px; }
@@ -131,7 +172,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 12px;   /* ← tambah ini */
+            padding: 0 12px;
         }
 
         .barcode-wrap svg {
@@ -171,7 +212,6 @@
 </head>
 <body>
 
-
 @php
     use Picqer\Barcode\BarcodeGeneratorSVG;
 
@@ -180,26 +220,49 @@
     }
 
     $barcodeGenerator = new BarcodeGeneratorSVG();
+
+    // ── Pre-fetch semua rack_no sekaligus (hindari N+1 query) ──
+    $partNos = $kanbanhpms->pluck('part_no')->unique()->toArray();
+    $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
+                    ->pluck('rack_no', 'part_no');
+
+    // ── Split: Plant 1 (rack_no TIDAK diawali 'K') dan Plant 2 (diawali 'K') ──
+    $plant1Items = $kanbanhpms->filter(function ($item) use ($rackMap) {
+        $rack = strtoupper(trim($rackMap[$item->part_no] ?? ''));
+        return !str_starts_with($rack, 'K');
+    })->values();
+
+    $plant2Items = $kanbanhpms->filter(function ($item) use ($rackMap) {
+        $rack = strtoupper(trim($rackMap[$item->part_no] ?? ''));
+        return str_starts_with($rack, 'K');
+    })->values();
+
+    // ── Helper macro render satu kartu ──
+    // (dipakai dua kali: plant1 dan plant2, hindari duplikasi HTML)
+    $globalIndex = 0;
 @endphp
 
-@foreach($kanbanhpms as $index => $item)
+{{-- ════════════════════════════════════════════
+     PLANT 1
+════════════════════════════════════════════ --}}
 
+@foreach($plant1Items as $item)
 @php
+    $index        = $globalIndex++;
     $diPart       = preg_replace('/^DI/', '', $item->di_no);
     $seqPart      = str_pad($item->item_seq, 5, '0', STR_PAD_LEFT);
     $shipPart     = str_pad($item->ship, 2, '0', STR_PAD_LEFT);
     $barcodeValue = $diPart . $seqPart . '0000' . $shipPart;
-    $qrValue      = $diPart . $seqPart . $item->part_no;
+    $qrValue      = $diPart . $seqPart .'-'. $item->part_no;
 
     $barcodeSvg = $barcodeGenerator->getBarcode(
-    $barcodeValue,
-    BarcodeGeneratorSVG::TYPE_CODE_39,
-    2,      // widthFactor naik → bar lebih lebar, gap lebih jelas
-    77     // height sedikit turun biar proporsional
-);
+        $barcodeValue,
+        BarcodeGeneratorSVG::TYPE_CODE_39,
+        2,
+        77
+    );
 
-    $rackNo = \App\Models\HpmAddress::where('part_no', $item->part_no)
-                ->value('rack_no') ?? '';
+    $rackNo = $rackMap[$item->part_no] ?? '';
 
     $dateDisplay = '';
     if (!empty($item->datetime)) {
@@ -284,19 +347,10 @@
 
     <div class="rack-no-val">{{ $rackNo }}</div>
 
-    {{-- QR Code --}}
     <div class="qr-wrapper">
         <div id="qr-{{ $index }}" data-qr="{{ $qrValue }}"></div>
     </div>
 
-    {{--
-        BARCODE — server-side SVG dari picqer/php-barcode-generator
-        - Tidak ada JS rendering
-        - Tidak ada font dependency
-        - Bar width matematis presisi
-        - * otomatis ditambah library (Code39 spec)
-        - Quiet zone sudah include di SVG viewBox
-    --}}
     <div class="barcode-wrap">
         {!! $barcodeSvg !!}
     </div>
@@ -305,12 +359,155 @@
     <div class="date-val">{{ $dateDisplay }}</div>
 
 </div>
-
 @endforeach
+
+
+{{-- ════════════════════════════════════════════
+     SEPARATOR PAGE — PLANT 2
+     (hanya muncul kalau ada item Plant 2)
+════════════════════════════════════════════ --}}
+
+@if($plant2Items->isNotEmpty())
+<div class="frame-1 separator-page">
+    <div class="separator-inner">
+        <div class="separator-line"></div>
+        <div class="separator-plant-label">PLANT 2</div>
+        <div class="separator-line"></div>
+        <div class="separator-count">{{ $plant2Items->count() }} kanban</div>
+    </div>
+</div>
+
+
+{{-- ════════════════════════════════════════════
+     PLANT 2
+════════════════════════════════════════════ --}}
+
+@foreach($plant2Items as $item)
+@php
+    $index        = $globalIndex++;
+    $diPart       = preg_replace('/^DI/', '', $item->di_no);
+    $seqPart      = str_pad($item->item_seq, 5, '0', STR_PAD_LEFT);
+    $shipPart     = str_pad($item->ship, 2, '0', STR_PAD_LEFT);
+    $barcodeValue = $diPart . $seqPart . '0000' . $shipPart;
+    $qrValue      = $diPart . $seqPart . $item->part_no;
+
+    $barcodeSvg = $barcodeGenerator->getBarcode(
+        $barcodeValue,
+        BarcodeGeneratorSVG::TYPE_CODE_39,
+        2,
+        77
+    );
+
+    $rackNo = $rackMap[$item->part_no] ?? '';
+
+    $dateDisplay = '';
+    if (!empty($item->datetime)) {
+        $parts       = explode(' ', trim($item->datetime));
+        $dateDisplay = $parts[0] ?? '';
+    }
+
+    $len = strlen($item->part_no);
+    $left = 183;
+    if ($len > 13) {
+        $left = 183 - (($len - 13) * 8);
+    }
+@endphp
+
+<div class="frame-1">
+
+    <div class="rectangle-1"></div>
+    <div class="rectangle-2"></div>
+
+    <div class="line line-21"></div>
+    <div class="line line-22"></div>
+    <div class="line line-14"></div>
+    <div class="line line-15"></div>
+    <div class="line line-17"></div>
+    <div class="line line-6"></div>
+    <div class="line line-16"></div>
+    <div class="line line-13"></div>
+    <div class="line line-19"></div>
+    <div class="line line-20"></div>
+    <div class="line line-12"></div>
+    <div class="line line-11"></div>
+    <div class="line line-10"></div>
+    <div class="line line-7"></div>
+    <div class="line line-8"></div>
+    <div class="line line-1"></div>
+    <div class="line line-18"></div>
+    <div class="line line-2"></div>
+    <div class="line line-3"></div>
+    <div class="line line-4"></div>
+    <div class="line line-5"></div>
+
+    <div class="lbl parts-contents-card-lbl">Part Content Card</div>
+    <div class="lbl from-lbl">FROM</div>
+    <div class="lbl to-lbl">TO</div>
+    <div class="lbl qr-code-lbl">QR CODE</div>
+    <div class="lbl part-color-lbl">PART COLOR</div>
+    <div class="lbl ps-code-lbl">P/S CODE</div>
+    <div class="lbl supply-adr-lbl">SUPPLY ADR</div>
+    <div class="lbl next-supply-addr-lbl">NEXT SUPPLY<br>ADDR</div>
+    <div class="lbl order-class-lbl">ORDER CLASS</div>
+    <div class="lbl prod-seq-no-lbl">PROD SEQ NO</div>
+    <div class="lbl kd-lot-no-lbl">KD LOT NO</div>
+    <div class="lbl inv-cat-lbl">INV CAT</div>
+    <div class="lbl ms-id-lbl">M/S ID</div>
+    <div class="lbl sp-order-no-lbl">SP ORDER NO</div>
+    <div class="lbl part-weight-lbl">PART WEIGHT</div>
+    <div class="lbl hns-lbl">HNS</div>
+    <div class="lbl prod-day-lbl">PROD DAY</div>
+    <div class="lbl schedule-lbl">ADDRESS</div>
+    <div class="lbl adjusment-lbl">ADJUSMENT</div>
+    <div class="lbl check-lbl">CHECK</div>
+    <div class="lbl ship-lbl">SHIP</div>
+
+    <div class="val from-val">{{ fmtAddr($item->from) }}</div>
+    <div class="val to-val">{{ fmtAddr($item->to) }}</div>
+    <div class="val part-no-val">{{ $item->part_no }}</div>
+    <div class="val part-name-val">{{ $item->part_name }}</div>
+    <div class="val ship-val">{{ $item->ship }}</div>
+    <div class="val part-color-val">{{ $item->part_color_code }}</div>
+    <div class="val ps-code-val">{{ $item->ps_code }}</div>
+    <div class="val supply-adr-val">{{ $item->supply_address }}</div>
+    <div class="val next-supply-addr-val">{{ $item->next_supply_address }}</div>
+    <div class="val order-class-val">{{ $item->order_class }}</div>
+    <div class="val prod-seq-no-val">{{ $item->seq_no }}</div>
+    <div class="val kd-lot-no-val">
+        {{ substr($item->kd_lot_no, 0, 3) }}<br>
+        {{ substr($item->kd_lot_no, 3) }}
+    </div>
+    <div class="val inv-cat-val">{{ $item->inventory_category }}</div>
+    <div class="val ms-id-val">{{ $item->ms_id }}</div>
+    <div class="val sp-order-no-val">{{ $item->sp_order_no ?? '' }}</div>
+    <div class="val part-weight-val">{{ $item->part_weight }}</div>
+    <div class="val hns-val">{{ $item->hns }}</div>
+    <div class="val prod-day-val">{{ $item->production_day }}</div>
+    <div class="val schedule-val">{{ $item->schedule ?? '' }}</div>
+    <div class="val adjusment-val">{{ $item->adjustment ?? '' }}</div>
+    <div class="val check-val">{{ $item->check ?? '' }}</div>
+
+    <div class="rack-no-val">{{ $rackNo }}</div>
+
+    <div class="qr-wrapper">
+        <div id="qr-{{ $index }}" data-qr="{{ $qrValue }}"></div>
+    </div>
+
+    <div class="barcode-wrap">
+        {!! $barcodeSvg !!}
+    </div>
+
+    <div class="barcode-text-val">{{ $barcodeValue }}</div>
+    <div class="date-val">{{ $dateDisplay }}</div>
+
+</div>
+@endforeach
+
+@endif {{-- end @if($plant2Items->isNotEmpty()) --}}
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    /* ── QR Code ── */
     document.querySelectorAll('div[data-qr]').forEach(function (div) {
         var val = div.getAttribute('data-qr');
         if (!val) return;

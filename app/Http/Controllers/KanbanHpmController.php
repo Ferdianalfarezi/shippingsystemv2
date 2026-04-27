@@ -471,23 +471,35 @@ class KanbanHpmController extends Controller
      * Print All records
      */
     public function printAll(Request $request)
-    {
-        try {
-            $kanbanhpms = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
+{
+    try {
+        $kanbanhpms = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
 
-            if ($kanbanhpms->isEmpty()) {
-                return redirect()->route('kanbanhpms.index')
-                    ->with('error', 'Tidak ada data untuk diprint.');
-            }
-
-            return view('kanbanhpms.printnew', compact('kanbanhpms'));
-
-        } catch (\Exception $e) {
-            Log::error('KanbanHpm printAll error: ' . $e->getMessage());
+        if ($kanbanhpms->isEmpty()) {
             return redirect()->route('kanbanhpms.index')
-                ->with('error', 'Error: ' . $e->getMessage());
+                ->with('error', 'Tidak ada data untuk diprint.');
         }
+
+        // Ambil semua rack_no sekaligus (hindari N+1 query)
+        $partNos  = $kanbanhpms->pluck('part_no')->unique()->toArray();
+        $rackMap  = \App\Models\HpmAddress::whereIn('part_no', $partNos)
+                        ->pluck('rack_no', 'part_no');
+
+        // Sort: rack_no awalan 'K' → taruh di bawah
+        $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
+            $rack = $rackMap[$item->part_no] ?? '';
+            return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
+        })->values();
+
+        return view('kanbanhpms.printnew', compact('kanbanhpms','rackMap'));
+
+    } catch (\Exception $e) {
+        Log::error('KanbanHpm printAll error: ' . $e->getMessage());
+        return redirect()->route('kanbanhpms.index')
+            ->with('error', 'Error: ' . $e->getMessage());
     }
+}
+
 
     /**
      * Delete a single record
@@ -543,6 +555,17 @@ class KanbanHpmController extends Controller
                 <h3>Tidak ada data yang sesuai filter.</h3></div>', 200)
                 ->header('Content-Type', 'text/html');
         }
+
+        // Ambil semua rack_no sekaligus (hindari N+1 query)
+        $partNos = $kanbanhpms->pluck('part_no')->unique()->toArray();
+        $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
+                        ->pluck('rack_no', 'part_no');
+
+        // Sort: rack_no awalan 'K' → taruh di bawah
+        $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
+            $rack = $rackMap[$item->part_no] ?? '';
+            return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
+        })->values();
 
         return view('kanbanhpms.printnew', compact('kanbanhpms'));
 
