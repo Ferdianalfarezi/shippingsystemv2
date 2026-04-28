@@ -10,7 +10,7 @@
         body { margin: 0; padding: 0; background: #fff; }
 
         @media print {
-            @page { margin: 0; padding: 0; size: 645px 491px; }
+            @page { margin: 0; padding: 0; size: 100mm 85mm; }
             body { margin: 0; padding: 0; }
             .frame-1 { page-break-after: always; page-break-inside: avoid; }
             .no-print { display: none !important; }
@@ -26,15 +26,19 @@
 
         .frame-1, .frame-1 * { box-sizing: border-box; }
         .frame-1 {
-            background: #ffffff; width: 645px; height: 491px;
-            position: relative; overflow: hidden; margin-bottom: 8px;
+            background: #ffffff;
+            width: 731px;
+            height: 521px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 8px;
         }
 
         /* ── Separator Page ── */
         .separator-page {
             background: #ffffff;
-            width: 645px;
-            height: 491px;
+            width: 731px;
+            height: 521px;
             position: relative;
             overflow: hidden;
             margin-bottom: 8px;
@@ -43,170 +47,181 @@
             justify-content: center;
             border: 3px solid #000;
         }
-        .separator-inner {
-            text-align: center;
-        }
+        .separator-inner { text-align: center; }
         .separator-plant-label {
-            font-size: 90px;
-            font-weight: 900;
-            letter-spacing: 10px;
-            color: #000;
-            line-height: 1;
-            text-transform: uppercase;
+            font-size: 90px; font-weight: 900; letter-spacing: 10px;
+            color: #000; line-height: 1; text-transform: uppercase;
         }
-        .separator-sub {
-            font-size: 20px;
-            color: #444;
-            margin-top: 16px;
-            letter-spacing: 2px;
-        }
-        .separator-line {
-            width: 400px;
-            height: 4px;
-            background: #000;
-            margin: 20px auto;
-        }
-        .separator-count {
-            font-size: 16px;
-            color: #666;
-            margin-top: 8px;
-        }
+        .separator-sub { font-size: 20px; color: #444; margin-top: 16px; letter-spacing: 2px; }
+        .separator-line { width: 400px; height: 4px; background: #000; margin: 20px auto; }
+        .separator-count { font-size: 16px; color: #666; margin-top: 8px; }
 
+        /* ─── RECTANGLE BORDERS ─── */
         .rectangle-1 {
             background: rgba(217,217,217,0); border: 2px solid #000;
-            width: 623px; height: 463px; position: absolute; left: 11px; top: 13px;
+            width: 706px; height: 493px; position: absolute; left: 12px; top: 13px;
         }
         .rectangle-2 {
             background: rgba(217,217,217,0); border: 2px solid #000;
-            width: 600px; height: 429px; position: absolute; left: 22px; top: 34px;
+            width: 680px; height: 459px; position: absolute; left: 25px; top: 34px;
         }
 
+        /* ─── HORIZONTAL LINES ─── */
         .line { position: absolute; border: 0; }
-        .line-14  { border-top: 2px solid #000; width: 480px; left: 23px;   top: 88px; }
-        .line-15  { border-top: 2px solid #000; width: 480px; left: 23px;   top: 119px; }
-        .line-17  { border-top: 2px solid #000; width: 599px; left: 23px;   top: 147px; }
-        .line-6   { border-top: 2px solid #000; width: 599px; left: 23px;   top: 184px; }
-        .line-16  { border-top: 2px solid #000; width: 480px; left: 142px;  top: 206px; }
-        .line-13  { border-top: 2px solid #000; width: 480px; left: 142px;  top: 227px; }
-        .line-19  { border-top: 2px solid #000; width: 243px; left: 142px;  top: 255px; }
-        .line-20  { border-top: 2px solid #000; width: 243px; left: 142px;  top: 277px; }
-        .line-12  { border-top: 2px solid #000; width: 600px; left: 22px;   top: 297px; }
-        .line-11  { border-top: 2px solid #000; width: 600px; left: 22px;   top: 320px; }
-        .line-10  { border-top: 2px solid #000; width: 599px; left: 23px;   top: 341px; }
-        .line-7   { border-top: 2px solid #000; width: 599px; left: 23px;   top: 362px; }
-        .line-8   { border-top: 2px solid #000; width: 599px; left: 23px;   top: 441px; }
-        .line-21  { border-top: 2px solid #000; width: 120px; left: 22px;   top: 63px; }
-        .line-22  { border-top: 2px solid #000; width: 119px; left: 503px;  top: 63px; }
-        .line-1  { border-top: 2px solid #000; width: 328px; left: 142px; top: 35px; transform-origin: 0 0; transform: rotate(90deg); }
-        .line-18 { border-top: 2px solid #000; width: 172px; left: 503px; top: 35px; transform-origin: 0 0; transform: rotate(90deg); }
-        .line-2  { border-top: 2px solid #000; width: 215px; left: 385.21px; top: 148px; transform-origin: 0 0; transform: rotate(90.05deg); }
-        .line-3  { border-top: 2px solid #000; width: 87px;  left: 263.21px; top: 120px; transform-origin: 0 0; transform: rotate(90.138deg); }
-        .line-4  { border-top: 2px solid #000; width: 65px;  left: 263.21px; top: 298px; transform-origin: 0 0; transform: rotate(90.145deg); }
-        .line-5  { border-top: 2px solid #000; width: 65px;  left: 502.21px; top: 298px; transform-origin: 0 0; transform: rotate(90.145deg); }
 
+        .line-21 { border-top: 2px solid #000; width: 136px; left: 25px;   top: 63px; }
+        .line-22 { border-top: 2px solid #000; width: 135px; left: 570px;  top: 63px; }
+        .line-14 { border-top: 2px solid #000; width: 544px; left: 26px;   top: 88px; }
+        .line-15 { border-top: 2px solid #000; width: 544px; left: 26px;   top: 119px; }
+        .line-17 { border-top: 2px solid #000; width: 543px; left: 26px;   top: 147px; }
+        .line-date-bottom { border-top: 2px solid #000; width: 679px; left: 26px; top: 177px; }
+        .line-6  { border-top: 2px solid #000; width: 679px; left: 26px;   top: 214px; }
+        .line-16 { border-top: 2px solid #000; width: 544px; left: 161px;  top: 236px; }
+        .line-13 { border-top: 2px solid #000; width: 544px; left: 161px;  top: 257px; }
+        .line-19 { border-top: 2px solid #000; width: 275px; left: 161px;  top: 285px; }
+        .line-20 { border-top: 2px solid #000; width: 275px; left: 161px;  top: 307px; }
+        .line-12 { border-top: 2px solid #000; width: 680px; left: 25px;   top: 327px; }
+        .line-11 { border-top: 2px solid #000; width: 680px; left: 25px;   top: 350px; }
+        .line-10 { border-top: 2px solid #000; width: 679px; left: 26px;   top: 371px; }
+        .line-7  { border-top: 2px solid #000; width: 679px; left: 26px;   top: 392px; }
+        .line-8  { border-top: 2px solid #000; width: 679px; left: 26px;   top: 471px; }
+
+        /* ─── VERTICAL LINES ─── */
+        .line-0  {
+            border-top: 2px solid #000; width: 214px;
+            left: 161px; top: 178px;
+            transform-origin: 0 0; transform: rotate(90deg);
+        }
+        .line-1  {
+            border-top: 2px solid #000; width: 112px;
+            left: 161px; top: 36px;
+            transform-origin: 0 0; transform: rotate(90deg);
+        }
+        .line-18 {
+            border-top: 2px solid #000; width: 202px;
+            left: 570px; top: 35px;
+            transform-origin: 0 0; transform: rotate(90deg);
+        }
+        .line-2  {
+            border-top: 2px solid #000; width: 215px;
+            left: 436px; top: 178px;
+            transform-origin: 0 0; transform: rotate(90.05deg);
+        }
+        .line-3  {
+            border-top: 2px solid #000; width: 95px;
+            left: 298px; top: 120px;
+            transform-origin: 0 0; transform: rotate(90.138deg);
+        }
+        .line-4  {
+            border-top: 2px solid #000; width: 65px;
+            left: 298px; top: 328px;
+            transform-origin: 0 0; transform: rotate(90.145deg);
+        }
+        .line-5  {
+            border-top: 2px solid #000; width: 65px;
+            left: 569px; top: 328px;
+            transform-origin: 0 0; transform: rotate(90.145deg);
+        }
+
+        /* ─── LABELS & VALUES ─── */
         .lbl { position: absolute; font-size: 11px; font-weight: 400; color: #000; white-space: nowrap; }
         .val { position: absolute; font-size: 11px; font-weight: 400; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .parts-contents-card-lbl { left: 260px; top: 17px; font-size: 14px; }
-        .from-lbl       { left: 29px;  top: 38px;  font-size: 15px; }
-        .to-lbl         { left: 28px;  top: 93px;  font-size: 15px; }
-        .qr-code-lbl    { left: 29px;  top: 150px; font-size: 15px; }
-        .part-color-lbl       { left: 149px; top: 123px; font-size: 13px; }
-        .prod-seq-no-lbl      { left: 150px; top: 209px; font-size: 13px; }
-        .inv-cat-lbl          { left: 148px; top: 258px; font-size: 13px; }
-        .sp-order-no-lbl      { left: 150px; top: 300px; font-size: 13px; }
-        .ms-id-lbl            { left: 28px;  top: 300px; font-size: 13px; }
-        .schedule-lbl         { left: 28px;  top: 345px; font-size: 13px; }
-        .supply-adr-lbl       { left: 269px; top: 150px; font-size: 13px; }
-        .ps-code-lbl          { left: 149px; top: 150px; font-size: 13px; }
-        .part-weight-lbl      { left: 270px; top: 300px; }
-        .adjusment-lbl        { left: 270px; top: 343px; }
-        .next-supply-addr-lbl { left: 391px; top: 150px; font-size: 13px; }
-        .kd-lot-no-lbl        { left: 392px; top: 209px; }
-        .hns-lbl              { left: 391px; top: 300px; }
-        .ship-lbl             { left: 509px; top: 40px;  font-size: 13px; }
-        .order-class-lbl      { left: 510px; top: 150px; font-size: 13px; }
-        .prod-day-lbl         { left: 510px; top: 300px; }
-        .check-lbl            { left: 510px; top: 343px; }
+        /* Labels — top < 147 */
+        .parts-contents-card-lbl { left: 295px; top: 17px;  font-size: 14px; }
+        .from-lbl                { left:  33px; top: 38px;  font-size: 15px; }
+        .to-lbl                  { left:  32px; top: 93px;  font-size: 15px; }
+        .part-color-lbl          { left: 169px; top: 123px; font-size: 13px; }
+        .ship-lbl                { left: 577px; top: 40px;  font-size: 13px; }
 
-        .from-val            { left: 29px;  top: 68px;  width: 110px; font-size: 13px; font-weight: bold; }
-        .to-val              { left: 28px;  top: 127px; width: 110px; font-size: 13px; font-weight: bold; }
-        .part-no-val         {left: 142px; width: 361px; top: 42px; font-size: 35px; font-weight: 700; text-align: center; }
-        .part-name-val       { left: 220px; top: 95px;  width: 340px; font-size: 16px; font-weight: 700; }
-        .ship-val            { left: 530px; top: 73px;  width: 110px; font-size: 55px; font-weight: 700; }
-        .part-color-val      { left: 210px; top: 122px; width: 150px; font-size: 11px; }
-        .ps-code-val         { left: 149px; top: 188px; width: 110px; font-size: 13px; font-weight: 700; }
-        .supply-adr-val      { left: 269px; top: 188px; width: 110px; font-size: 13px; font-weight: 700; }
-        .next-supply-addr-val{ left: 391px; top: 162px; width: 108px; font-size: 11px; }
-        .order-class-val     { left: 510px; top: 188px; width: 108px; font-size: 13px; font-weight: 700; }
-        .prod-seq-no-val     { left: 150px; top: 235px; width: 240px; font-size: 15px; font-weight: 700; }
-        .kd-lot-no-val       { left: 392px; top: 235px; width: 225px; font-size: 25px; font-weight: 700; text-align: center; }
-        .inv-cat-val         { left: 148px; top: 280px; width: 110px; font-size: 15px; font-weight: 700; }
-        .sp-order-no-val     { left: 150px; top: 310px; width: 108px; font-size: 11px; }
-        .part-weight-val     { left: 270px; top: 310px; width: 108px; font-size: 11px; }
-        .hns-val             { left: 391px; top: 310px; width: 108px; font-size: 11px; }
-        .prod-day-val        { left: 510px; top: 310px; width: 108px; font-size: 11px; }
-        .ms-id-val           { left: 28px;  top: 325px; width: 108px; font-size: 11px; font-weight: 700; }
-        .schedule-val        { left: 28px;  top: 345px; width: 228px; font-size: 11px; }
-        .adjusment-val       { left: 270px; top: 345px; width: 228px; font-size: 11px; }
-        .check-val           { left: 510px; top: 355px; width: 108px; font-size: 11px; }
+        /* Labels — row Date / Adjust Date */
+        .date-row-lbl         { left:  33px; top: 154px; font-size: 13px; }
+        .adjust-date-row-lbl  { left: 305px; top: 154px; font-size: 13px; }
+
+        /* Labels — top >= 147 (+30) */
+        .qr-code-lbl          { left:  33px; top: 180px; font-size: 15px; }
+        .ps-code-lbl          { left: 169px; top: 180px; font-size: 13px; }
+        .supply-adr-lbl       { left: 305px; top: 180px; font-size: 13px; }
+        .next-supply-addr-lbl { left: 443px; top: 180px; font-size: 13px; }
+        .order-class-lbl      { left: 578px; top: 180px; font-size: 13px; }
+        .prod-seq-no-lbl      { left: 170px; top: 239px; font-size: 13px; }
+        .kd-lot-no-lbl        { left: 444px; top: 239px; }
+        .inv-cat-lbl          { left: 168px; top: 288px; font-size: 13px; }
+        .ms-id-lbl            { left:  32px; top: 330px; font-size: 13px; }
+        .sp-order-no-lbl      { left: 170px; top: 330px; font-size: 13px; }
+        .part-weight-lbl      { left: 306px; top: 330px; }
+        .hns-lbl              { left: 443px; top: 330px; }
+        .prod-day-lbl         { left: 578px; top: 330px; }
+        .schedule-lbl         { left:  32px; top: 375px; font-size: 13px; }
+        .adjusment-lbl        { left: 306px; top: 373px; }
+        .check-lbl            { left: 578px; top: 373px; }
+
+        /* Values — top < 147 */
+        .from-val     { left:  33px; top: 68px;  width: 125px; font-size: 13px; font-weight: bold; }
+        .to-val       { left:  32px; top: 127px; width: 125px; font-size: 13px; font-weight: bold; }
+        .part-no-val  { left: 161px; width: 409px; top: 42px; font-size: 35px; font-weight: 700; text-align: center; }
+        .part-name-val{ left: 249px; top: 95px;  width: 385px; font-size: 16px; font-weight: 700; }
+        .ship-val     { left: 605px; top: 90px;  width: 125px; font-size: 55px; font-weight: 700; }
+        .part-color-val{ left: 238px; top: 122px; width: 170px; font-size: 11px; }
+
+        /* Values — row Date / Adjust Date */
+        .date-row-val        { left:  80px; top: 155px; width: 325px; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+        .adjust-date-row-val { left: 410px; top: 155px; width: 290px; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+
+        /* Values — top >= 147 (+30) */
+        .ps-code-val          { left: 169px; top: 218px; width: 125px; font-size: 13px; font-weight: 700; }
+        .supply-adr-val       { left: 305px; top: 218px; width: 125px; font-size: 13px; font-weight: 700; }
+        .next-supply-addr-val { left: 443px; top: 192px; width: 122px; font-size: 11px; }
+        .order-class-val      { left: 578px; top: 218px; width: 122px; font-size: 13px; font-weight: 700; }
+        .prod-seq-no-val      { left: 170px; top: 265px; width: 272px; font-size: 15px; font-weight: 700; }
+        .kd-lot-no-val        { left: 444px; top: 265px; width: 255px; font-size: 25px; font-weight: 700; text-align: center; }
+        .inv-cat-val          { left: 168px; top: 310px; width: 125px; font-size: 15px; font-weight: 700; }
+        .ms-id-val            { left:  32px; top: 355px; width: 122px; font-size: 11px; font-weight: 700; }
+        .sp-order-no-val      { left: 170px; top: 340px; width: 122px; font-size: 11px; }
+        .part-weight-val      { left: 306px; top: 340px; width: 122px; font-size: 11px; }
+        .hns-val              { left: 443px; top: 340px; width: 122px; font-size: 11px; }
+        .prod-day-val         { left: 578px; top: 340px; width: 122px; font-size: 11px; }
+        .schedule-val         { left:  32px; top: 375px; width: 258px; font-size: 11px; }
+        .adjusment-val        { left: 306px; top: 375px; width: 258px; font-size: 11px; }
+        .check-val            { left: 578px; top: 385px; width: 122px; font-size: 11px; }
 
         .rack-no-val {
             position: absolute;
-            left: 150px;
-            top: 345px;
-            font-size: 15px;
-            font-weight: 700;
-            color: #000;
-            white-space: nowrap;
+            left: 170px; top: 375px;
+            font-size: 15px; font-weight: 700;
+            color: #000; white-space: nowrap;
         }
 
+        /* Barcode */
         .barcode-wrap {
             position: absolute;
-            left: 23px;
-            top: 374px;
-            width: 599px;
-            height: 58px;
-            background: #ffffff00;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 12px;
+            left: 26px; top: 404px;
+            width: 679px; height: 58px;
+            background: #ffffff00; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 14px;
         }
-
-        .barcode-wrap svg {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
+        .barcode-wrap svg { display: block; width: 100%; height: 100%; }
 
         .barcode-text-val {
             position: absolute;
-            left: 100px;
-            top: 444px;
-            width: 440px;
-            font-size: 13px;
-            text-align: center;
-            color: #000;
-            letter-spacing: 0.5px;
-        }
-
-        .date-val {
-            position: absolute; left: 465px; top: 444px;
-            width: 250px; font-size: 15px; font-weight: bold; text-align: center;
+            left: 113px; top: 474px;
+            width: 498px; font-size: 13px; text-align: center;
             color: #000; letter-spacing: 0.5px;
         }
 
+        .date-val {
+            position: absolute; left: 527px; top: 474px;
+            width: 283px; font-size: 15px; font-weight: bold; text-align: center;
+            color: #000; letter-spacing: 0.5px;
+        }
+
+        /* QR wrapper */
         .qr-wrapper {
             position: absolute;
-            left: 29px;
-            top: 187px;
-            width: 108px;
-            height: 108px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            left: 40px; top: 217px;
+            width: 108px; height: 108px;
+            display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
@@ -221,12 +236,10 @@
 
     $barcodeGenerator = new BarcodeGeneratorSVG();
 
-    // ── Pre-fetch semua rack_no sekaligus (hindari N+1 query) ──
     $partNos = $kanbanhpms->pluck('part_no')->unique()->toArray();
     $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
                     ->pluck('rack_no', 'part_no');
 
-    // ── Split: Plant 1 (rack_no TIDAK diawali 'K') dan Plant 2 (diawali 'K') ──
     $plant1Items = $kanbanhpms->filter(function ($item) use ($rackMap) {
         $rack = strtoupper(trim($rackMap[$item->part_no] ?? ''));
         return !str_starts_with($rack, 'K');
@@ -237,8 +250,6 @@
         return str_starts_with($rack, 'K');
     })->values();
 
-    // ── Helper macro render satu kartu ──
-    // (dipakai dua kali: plant1 dan plant2, hindari duplikasi HTML)
     $globalIndex = 0;
 @endphp
 
@@ -276,11 +287,13 @@
     <div class="rectangle-1"></div>
     <div class="rectangle-2"></div>
 
+    {{-- Horizontal lines --}}
     <div class="line line-21"></div>
     <div class="line line-22"></div>
     <div class="line line-14"></div>
     <div class="line line-15"></div>
     <div class="line line-17"></div>
+    <div class="line line-date-bottom"></div>
     <div class="line line-6"></div>
     <div class="line line-16"></div>
     <div class="line line-13"></div>
@@ -291,6 +304,9 @@
     <div class="line line-10"></div>
     <div class="line line-7"></div>
     <div class="line line-8"></div>
+
+    {{-- Vertical lines --}}
+    <div class="line line-0"></div>
     <div class="line line-1"></div>
     <div class="line line-18"></div>
     <div class="line line-2"></div>
@@ -298,11 +314,18 @@
     <div class="line line-4"></div>
     <div class="line line-5"></div>
 
+    {{-- Labels --}}
     <div class="lbl parts-contents-card-lbl">Part Content Card</div>
     <div class="lbl from-lbl">FROM</div>
     <div class="lbl to-lbl">TO</div>
-    <div class="lbl qr-code-lbl">QR CODE</div>
+    <div class="lbl ship-lbl">SHIP</div>
     <div class="lbl part-color-lbl">PART COLOR</div>
+
+    {{-- FIX: label Date/Adjust Date sekarang UPPERCASE konsisten --}}
+    <div class="lbl date-row-lbl">DATE</div>
+    <div class="lbl adjust-date-row-lbl">ADJUST DATE</div>
+
+    <div class="lbl qr-code-lbl">QR CODE</div>
     <div class="lbl ps-code-lbl">P/S CODE</div>
     <div class="lbl supply-adr-lbl">SUPPLY ADR</div>
     <div class="lbl next-supply-addr-lbl">NEXT SUPPLY<br>ADDR</div>
@@ -318,14 +341,16 @@
     <div class="lbl schedule-lbl">ADDRESS</div>
     <div class="lbl adjusment-lbl">ADJUSMENT</div>
     <div class="lbl check-lbl">CHECK</div>
-    <div class="lbl ship-lbl">SHIP</div>
 
+    {{-- Values --}}
     <div class="val from-val">{{ fmtAddr($item->from) }}</div>
     <div class="val to-val">{{ fmtAddr($item->to) }}</div>
     <div class="val part-no-val">{{ $item->part_no }}</div>
     <div class="val part-name-val">{{ $item->part_name }}</div>
     <div class="val ship-val">{{ $item->ship }}</div>
     <div class="val part-color-val">{{ $item->part_color_code }}</div>
+    <div class="val date-row-val">{{ $item->datetime ?? '' }}</div>
+    <div class="val adjust-date-row-val">{{ $item->adjusted_datetime ?? '' }}</div>
     <div class="val ps-code-val">{{ $item->ps_code }}</div>
     <div class="val supply-adr-val">{{ $item->supply_address }}</div>
     <div class="val next-supply-addr-val">{{ $item->next_supply_address }}</div>
@@ -356,7 +381,7 @@
     </div>
 
     <div class="barcode-text-val">{{ $barcodeValue }}</div>
-    <div class="date-val">{{ $dateDisplay }}</div>
+   
 
 </div>
 @endforeach
@@ -364,7 +389,6 @@
 
 {{-- ════════════════════════════════════════════
      SEPARATOR PAGE — PLANT 2
-     (hanya muncul kalau ada item Plant 2)
 ════════════════════════════════════════════ --}}
 
 @if($plant2Items->isNotEmpty())
@@ -400,29 +424,21 @@
 
     $rackNo = $rackMap[$item->part_no] ?? '';
 
-    $dateDisplay = '';
-    if (!empty($item->datetime)) {
-        $parts       = explode(' ', trim($item->datetime));
-        $dateDisplay = $parts[0] ?? '';
-    }
-
-    $len = strlen($item->part_no);
-    $left = 183;
-    if ($len > 13) {
-        $left = 183 - (($len - 13) * 8);
-    }
+    // SESUDAH — ambil dd-mm-yyyy, buang HH:MM
+$src         = !empty($item->adjusted_datetime) ? $item->adjusted_datetime : ($item->datetime ?? '');
+$dateDisplay = !empty($src) ? (explode(' ', trim($src))[0] ?? '') : '';
 @endphp
 
 <div class="frame-1">
 
     <div class="rectangle-1"></div>
     <div class="rectangle-2"></div>
-
     <div class="line line-21"></div>
     <div class="line line-22"></div>
     <div class="line line-14"></div>
     <div class="line line-15"></div>
     <div class="line line-17"></div>
+    <div class="line line-date-bottom"></div>
     <div class="line line-6"></div>
     <div class="line line-16"></div>
     <div class="line line-13"></div>
@@ -433,6 +449,7 @@
     <div class="line line-10"></div>
     <div class="line line-7"></div>
     <div class="line line-8"></div>
+    <div class="line line-0"></div>
     <div class="line line-1"></div>
     <div class="line line-18"></div>
     <div class="line line-2"></div>
@@ -443,8 +460,11 @@
     <div class="lbl parts-contents-card-lbl">Part Content Card</div>
     <div class="lbl from-lbl">FROM</div>
     <div class="lbl to-lbl">TO</div>
-    <div class="lbl qr-code-lbl">QR CODE</div>
+    <div class="lbl ship-lbl">SHIP</div>
     <div class="lbl part-color-lbl">PART COLOR</div>
+    <div class="lbl date-row-lbl">DATE</div>
+    <div class="lbl adjust-date-row-lbl">ADJUST DATE</div>
+    <div class="lbl qr-code-lbl">QR CODE</div>
     <div class="lbl ps-code-lbl">P/S CODE</div>
     <div class="lbl supply-adr-lbl">SUPPLY ADR</div>
     <div class="lbl next-supply-addr-lbl">NEXT SUPPLY<br>ADDR</div>
@@ -460,7 +480,6 @@
     <div class="lbl schedule-lbl">ADDRESS</div>
     <div class="lbl adjusment-lbl">ADJUSMENT</div>
     <div class="lbl check-lbl">CHECK</div>
-    <div class="lbl ship-lbl">SHIP</div>
 
     <div class="val from-val">{{ fmtAddr($item->from) }}</div>
     <div class="val to-val">{{ fmtAddr($item->to) }}</div>
@@ -468,6 +487,8 @@
     <div class="val part-name-val">{{ $item->part_name }}</div>
     <div class="val ship-val">{{ $item->ship }}</div>
     <div class="val part-color-val">{{ $item->part_color_code }}</div>
+    <div class="val date-row-val">{{ $item->datetime ?? '' }}</div>
+    <div class="val adjust-date-row-val">{{ $item->adjusted_datetime ?? '' }}</div>
     <div class="val ps-code-val">{{ $item->ps_code }}</div>
     <div class="val supply-adr-val">{{ $item->supply_address }}</div>
     <div class="val next-supply-addr-val">{{ $item->next_supply_address }}</div>

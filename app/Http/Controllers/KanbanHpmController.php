@@ -16,19 +16,26 @@ class KanbanHpmController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-{
-    $kanbanhpms       = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
-    $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
+    {
+        $kanbanhpms = KanbanHpm::orderBy('di_no')
+            ->orderBy('item_seq')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>', now());
+            })
+            ->get();
 
-    $kanbanPrintData = $kanbanhpms->map(function ($i) {
-        return [
-            'date' => !empty($i->datetime) ? explode(' ', trim($i->datetime))[0] : '',
-            'dock' => !empty($i->ps_code)  ? substr(trim($i->ps_code), -2) : '',
-        ];
-    })->values();
+        $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
 
-    return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'kanbanPrintData'));
-}
+        $kanbanPrintData = $kanbanhpms->map(function ($i) {
+            return [
+                'date' => !empty($i->datetime) ? explode(' ', trim($i->datetime))[0] : '',
+                'dock' => !empty($i->ps_code)  ? substr(trim($i->ps_code), -2) : '',
+            ];
+        })->values();
+
+        return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'kanbanPrintData'));
+    }
 
     /**
      * Import TXT file (HPM format - fixed-width)
@@ -50,11 +57,12 @@ class KanbanHpmController extends Controller
         }
 
         try {
-            $deletedCount = KanbanHpm::count();
-            KanbanHpm::truncate();
+            $deletedCount = KanbanHpm::where('expires_at', '<=', now())->count();
+            KanbanHpm::where('expires_at', '<=', now())->delete();
 
             $importedCount = 0;
             $generator     = new BarcodeGeneratorPNG();
+            $year          = now()->year; // tahun sekarang untuk append ke datetime
 
             foreach ($lines as $rawLine) {
                 $line = rtrim($rawLine, "\r\n");
@@ -123,7 +131,8 @@ class KanbanHpmController extends Controller
 
                 preg_match('/(\d{2}-\d{2})\s+(\d{2}:\d{2})/', $dt_area, $dtMatch);
                 if (isset($dtMatch[1])) {
-                    $datetime = trim($dtMatch[1] . ' ' . $dtMatch[2]);
+                    // Format: "dd-mm-yyyy HH:MM"
+                    $datetime = $dtMatch[1] . '-' . $year . ' ' . $dtMatch[2];
                     $datePos  = strpos($dt_area, $dtMatch[1]);
                     $ship_raw = substr($dt_area, $datePos - 2, 2);
                     $ship     = ltrim($ship_raw, '0') ?: '0';
@@ -159,6 +168,7 @@ class KanbanHpmController extends Controller
                     'datetime'           => $datetime,
                     'barcode'            => $barcode,
                     'last_upload_at'     => now()->toDateTimeString(),
+                    'expires_at'         => now()->addDays(7),
                     'uploaded_by'        => $uploadedBy,
                 ]);
 
@@ -202,14 +212,13 @@ class KanbanHpmController extends Controller
             $path        = $request->file('file_weekly')->getRealPath();
             $spreadsheet = IOFactory::load($path);
 
-            // Ambil active sheet (sheet yang aktif saat file disave)
-            // Lebih reliable dari getSheetNames()[0] yang bisa return sheet tersembunyi/helper
             $sheet     = $spreadsheet->getActiveSheet();
             $sheetName = $sheet->getTitle();
 
             $adjustMap = $this->parseAdjustExcel($path, [$sheetName], 16, 10, 12, 5);
 
             Log::info("AdjustWeekly: parsed sheet='{$sheetName}', entries=" . count($adjustMap));
+
             if (empty($adjustMap)) {
                 return redirect()->route('kanbanhpms.index')->with([
                     'sweet_alert' => [
@@ -221,7 +230,6 @@ class KanbanHpmController extends Controller
                 ]);
             }
 
-            // ── 3. Update DB ──────────────────────────────────────────────────
             $updated   = 0;
             $sameValue = 0;
             $noAdj     = 0;
@@ -236,8 +244,9 @@ class KanbanHpmController extends Controller
                     $adj         = $adjustMap[$key];
                     $newDatetime = $adj['date'] . ' ' . $adj['time'];
 
-                    if ($item->datetime !== $newDatetime) {
-                        $item->datetime = $newDatetime;
+                    // Simpan ke adjusted_datetime, TIDAK mengubah datetime (original dari TXT)
+                    if ($item->adjusted_datetime !== $newDatetime) {
+                        $item->adjusted_datetime = $newDatetime;
                         $item->save();
                         $updated++;
                     } else {
@@ -254,7 +263,7 @@ class KanbanHpmController extends Controller
                 'sweet_alert' => [
                     'type'              => 'success',
                     'title'             => 'Adjust Weekly Berhasil!',
-                    'text'              => "{$updated} data diupdate, {$sameValue} data sudah sama, {$noAdj} data tidak ada di Excel (datetime tidak berubah).",
+                    'text'              => "{$updated} data diupdate, {$sameValue} data sudah sama, {$noAdj} data tidak ada di Excel (adjusted_datetime tidak berubah).",
                     'showConfirmButton' => true,
                     'timer'             => 7000,
                 ],
@@ -275,18 +284,6 @@ class KanbanHpmController extends Controller
         }
     }
 
-    /**
-     * Parse Excel dan return mapping kd_lot_no => [date, time]
-     * Hanya row yang punya Adjustment Date DAN Time yang dimasukkan.
-     *
-     * @param  string  $path        Path file Excel
-     * @param  array   $sheetNames  Nama-nama sheet yang dibaca
-     * @param  int     $colKd       Index kolom KD Lot Number (0-based)
-     * @param  int     $colAdjDate  Index kolom Adj Ship Date (0-based)
-     * @param  int     $colAdjTime  Index kolom Adj Ship Time (0-based)
-     * @param  int     $headerRow   Baris header (1-based); data mulai baris berikutnya
-     * @return array
-     */
     private function parseAdjustExcel(
         string $path,
         array  $sheetNames,
@@ -305,17 +302,14 @@ class KanbanHpmController extends Controller
                 continue;
             }
 
-            $highestRow = $sheet->getHighestDataRow();
+            $highestRow   = $sheet->getHighestDataRow();
             $debugSamples = 0;
 
-            // Iterate per row, baca cell langsung (lebih reliable dari toArray)
             for ($rowIdx = $headerRow + 1; $rowIdx <= $highestRow; $rowIdx++) {
-                // +1 karena $headerRow adalah baris header (1-based), data mulai baris berikutnya
                 $kdRaw   = trim((string) ($sheet->getCellByColumnAndRow($colKd + 1, $rowIdx)->getValue() ?? ''));
                 $adjDate = $sheet->getCellByColumnAndRow($colAdjDate + 1, $rowIdx)->getValue();
                 $adjTime = $sheet->getCellByColumnAndRow($colAdjTime + 1, $rowIdx)->getValue();
 
-                // Debug log untuk 3 baris pertama
                 if ($debugSamples < 3) {
                     Log::debug("AdjustWeekly row {$rowIdx}: KD=" . var_export($kdRaw, true)
                         . " | Date=" . var_export($adjDate, true) . " (" . gettype($adjDate) . ")"
@@ -332,9 +326,7 @@ class KanbanHpmController extends Controller
                 if ($dateStr === null || $timeStr === null) {
                     Log::debug("AdjustWeekly SKIP row {$rowIdx}: KD={$kdRaw}"
                         . " dateStr=" . var_export($dateStr, true)
-                        . " timeStr=" . var_export($timeStr, true)
-                        . " | rawDate=" . var_export($adjDate, true) . " (" . gettype($adjDate) . ")"
-                        . " | rawTime=" . var_export($adjTime, true) . " (" . gettype($adjTime) . ")");
+                        . " timeStr=" . var_export($timeStr, true));
                     continue;
                 }
 
@@ -351,55 +343,56 @@ class KanbanHpmController extends Controller
     }
 
     /**
-     * Format nilai date dari Excel menjadi "dd-mm"
-     *
-     * formatData=false -> PhpSpreadsheet return float serial (misal 46118.0 = 06-04-2026)
-     * Konversi manual dari epoch Excel (1899-12-30 UTC) tanpa ExcelDate::excelToDateTimeObject()
-     * agar bebas dari timezone offset PHP server.
+     * Format nilai date dari Excel menjadi "dd-mm-yyyy"
      */
     private function formatExcelDate($value): ?string
     {
+        $year = now()->year;
+
         if ($value === null) return null;
 
-        // DateTime object (fallback jika PhpSpreadsheet return object)
         if ($value instanceof \DateTimeInterface) {
-            return $value->format('d-m');
+            return $value->format('d-m-') . $year;
         }
 
         if (is_string($value)) {
             $value = trim($value);
             if ($value === '') return null;
 
-            // Format "YYYYMMDD" integer string (e.g. "20260410" dari EXPORT_CALC)
+            // Format "YYYYMMDD" integer string (e.g. "20260410")
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $value, $m)) {
-                return $m[3] . '-' . $m[2];
+                return $m[3] . '-' . $m[2] . '-' . $m[1];
             }
 
             // Format ISO "2026-03-30"
             if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $value, $m)) {
-                return $m[3] . '-' . $m[2];
+                return $m[3] . '-' . $m[2] . '-' . $m[1];
+            }
+
+            // Format "dd-mm" tanpa tahun (dari TXT lama) → append tahun sekarang
+            if (preg_match('/^(\d{2})-(\d{2})$/', $value)) {
+                return $value . '-' . $year;
             }
 
             return null;
         }
 
-        // Integer YYYYMMDD (e.g. 20260410 dari EXPORT_CALC)
-        // Integer atau float: bisa YYYYMMDD atau Excel serial date
         if (is_int($value) || is_float($value)) {
             $num = (int) $value;
-            // Format YYYYMMDD (e.g. 20260410 dari EXPORT_CALC)
+
+            // Format YYYYMMDD (e.g. 20260410)
             if ($num > 19000101 && $num < 21001231 && strlen((string) $num) === 8) {
                 $str = (string) $num;
-                return substr($str, 6, 2) . '-' . substr($str, 4, 2);
+                return substr($str, 6, 2) . '-' . substr($str, 4, 2) . '-' . substr($str, 0, 4);
             }
+
             // Excel serial date (e.g. 46118 = 2026-04-06)
-            // PhpSpreadsheet formatData=false return INTEGER untuk date cell
-            // Konversi manual epoch 1899-12-30 UTC -> bebas timezone & locale
             if ($num >= 1 && $num < 100000) {
                 $epoch = \Carbon\Carbon::create(1899, 12, 30, 0, 0, 0, 'UTC');
                 $dt    = $epoch->addDays($num);
-                return $dt->format('d-m');
+                return $dt->format('d-m-Y');
             }
+
             return null;
         }
 
@@ -408,14 +401,11 @@ class KanbanHpmController extends Controller
 
     /**
      * Format nilai time dari Excel menjadi "HH:MM"
-     *
-     * formatData=false -> PhpSpreadsheet return float fraksi hari (misal 0.625 = 15:00)
      */
     private function formatExcelTime($value): ?string
     {
         if ($value === null) return null;
 
-        // DateTime object
         if ($value instanceof \DateTimeInterface) {
             return $value->format('H:i');
         }
@@ -424,12 +414,10 @@ class KanbanHpmController extends Controller
             $value = trim($value);
             if ($value === '') return null;
 
-            // Format "HH:MM" atau "HH:MM:SS"
             if (preg_match('/^(\d{1,2}):(\d{2})/', $value, $m)) {
                 return str_pad($m[1], 2, '0', STR_PAD_LEFT) . ':' . $m[2];
             }
 
-            // Integer string HHMMSS (e.g. "90000" dari EXPORT_CALC)
             if (preg_match('/^\d{5,6}$/', $value)) {
                 $str = str_pad($value, 6, '0', STR_PAD_LEFT);
                 return substr($str, 0, 2) . ':' . substr($str, 2, 2);
@@ -438,7 +426,6 @@ class KanbanHpmController extends Controller
             return null;
         }
 
-        // Float fraksi hari (0.625 = 15:00) - output formatData=false untuk time cell
         if (is_float($value) && $value >= 0 && $value < 1) {
             $totalSecs = (int) round($value * 86400);
             $h = intdiv($totalSecs, 3600);
@@ -446,7 +433,6 @@ class KanbanHpmController extends Controller
             return str_pad($h, 2, '0', STR_PAD_LEFT) . ':' . str_pad($i, 2, '0', STR_PAD_LEFT);
         }
 
-        // Integer HHMMSS
         if (is_int($value)) {
             $str = str_pad((string) $value, 6, '0', STR_PAD_LEFT);
             return substr($str, 0, 2) . ':' . substr($str, 2, 2);
@@ -456,50 +442,35 @@ class KanbanHpmController extends Controller
     }
 
     /**
-     * Parse Excel dan return mapping kd_lot_no => [date, time]
-     * Hanya row yang punya Adjustment Date DAN Time yang dimasukkan.
-     *
-     * @param  string  $path        Path file Excel
-     * @param  array   $sheetNames  Nama-nama sheet yang dibaca
-     * @param  int     $colKd       Index kolom KD Lot Number (0-based)
-     * @param  int     $colAdjDate  Index kolom Adj Ship Date (0-based)
-     * @param  int     $colAdjTime  Index kolom Adj Ship Time (0-based)
-     * @param  int     $headerRow   Baris header (1-based); data mulai baris berikutnya
-     * @return array
-     */
-    /**
      * Print All records
      */
     public function printAll(Request $request)
-{
-    try {
-        $kanbanhpms = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
+    {
+        try {
+            $kanbanhpms = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
 
-        if ($kanbanhpms->isEmpty()) {
+            if ($kanbanhpms->isEmpty()) {
+                return redirect()->route('kanbanhpms.index')
+                    ->with('error', 'Tidak ada data untuk diprint.');
+            }
+
+            $partNos = $kanbanhpms->pluck('part_no')->unique()->toArray();
+            $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
+                            ->pluck('rack_no', 'part_no');
+
+            $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
+                $rack = $rackMap[$item->part_no] ?? '';
+                return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
+            })->values();
+
+            return view('kanbanhpms.printnew', compact('kanbanhpms', 'rackMap'));
+
+        } catch (\Exception $e) {
+            Log::error('KanbanHpm printAll error: ' . $e->getMessage());
             return redirect()->route('kanbanhpms.index')
-                ->with('error', 'Tidak ada data untuk diprint.');
+                ->with('error', 'Error: ' . $e->getMessage());
         }
-
-        // Ambil semua rack_no sekaligus (hindari N+1 query)
-        $partNos  = $kanbanhpms->pluck('part_no')->unique()->toArray();
-        $rackMap  = \App\Models\HpmAddress::whereIn('part_no', $partNos)
-                        ->pluck('rack_no', 'part_no');
-
-        // Sort: rack_no awalan 'K' → taruh di bawah
-        $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
-            $rack = $rackMap[$item->part_no] ?? '';
-            return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
-        })->values();
-
-        return view('kanbanhpms.printnew', compact('kanbanhpms','rackMap'));
-
-    } catch (\Exception $e) {
-        Log::error('KanbanHpm printAll error: ' . $e->getMessage());
-        return redirect()->route('kanbanhpms.index')
-            ->with('error', 'Error: ' . $e->getMessage());
     }
-}
-
 
     /**
      * Delete a single record
@@ -524,56 +495,54 @@ class KanbanHpmController extends Controller
         }
     }
 
-   public function printFiltered(Request $request)
-{
-    try {
-        $dates = $request->input('dates', []);
-        $docks = $request->input('docks', []);
+    public function printFiltered(Request $request)
+    {
+        try {
+            $dates = $request->input('dates', []);
+            $docks = $request->input('docks', []);
 
-        $query = KanbanHpm::orderBy('di_no')->orderBy('item_seq');
+            $query = KanbanHpm::orderBy('di_no')->orderBy('item_seq');
 
-        if (!empty($dates)) {
-            $query->where(function ($q) use ($dates) {
-                foreach ($dates as $date) {
-                    $q->orWhere('datetime', 'LIKE', $date . '%');
-                }
-            });
-        }
+            if (!empty($dates)) {
+                $query->where(function ($q) use ($dates) {
+                    foreach ($dates as $date) {
+                        $q->orWhere('datetime', 'LIKE', $date . '%');
+                    }
+                });
+            }
 
-        if (!empty($docks)) {
-            $query->where(function ($q) use ($docks) {
-                foreach ($docks as $dock) {
-                    $q->orWhereRaw("RIGHT(TRIM(ps_code), 2) = ?", [$dock]);
-                }
-            });
-        }
+            if (!empty($docks)) {
+                $query->where(function ($q) use ($docks) {
+                    foreach ($docks as $dock) {
+                        $q->orWhereRaw("RIGHT(TRIM(ps_code), 2) = ?", [$dock]);
+                    }
+                });
+            }
 
-        $kanbanhpms = $query->get();
+            $kanbanhpms = $query->get();
 
-        if ($kanbanhpms->isEmpty()) {
-            return response('<div style="font-family:Arial;padding:40px;text-align:center;color:#888;">
-                <h3>Tidak ada data yang sesuai filter.</h3></div>', 200)
+            if ($kanbanhpms->isEmpty()) {
+                return response('<div style="font-family:Arial;padding:40px;text-align:center;color:#888;">
+                    <h3>Tidak ada data yang sesuai filter.</h3></div>', 200)
+                    ->header('Content-Type', 'text/html');
+            }
+
+            $partNos = $kanbanhpms->pluck('part_no')->unique()->toArray();
+            $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
+                            ->pluck('rack_no', 'part_no');
+
+            $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
+                $rack = $rackMap[$item->part_no] ?? '';
+                return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
+            })->values();
+
+            return view('kanbanhpms.printnew', compact('kanbanhpms'));
+
+        } catch (\Exception $e) {
+            Log::error('KanbanHpm printFiltered error: ' . $e->getMessage());
+            return response('<div style="font-family:Arial;padding:40px;color:red;">Error: '
+                . e($e->getMessage()) . '</div>', 500)
                 ->header('Content-Type', 'text/html');
         }
-
-        // Ambil semua rack_no sekaligus (hindari N+1 query)
-        $partNos = $kanbanhpms->pluck('part_no')->unique()->toArray();
-        $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
-                        ->pluck('rack_no', 'part_no');
-
-        // Sort: rack_no awalan 'K' → taruh di bawah
-        $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
-            $rack = $rackMap[$item->part_no] ?? '';
-            return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
-        })->values();
-
-        return view('kanbanhpms.printnew', compact('kanbanhpms'));
-
-    } catch (\Exception $e) {
-        Log::error('KanbanHpm printFiltered error: ' . $e->getMessage());
-        return response('<div style="font-family:Arial;padding:40px;color:red;">Error: '
-            . e($e->getMessage()) . '</div>', 500)
-            ->header('Content-Type', 'text/html');
     }
-}
 }

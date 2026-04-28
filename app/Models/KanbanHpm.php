@@ -28,7 +28,9 @@ class KanbanHpm extends Model
         'datetime',
         'ship',
         'barcode',
+        'adjusted_datetime',
         'last_upload_at',
+        'expires_at',
         'uploaded_by',
     ];
 

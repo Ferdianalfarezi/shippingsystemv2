@@ -294,7 +294,7 @@
    {{-- ==================== MODAL: Print Filter ==================== --}}
 <div class="modal fade" id="printFilterModal" tabindex="-2"
      aria-labelledby="printFilterModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" style="max-width: 900px;">
+    <div class="modal-dialog" style="max-width: 1000px; width: 95vw;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title text-dark" id="printFilterModalLabel">
@@ -303,10 +303,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-dark p-0">
-                <div class="row g-0">
+                <div class="d-flex" style="min-height: 75vh;">
 
                     {{-- ── LEFT: Filter Panel ── --}}
-                    <div class="col-md-3 border-end p-3" style="background: #f8f9fa;">
+                    <div class="flex-shrink-0 border-end p-3" style="width: 240px; background: #f8f9fa;">
 
                         {{-- Filter Tanggal --}}
                         <div class="mb-3">
@@ -348,7 +348,6 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold">
                                 <i class="bi bi-signpost-split text-success me-1"></i>Dock
-                               
                             </label>
                             <div class="border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
                                 <div class="form-check mb-1">
@@ -377,7 +376,6 @@
                                     <span class="text-muted small">Tidak ada dock</span>
                                 @endforelse
                             </div>
-                            
                         </div>
 
                         <hr>
@@ -392,8 +390,8 @@
                     </div>
 
                     {{-- ── RIGHT: Preview Iframe ── --}}
-                    <div class="col-md-9 p-0">
-                        <div style="background: #e9ecef; height: 70vh; overflow: hidden; position: relative;">
+                    <div class="flex-grow-1 p-0">
+                        <div style="background: #e9ecef; height: 75vh; overflow: hidden; position: relative;">
 
                             {{-- Loading --}}
                             <div id="hpmPreviewLoading" class="text-center py-5 d-none"
