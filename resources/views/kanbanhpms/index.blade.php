@@ -22,6 +22,10 @@
         <!-- Right: Controls -->
         <div class="d-flex align-items-center gap-2">
 
+            <a href="{{ route('sliphpms.index') }}" class="btn btn-success">
+                <i class="bi bi-file-earmark-text me-1"></i> Slip
+            </a>
+
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-primary"
                         data-bs-toggle="modal" data-bs-target="#printFilterModal">

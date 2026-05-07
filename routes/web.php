@@ -19,6 +19,7 @@ use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\KanbanHpmController;
 use App\Http\Controllers\HpmAddressController;
+use App\Http\Controllers\SlipHpmController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -168,14 +169,21 @@ Route::middleware(['auth'])->group(function () {
     });
     
     Route::prefix('kanbanhpms')->name('kanbanhpms.')->group(function () {
-    Route::get('/', [KanbanHpmController::class, 'index'])->name('index');
-    Route::post('/import', [KanbanHpmController::class, 'importTxt'])->name('import');
-    Route::get('/printall', [KanbanHpmController::class, 'printAll'])->name('printall');
-    Route::delete('/{id}', [KanbanHpmController::class, 'destroy'])->name('destroy');
-    Route::post('/adjust-weekly', [KanbanHpmController::class, 'adjustWeekly'])->name('adjustWeekly');
-    Route::match(['get', 'post'], '/print-filtered', [KanbanHpmController::class, 'printFiltered'])->name('printFiltered');
-});
- 
+        Route::get('/', [KanbanHpmController::class, 'index'])->name('index');
+        Route::post('/import', [KanbanHpmController::class, 'importTxt'])->name('import');
+        Route::get('/printall', [KanbanHpmController::class, 'printAll'])->name('printall');
+        Route::delete('/{id}', [KanbanHpmController::class, 'destroy'])->name('destroy');
+        Route::post('/adjust-weekly', [KanbanHpmController::class, 'adjustWeekly'])->name('adjustWeekly');
+        Route::match(['get', 'post'], '/print-filtered', [KanbanHpmController::class, 'printFiltered'])->name('printFiltered');
+    });
+
+    Route::prefix('sliphpms')->name('sliphpms.')->group(function () {
+        Route::get('/',                [SlipHpmController::class, 'index'])->name('index');
+        Route::post('/import',         [SlipHpmController::class, 'import'])->name('import');
+        Route::get('/print-filtered',  [SlipHpmController::class, 'printFiltered'])->name('printFiltered');
+        Route::delete('/{sliphpm}',    [SlipHpmController::class, 'destroy'])->name('destroy');
+    });
+        
     Route::prefix('advertisements')->name('advertisements.')->group(function () {
         Route::get('/', [AdvertisementController::class, 'index'])->name('index');
         Route::post('/', [AdvertisementController::class, 'store'])->name('store');
