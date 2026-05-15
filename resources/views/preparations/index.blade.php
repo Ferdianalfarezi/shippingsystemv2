@@ -65,8 +65,9 @@
                                 <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#lpConfigModal">
                                     <i class="bi bi-gear-fill me-2"></i> Konfigurasi LP
                                 </a>
-                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#admLeadTimeModal">
-                                    <i class="bi bi-clock-history me-2"></i> Konfigurasi Lead Time ADM
+                                {{-- Konfigurasi Lead Time ADM dihapus — diganti Matrix Pulling --}}
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#pullingMatrixModal">
+                                    <i class="bi bi-table me-2"></i> Matrix Pulling
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
@@ -293,7 +294,8 @@
     @include('preparations.import-tmmin')
     @include('preparations.lp-config')
     @include('preparations.import-adm')
-    @include('preparations.adm-lead-time-config')
+    {{-- adm-lead-time-config dihapus, diganti pulling-matrix-config --}}
+    @include('preparations.pulling-matrix-config')
 
     
 @endsection
@@ -332,20 +334,15 @@
 
         // Function untuk proses scan DN
         function processScanDn(noDn) {
-            // Cari preparation berdasarkan no_dn
             $.ajax({
                 url: '{{ route("preparations.findByDn") }}',
                 type: 'GET',
                 data: { no_dn: noDn },
                 success: function(response) {
                     if (response.success && response.data) {
-                        // Clear input
                         $('#scanDnInput').val('');
-                        
-                        // Tampilkan modal pilih address
                         showScanAddressModal(response.data);
                     } else {
-                        // DN tidak ditemukan
                         Swal.fire({
                             title: 'DN Tidak Ditemukan!',
                             html: `No DN <strong>${noDn}</strong> tidak ditemukan di tabel preparation`,
@@ -369,7 +366,6 @@
             });
         }
 
-        // Function untuk menampilkan modal pilih address setelah scan
         function showScanAddressModal(preparation) {
             Swal.fire({
                 title: 'Move to Shipping',
@@ -410,7 +406,6 @@
                 cancelButtonColor: '#6c757d',
                 width: 500,
                 didOpen: () => {
-                    // Handle address button click
                     document.querySelectorAll('.scan-address-btn').forEach(btn => {
                         btn.addEventListener('click', function() {
                             const address = this.getAttribute('data-address');
@@ -420,13 +415,11 @@
                     });
                 },
                 didClose: () => {
-                    // Focus kembali ke input scan
                     $('#scanDnInput').focus();
                 }
             });
         }
 
-        // Function untuk eksekusi move to shipping dari scan
         function executeMoveToShipping(preparationId, address, noDn) {
             $.ajax({
                 url: '{{ route("shippings.moveFromPreparation") }}',
@@ -437,7 +430,6 @@
                     address: address
                 },
                 success: function(response) {
-                    // Toast notification sukses
                     Swal.fire({
                         title: 'Berhasil!',
                         html: `DN <strong>${noDn}</strong> dipindahkan ke <strong>${address}</strong>`,
@@ -462,96 +454,64 @@
         }
         // ==================== END SCAN DN TO SHIPPING ====================
 
-        // Handle nested dropdown for Import Options
-        $('.dropend').on('mouseenter', function() {
-            $(this).find('.dropdown-menu').addClass('show');
-        }).on('mouseleave', function() {
-            $(this).find('.dropdown-menu').removeClass('show');
-        });
-
-        // Handle click on Import Options
-        $('#importOptionsDropdown').on('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            $(this).next('.dropdown-menu').toggleClass('show');
-        });
-
-        // Prevent parent dropdown from closing when clicking submenu
-        $('.dropend .dropdown-menu').on('click', function(e) {
-            e.stopPropagation();
-        });
-
         // Delete confirmation dengan SweetAlert
-$('.delete-form').on('submit', function(e) {
-    e.preventDefault();
-    
-    const form = $(this);
-    const url = form.attr('action');
-    
-    console.log('Form URL:', url); // DEBUG
-    console.log('CSRF Token:', '{{ csrf_token() }}'); // DEBUG
-    
-    Swal.fire({
-        title: 'Apakah Anda yakin?',
-        text: "Data ini akan dihapus permanen!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Ya, Hapus!',
-        cancelButtonText: 'Batal',
-        reverseButtons: true
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // Tampilkan loading
+        $('.delete-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const form = $(this);
+            const url = form.attr('action');
+            
             Swal.fire({
-                title: 'Menghapus...',
-                text: 'Mohon tunggu sebentar',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-            
-            console.log('Sending DELETE request...'); // DEBUG
-            
-            // AJAX Request untuk delete
-            $.ajax({
-                url: url,
-                type: 'POST',
-                data: {
-                    _token: '{{ csrf_token() }}',
-                    _method: 'DELETE'
-                },
-                success: function(response) {
-                    console.log('Success response:', response); // DEBUG
+                title: 'Apakah Anda yakin?',
+                text: "Data ini akan dihapus permanen!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
                     Swal.fire({
-                        title: 'Berhasil!',
-                        text: response.message || 'Data berhasil dihapus',
-                        icon: 'success',
-                        confirmButtonColor: '#059669'
-                    }).then(() => {
-                        window.location.reload();
+                        title: 'Menghapus...',
+                        text: 'Mohon tunggu sebentar',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
                     });
-                },
-                error: function(xhr, status, error) {
-                    console.log('Error status:', status); // DEBUG
-                    console.log('Error detail:', error); // DEBUG
-                    console.log('XHR response:', xhr.responseText); // DEBUG
-                    console.log('XHR status code:', xhr.status); // DEBUG
                     
-                    Swal.fire({
-                        title: 'Gagal!',
-                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat menghapus data',
-                        icon: 'error',
-                        confirmButtonColor: '#dc2626'
+                    $.ajax({
+                        url: url,
+                        type: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            _method: 'DELETE'
+                        },
+                        success: function(response) {
+                            Swal.fire({
+                                title: 'Berhasil!',
+                                text: response.message || 'Data berhasil dihapus',
+                                icon: 'success',
+                                confirmButtonColor: '#059669'
+                            }).then(() => {
+                                window.location.reload();
+                            });
+                        },
+                        error: function(xhr) {
+                            Swal.fire({
+                                title: 'Gagal!',
+                                text: xhr.responseJSON?.message || 'Terjadi kesalahan saat menghapus data',
+                                icon: 'error',
+                                confirmButtonColor: '#dc2626'
+                            });
+                        }
                     });
                 }
             });
-        }
-    });
-});
+        });
 
         // Delete All Button
         $('#deleteAllButton').on('click', function() {
@@ -574,7 +534,6 @@ $('.delete-form').on('submit', function(e) {
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Tampilkan loading
                     Swal.fire({
                         title: 'Menghapus Semua Data...',
                         text: 'Mohon tunggu sebentar',
@@ -585,7 +544,6 @@ $('.delete-form').on('submit', function(e) {
                         }
                     });
                     
-                    // Ajax request untuk delete all
                     $.ajax({
                         url: '{{ route("preparations.deleteAll") }}',
                         type: 'DELETE',
@@ -632,7 +590,6 @@ $('.delete-form').on('submit', function(e) {
                 return;
             }
             
-            // Show progress
             $('#importProgress').removeClass('d-none');
             $('#importButton').prop('disabled', true);
             
@@ -647,7 +604,6 @@ $('.delete-form').on('submit', function(e) {
                     $('#importButton').prop('disabled', false);
                     
                     if (response.status === 'duplicates_found') {
-                        // Tampilkan konfirmasi untuk duplikat
                         let duplicateList = '<ul class="text-start">';
                         response.duplicates.forEach(function(dup) {
                             duplicateList += `<li>${dup.table}: ${dup.count} data</li>`;
@@ -665,9 +621,7 @@ $('.delete-form').on('submit', function(e) {
                             cancelButtonText: 'Batal'
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                // Import ulang dengan force_import flag
                                 formData.append('force_import', '1');
-                                
                                 $('#importProgress').removeClass('d-none');
                                 $('#importButton').prop('disabled', true);
                                 
@@ -680,7 +634,6 @@ $('.delete-form').on('submit', function(e) {
                                     success: function(response) {
                                         $('#importProgress').addClass('d-none');
                                         $('#importButton').prop('disabled', false);
-                                        
                                         if (response.status === 'success') {
                                             Swal.fire({
                                                 title: 'Berhasil!',
@@ -696,7 +649,6 @@ $('.delete-form').on('submit', function(e) {
                                     error: function(xhr) {
                                         $('#importProgress').addClass('d-none');
                                         $('#importButton').prop('disabled', false);
-                                        
                                         Swal.fire({
                                             title: 'Gagal!',
                                             text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
@@ -722,7 +674,6 @@ $('.delete-form').on('submit', function(e) {
                 error: function(xhr) {
                     $('#importProgress').addClass('d-none');
                     $('#importButton').prop('disabled', false);
-                    
                     Swal.fire({
                         title: 'Gagal!',
                         text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
@@ -733,7 +684,6 @@ $('.delete-form').on('submit', function(e) {
             });
         });
 
-        // Reset form when modal is closed
         $('#importExcelModal').on('hidden.bs.modal', function () {
             $('#importExcelForm')[0].reset();
             $('#importProgress').addClass('d-none');
@@ -745,190 +695,132 @@ $('.delete-form').on('submit', function(e) {
             performSearch();
         });
 
-        // Handle Enter key on search input
         $('#searchInput').on('keypress', function(e) {
-            if (e.which === 13) {
-                performSearch();
-            }
+            if (e.which === 13) performSearch();
         });
 
-        // Handle Per Page Change
         $('#perPageSelect').on('change', function() {
-            const perPage = $(this).val();
-            const search = $('#searchInput').val();
-            updateUrl(perPage, search);
+            updateUrl($(this).val(), $('#searchInput').val());
         });
 
-        // Function to perform search
         function performSearch() {
-            const search = $('#searchInput').val();
-            const perPage = $('#perPageSelect').val();
-            updateUrl(perPage, search);
+            updateUrl($('#perPageSelect').val(), $('#searchInput').val());
         }
 
-        // Function to update URL with parameters
         function updateUrl(perPage, search) {
             const url = new URL(window.location.href);
-            
             if (perPage && perPage !== '50') {
                 url.searchParams.set('per_page', perPage);
             } else {
                 url.searchParams.delete('per_page');
             }
-            
             if (search && search.trim() !== '') {
                 url.searchParams.set('search', search);
             } else {
                 url.searchParams.delete('search');
             }
-            
             window.location.href = url.toString();
         }
     });
 
     // Handle Import TMMIN TXT Form
-        $('#importTmminForm').on('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const fileInput = $('#tmminFile')[0];
-            
-            if (!fileInput.files.length) {
-                Swal.fire({
-                    title: 'Error!',
-                    text: 'Silakan pilih file TXT terlebih dahulu',
-                    icon: 'error',
-                    confirmButtonColor: '#dc2626'
-                });
-                return;
-            }
-            
-            // Show progress
-            $('#importTmminProgress').removeClass('d-none');
-            $('#importTmminButton').prop('disabled', true);
-            
-            $.ajax({
-                url: '{{ route("preparations.import-tmmin") }}',
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    $('#importTmminProgress').addClass('d-none');
-                    $('#importTmminButton').prop('disabled', false);
-                    
-                    if (response.status === 'duplicates_found') {
-                        // Tampilkan konfirmasi untuk duplikat
-                        let duplicateList = '<ul class="text-start">';
-                        response.duplicates.forEach(function(dup) {
-                            duplicateList += `<li>${dup.table}: ${dup.count} data</li>`;
-                        });
-                        duplicateList += '</ul>';
-                        
-                        Swal.fire({
-                            title: 'Data Duplikat Ditemukan!',
-                            html: response.message + duplicateList + '<br><strong>Apakah Anda ingin melanjutkan import tanpa data duplikat?</strong>',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#059669',
-                            cancelButtonColor: '#6c757d',
-                            confirmButtonText: 'Ya, Lanjutkan!',
-                            cancelButtonText: 'Batal'
-                        }).then((result) => {
-                            if (result.isConfirmed) {
-                                // Import ulang dengan force_import flag
-                                formData.append('force_import', '1');
-                                
-                                $('#importTmminProgress').removeClass('d-none');
-                                $('#importTmminButton').prop('disabled', true);
-                                
-                                $.ajax({
-                                    url: '{{ route("preparations.import-tmmin") }}',
-                                    type: 'POST',
-                                    data: formData,
-                                    processData: false,
-                                    contentType: false,
-                                    success: function(response) {
-                                        $('#importTmminProgress').addClass('d-none');
-                                        $('#importTmminButton').prop('disabled', false);
-                                        
-                                        if (response.status === 'success') {
-                                            Swal.fire({
-                                                title: 'Berhasil!',
-                                                text: response.message,
-                                                icon: 'success',
-                                                confirmButtonColor: '#059669'
-                                            }).then(() => {
-                                                $('#importTmminModal').modal('hide');
-                                                window.location.reload();
-                                            });
-                                        }
-                                    },
-                                    error: function(xhr) {
-                                        $('#importTmminProgress').addClass('d-none');
-                                        $('#importTmminButton').prop('disabled', false);
-                                        
-                                        Swal.fire({
-                                            title: 'Gagal!',
-                                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
-                                            icon: 'error',
-                                            confirmButtonColor: '#dc2626'
-                                        });
-                                    }
-                                });
-                            }
-                        });
-                    } else if (response.status === 'success') {
-                        Swal.fire({
-                            title: 'Berhasil!',
-                            text: response.message,
-                            icon: 'success',
-                            confirmButtonColor: '#059669'
-                        }).then(() => {
-                            $('#importTmminModal').modal('hide');
-                            window.location.reload();
-                        });
-                    }
-                },
-                error: function(xhr) {
-                    $('#importTmminProgress').addClass('d-none');
-                    $('#importTmminButton').prop('disabled', false);
+    $('#importTmminForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const fileInput = $('#tmminFile')[0];
+        
+        if (!fileInput.files.length) {
+            Swal.fire({ title: 'Error!', text: 'Silakan pilih file TXT terlebih dahulu', icon: 'error', confirmButtonColor: '#dc2626' });
+            return;
+        }
+        
+        $('#importTmminProgress').removeClass('d-none');
+        $('#importTmminButton').prop('disabled', true);
+        
+        $.ajax({
+            url: '{{ route("preparations.import-tmmin") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $('#importTmminProgress').addClass('d-none');
+                $('#importTmminButton').prop('disabled', false);
+                
+                if (response.status === 'duplicates_found') {
+                    let duplicateList = '<ul class="text-start">';
+                    response.duplicates.forEach(function(dup) { duplicateList += `<li>${dup.table}: ${dup.count} data</li>`; });
+                    duplicateList += '</ul>';
                     
                     Swal.fire({
-                        title: 'Gagal!',
-                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
-                        icon: 'error',
-                        confirmButtonColor: '#dc2626'
+                        title: 'Data Duplikat Ditemukan!',
+                        html: response.message + duplicateList + '<br><strong>Apakah Anda ingin melanjutkan import tanpa data duplikat?</strong>',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#059669',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Ya, Lanjutkan!',
+                        cancelButtonText: 'Batal'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            formData.append('force_import', '1');
+                            $('#importTmminProgress').removeClass('d-none');
+                            $('#importTmminButton').prop('disabled', true);
+                            
+                            $.ajax({
+                                url: '{{ route("preparations.import-tmmin") }}',
+                                type: 'POST',
+                                data: formData,
+                                processData: false,
+                                contentType: false,
+                                success: function(response) {
+                                    $('#importTmminProgress').addClass('d-none');
+                                    $('#importTmminButton').prop('disabled', false);
+                                    if (response.status === 'success') {
+                                        Swal.fire({ title: 'Berhasil!', text: response.message, icon: 'success', confirmButtonColor: '#059669' })
+                                            .then(() => { $('#importTmminModal').modal('hide'); window.location.reload(); });
+                                    }
+                                },
+                                error: function(xhr) {
+                                    $('#importTmminProgress').addClass('d-none');
+                                    $('#importTmminButton').prop('disabled', false);
+                                    Swal.fire({ title: 'Gagal!', text: xhr.responseJSON?.message || 'Terjadi kesalahan', icon: 'error', confirmButtonColor: '#dc2626' });
+                                }
+                            });
+                        }
                     });
+                } else if (response.status === 'success') {
+                    Swal.fire({ title: 'Berhasil!', text: response.message, icon: 'success', confirmButtonColor: '#059669' })
+                        .then(() => { $('#importTmminModal').modal('hide'); window.location.reload(); });
                 }
-            });
+            },
+            error: function(xhr) {
+                $('#importTmminProgress').addClass('d-none');
+                $('#importTmminButton').prop('disabled', false);
+                Swal.fire({ title: 'Gagal!', text: xhr.responseJSON?.message || 'Terjadi kesalahan', icon: 'error', confirmButtonColor: '#dc2626' });
+            }
         });
+    });
 
-        // Reset form when modal is closed
-        $('#importTmminModal').on('hidden.bs.modal', function () {
-            $('#importTmminForm')[0].reset();
-            $('#importTmminProgress').addClass('d-none');
-            $('#importTmminButton').prop('disabled', false);
-        });
+    $('#importTmminModal').on('hidden.bs.modal', function () {
+        $('#importTmminForm')[0].reset();
+        $('#importTmminProgress').addClass('d-none');
+        $('#importTmminButton').prop('disabled', false);
+    });
 
-
-        $('#importAdmForm').on('submit', function(e) {
+    // Handle Import ADM Form
+    $('#importAdmForm').on('submit', function(e) {
         e.preventDefault();
         
         const formData = new FormData(this);
         const fileInput = $('#admFile')[0];
         
         if (!fileInput.files.length) {
-            Swal.fire({
-                title: 'Error!',
-                text: 'Silakan pilih file Excel terlebih dahulu',
-                icon: 'error',
-                confirmButtonColor: '#dc2626'
-            });
+            Swal.fire({ title: 'Error!', text: 'Silakan pilih file Excel terlebih dahulu', icon: 'error', confirmButtonColor: '#dc2626' });
             return;
         }
         
-        // Show progress
         $('#importAdmProgress').removeClass('d-none');
         $('#importAdmButton').prop('disabled', true);
         
@@ -943,16 +835,9 @@ $('.delete-form').on('submit', function(e) {
                 $('#importAdmButton').prop('disabled', false);
                 
                 if (response.status === 'duplicates_found') {
-                    // Tampilkan konfirmasi untuk duplikat
-                    let duplicateList = '<ul class="text-start">';
-                    response.duplicates.forEach(function(dup) {
-                        
-                    });
-                    duplicateList += '</ul>';
-                    
                     Swal.fire({
                         title: 'Data Duplikat Ditemukan!',
-                        html: response.message + duplicateList + '<br><strong>Jika lanjut data yang duplikat akan di abaikan</strong>',
+                        html: response.message + '<br><strong>Jika lanjut data yang duplikat akan diabaikan</strong>',
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#059669',
@@ -961,9 +846,7 @@ $('.delete-form').on('submit', function(e) {
                         cancelButtonText: 'Batal'
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            // Import ulang dengan force_import flag
                             formData.append('force_import', '1');
-                            
                             $('#importAdmProgress').removeClass('d-none');
                             $('#importAdmButton').prop('disabled', true);
                             
@@ -976,60 +859,32 @@ $('.delete-form').on('submit', function(e) {
                                 success: function(response) {
                                     $('#importAdmProgress').addClass('d-none');
                                     $('#importAdmButton').prop('disabled', false);
-                                    
                                     if (response.status === 'success') {
-                                        Swal.fire({
-                                            title: 'Berhasil!',
-                                            text: response.message,
-                                            icon: 'success',
-                                            confirmButtonColor: '#059669'
-                                        }).then(() => {
-                                            $('#importAdmModal').modal('hide');
-                                            window.location.reload();
-                                        });
+                                        Swal.fire({ title: 'Berhasil!', text: response.message, icon: 'success', confirmButtonColor: '#059669' })
+                                            .then(() => { $('#importAdmModal').modal('hide'); window.location.reload(); });
                                     }
                                 },
                                 error: function(xhr) {
                                     $('#importAdmProgress').addClass('d-none');
                                     $('#importAdmButton').prop('disabled', false);
-                                    
-                                    Swal.fire({
-                                        title: 'Gagal!',
-                                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
-                                        icon: 'error',
-                                        confirmButtonColor: '#dc2626'
-                                    });
+                                    Swal.fire({ title: 'Gagal!', text: xhr.responseJSON?.message || 'Terjadi kesalahan', icon: 'error', confirmButtonColor: '#dc2626' });
                                 }
                             });
                         }
                     });
                 } else if (response.status === 'success') {
-                    Swal.fire({
-                        title: 'Berhasil!',
-                        text: response.message,
-                        icon: 'success',
-                        confirmButtonColor: '#059669'
-                    }).then(() => {
-                        $('#importAdmModal').modal('hide');
-                        window.location.reload();
-                    });
+                    Swal.fire({ title: 'Berhasil!', text: response.message, icon: 'success', confirmButtonColor: '#059669' })
+                        .then(() => { $('#importAdmModal').modal('hide'); window.location.reload(); });
                 }
             },
             error: function(xhr) {
                 $('#importAdmProgress').addClass('d-none');
                 $('#importAdmButton').prop('disabled', false);
-                
-                Swal.fire({
-                    title: 'Gagal!',
-                    text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mengimpor data',
-                    icon: 'error',
-                    confirmButtonColor: '#dc2626'
-                });
+                Swal.fire({ title: 'Gagal!', text: xhr.responseJSON?.message || 'Terjadi kesalahan', icon: 'error', confirmButtonColor: '#dc2626' });
             }
         });
     });
 
-    // Reset form when modal is closed
     $('#importAdmModal').on('hidden.bs.modal', function () {
         $('#importAdmForm')[0].reset();
         $('#importAdmProgress').addClass('d-none');
@@ -1062,7 +917,6 @@ $('.delete-form').on('submit', function(e) {
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                // Print QR Code
                 const printWindow = window.open('', '_blank');
                 const qrImage = document.querySelector('#qrcode img').src;
                 printWindow.document.write(`
@@ -1082,7 +936,6 @@ $('.delete-form').on('submit', function(e) {
 
     // Open Move to Shipping SweetAlert
     function openMoveToShippingModal(preparationId) {
-        // Fetch data preparation dulu
         $.ajax({
             url: `/preparations/${preparationId}/edit`,
             type: 'GET',
@@ -1126,7 +979,6 @@ $('.delete-form').on('submit', function(e) {
                     cancelButtonColor: '#6c757d',
                     width: 500,
                     didOpen: () => {
-                        // Handle address button click
                         document.querySelectorAll('.address-select-btn').forEach(btn => {
                             btn.addEventListener('click', function() {
                                 const address = this.getAttribute('data-address');
@@ -1138,17 +990,11 @@ $('.delete-form').on('submit', function(e) {
                 });
             },
             error: function() {
-                Swal.fire({
-                    title: 'Error!',
-                    text: 'Gagal mengambil data preparation',
-                    icon: 'error',
-                    confirmButtonColor: '#dc2626'
-                });
+                Swal.fire({ title: 'Error!', text: 'Gagal mengambil data preparation', icon: 'error', confirmButtonColor: '#dc2626' });
             }
         });
     }
 
-    // Confirm and process move to shipping
     function confirmMoveToShipping(preparationId, address) {
         Swal.fire({
             title: 'Konfirmasi',
@@ -1162,18 +1008,6 @@ $('.delete-form').on('submit', function(e) {
             reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
-              
-                // Swal.fire({
-                //     title: 'Memindahkan...',
-                //     text: 'Mohon tunggu sebentar',
-                //     allowOutsideClick: false,
-                //     allowEscapeKey: false,
-                //     didOpen: () => {
-                //         Swal.showLoading();
-                //     }
-                // });
-                
-                // Send request
                 $.ajax({
                     url: '{{ route("shippings.moveFromPreparation") }}',
                     type: 'POST',
@@ -1189,9 +1023,7 @@ $('.delete-form').on('submit', function(e) {
                             icon: 'success',
                             showConfirmButton: false,
                             timer: 1000,
-                        }).then(() => {
-                            window.location.reload();
-                        });
+                        }).then(() => window.location.reload());
                     },
                     error: function(xhr) {
                         Swal.fire({

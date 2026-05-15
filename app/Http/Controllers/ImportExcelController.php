@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Preparation;
 use App\Models\LpConfig;
+use App\Models\PullingMatrix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
@@ -91,6 +92,13 @@ class ImportExcelController extends Controller
             // Load semua konfigurasi LP ke dalam array untuk performa
             $lpConfigs = LpConfig::pluck('logistic_partner', 'route')->toArray();
 
+            // ========================================
+            // LOAD PULLING MATRIX CONFIG
+            // ========================================
+            $pullingMatrices = PullingMatrix::all()->keyBy(function ($item) {
+                return strtoupper($item->route) . '|' . strtoupper($item->dock) . '|' . $item->cycle;
+            });
+
             // Import dengan filter duplikat
             $savedCount = 0;
             $skippedCount = 0;
@@ -156,47 +164,85 @@ class ImportExcelController extends Controller
                     }
                 }
 
-                // Handle pulling_date (index 7)
-                if (isset($row[7]) && !empty($row[7])) {
+                // Ambil route, dock, cycle dari Excel
+                $route = strtoupper(trim((string) ($row[0] ?? '')));
+                $dock  = strtoupper(trim((string) ($row[3] ?? '')));
+                $cycle = $row[6] ?? 1;
+
+                // ========================================
+                // HITUNG PULLING TIME DARI PULLING MATRIX
+                // ========================================
+                if ($deliveryDate && $deliveryTime) {
                     try {
-                        if (is_string($row[7]) && strpos($row[7], '=') === 0) {
+                        $deliveryDateTime = Carbon::createFromFormat('Y-m-d H:i:s', $deliveryDate . ' ' . ($deliveryTime ?? '00:00:00'));
+
+                        $cycleFormatted = sprintf('%02d', (int) $cycle);
+                        $cycleRaw       = (string) $cycle;
+
+                        $matrixKey1 = "{$route}|{$dock}|{$cycleFormatted}";
+                        $matrixKey2 = "{$route}|{$dock}|{$cycleRaw}";
+
+                        $matrixConfig = $pullingMatrices->get($matrixKey1) ?? $pullingMatrices->get($matrixKey2);
+
+                        if ($matrixConfig) {
+                            // Jam absolut dari matrix, tanggal ikut delivery date
+                            $pullingDateTime = Carbon::createFromFormat(
+                                'Y-m-d H:i:s',
+                                $deliveryDateTime->format('Y-m-d') . ' ' . $matrixConfig->pulling_time
+                            );
+                            $pullingDate = $pullingDateTime->format('Y-m-d');
+                            $pullingTime = $pullingDateTime->format('H:i:s');
+                            Log::info("[$noDn] Matrix hit → pulling_time = {$matrixConfig->pulling_time}");
+                        } else {
+                            // Tidak ada di matrix → baca dari kolom Excel (index 7 & 8) seperti semula
+                            Log::info("[$noDn] No matrix config → pakai kolom pulling dari Excel");
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("[$noDn] Failed to resolve pulling matrix: " . $e->getMessage());
+                    }
+                }
+
+                // Kalau pulling masih null (tidak ada matrix & tidak ada di Excel), baca dari Excel seperti aslinya
+                if (!$pullingDate) {
+                    // Handle pulling_date (index 7)
+                    if (isset($row[7]) && !empty($row[7])) {
+                        try {
+                            if (is_string($row[7]) && strpos($row[7], '=') === 0) {
+                                if ($deliveryDate) {
+                                    $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
+                                }
+                            } elseif ($row[7] instanceof \DateTime) {
+                                $pullingDate = $row[7]->format('Y-m-d');
+                            } elseif (is_numeric($row[7])) {
+                                $pullingDate = Carbon::createFromFormat('Y-m-d', \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[7])->format('Y-m-d'))->format('Y-m-d');
+                            } else {
+                                $pullingDate = Carbon::parse($row[7])->format('Y-m-d');
+                            }
+                        } catch (\Exception $e) {
+                            Log::warning('Invalid pulling date format for no_dn ' . $noDn . ': ' . $row[7]);
                             if ($deliveryDate) {
                                 $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
                             }
-                        } elseif ($row[7] instanceof \DateTime) {
-                            $pullingDate = $row[7]->format('Y-m-d');
-                        } elseif (is_numeric($row[7])) {
-                            $pullingDate = Carbon::createFromFormat('Y-m-d', \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[7])->format('Y-m-d'))->format('Y-m-d');
-                        } else {
-                            $pullingDate = Carbon::parse($row[7])->format('Y-m-d');
                         }
-                    } catch (\Exception $e) {
-                        Log::warning('Invalid pulling date format for no_dn ' . $noDn . ': ' . $row[7]);
-                        if ($deliveryDate) {
-                            $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
+                    }
+
+                    // Handle pulling_time (index 8)
+                    if (isset($row[8]) && !empty($row[8])) {
+                        try {
+                            if ($row[8] instanceof \DateTime) {
+                                $pullingTime = $row[8]->format('H:i:s');
+                            } elseif (is_numeric($row[8])) {
+                                $pullingTime = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[8])->format('H:i:s');
+                            } else {
+                                $pullingTime = Carbon::parse($row[8])->format('H:i:s');
+                            }
+                        } catch (\Exception $e) {
+                            Log::warning('Invalid pulling time format for no_dn ' . $noDn . ': ' . $row[8]);
+                            $pullingTime = '00:00:00';
                         }
                     }
                 }
 
-                // Handle pulling_time (index 8)
-                if (isset($row[8]) && !empty($row[8])) {
-                    try {
-                        if ($row[8] instanceof \DateTime) {
-                            $pullingTime = $row[8]->format('H:i:s');
-                        } elseif (is_numeric($row[8])) {
-                            $pullingTime = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[8])->format('H:i:s');
-                        } else {
-                            $pullingTime = Carbon::parse($row[8])->format('H:i:s');
-                        }
-                    } catch (\Exception $e) {
-                        Log::warning('Invalid pulling time format for no_dn ' . $noDn . ': ' . $row[8]);
-                        $pullingTime = '00:00:00';
-                    }
-                }
-
-                // Ambil route dari Excel
-                $route = $row[0] ?? '';
-                
                 // Cari logistic_partner berdasarkan route dari konfigurasi
                 $logisticPartner = $lpConfigs[$route] ?? '';
                 
@@ -206,16 +252,16 @@ class ImportExcelController extends Controller
 
                 try {
                     Preparation::create([
-                        'route' => $route,
-                        'logistic_partners' => $logisticPartner, // Auto-filled dari konfigurasi
-                        'no_dn' => $noDn,
-                        'customers' => $row[2] ?? '',
-                        'dock' => $row[3] ?? '',
-                        'delivery_date' => $deliveryDate,
-                        'delivery_time' => $deliveryTime ?? '00:00:00',
-                        'cycle' => $row[6] ?? 1,
-                        'pulling_date' => $pullingDate,
-                        'pulling_time' => $pullingTime ?? '00:00:00',
+                        'route'             => $row[0] ?? '',
+                        'logistic_partners' => $logisticPartner,
+                        'no_dn'             => $noDn,
+                        'customers'         => $row[2] ?? '',
+                        'dock'              => $row[3] ?? '',
+                        'delivery_date'     => $deliveryDate,
+                        'delivery_time'     => $deliveryTime ?? '00:00:00',
+                        'cycle'             => $cycle,
+                        'pulling_date'      => $pullingDate,
+                        'pulling_time'      => $pullingTime ?? '00:00:00',
                     ]);
 
                     $savedCount++;

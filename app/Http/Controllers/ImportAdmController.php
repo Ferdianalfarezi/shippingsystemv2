@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Preparation;
 use App\Models\LpConfig;
-use App\Models\AdmLeadTime;
+use App\Models\PullingMatrix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -90,10 +90,10 @@ class ImportAdmController extends Controller
             $lpConfigs = LpConfig::pluck('logistic_partner', 'route')->toArray();
 
             // ========================================
-            // AMBIL SEMUA ADM LEAD TIME CONFIG
+            // AMBIL SEMUA PULLING MATRIX CONFIG
             // ========================================
-            $admLeadTimes = AdmLeadTime::all()->keyBy(function ($item) {
-                return $item->route . '|' . $item->dock . '|' . $item->cycle;
+            $pullingMatrices = PullingMatrix::all()->keyBy(function ($item) {
+                return strtoupper($item->route) . '|' . strtoupper($item->dock) . '|' . $item->cycle;
             });
 
             // Mulai proses data dari baris ke-5
@@ -152,32 +152,28 @@ class ImportAdmController extends Controller
                 }
 
                 // ========================================
-                // HITUNG PULLING TIME BERDASARKAN LEAD TIME
+                // HITUNG PULLING TIME BERDASARKAN PULLING MATRIX
                 // ========================================
                 $cycleFormatted = sprintf('%02d', $cycle); // Format cycle jadi 01, 02, dll
                 $cycleRaw = (string) $cycle; // Cycle tanpa format
                 
-                // Cari lead time di config (coba formatted dan raw)
-                $leadTimeKey1 = $route . '|' . $dock . '|' . $cycleFormatted;
-                $leadTimeKey2 = $route . '|' . $dock . '|' . $cycleRaw;
+                // Cari pulling matrix di config (coba formatted dan raw)
+                $matrixKey1 = strtoupper($route) . '|' . strtoupper($dock) . '|' . $cycleFormatted;
+                $matrixKey2 = strtoupper($route) . '|' . strtoupper($dock) . '|' . $cycleRaw;
                 
-                $leadTimeConfig = $admLeadTimes->get($leadTimeKey1) ?? $admLeadTimes->get($leadTimeKey2);
+                $matrixConfig = $pullingMatrices->get($matrixKey1) ?? $pullingMatrices->get($matrixKey2);
                 
-                if ($leadTimeConfig) {
-                    // Gunakan lead time dari config
-                    $leadTimeParts = explode(':', $leadTimeConfig->lead_time);
-                    $leadTimeHours = (int) ($leadTimeParts[0] ?? 0);
-                    $leadTimeMinutes = (int) ($leadTimeParts[1] ?? 0);
-                    
-                    $pullingDateTime = $deliveryDateTime->copy()
-                        ->subHours($leadTimeHours)
-                        ->subMinutes($leadTimeMinutes);
-                    
-                    Log::info("Order {$orderNo}: Using config lead time {$leadTimeConfig->lead_time} for {$route}|{$dock}|{$cycle}");
+                if ($matrixConfig) {
+                    // Gunakan pulling time absolut dari matrix (tanggal ikut delivery date)
+                    $pullingDateTime = Carbon::createFromFormat(
+                        'Y-m-d H:i:s',
+                        $deliveryDateTime->format('Y-m-d') . ' ' . $matrixConfig->pulling_time
+                    );
+                    Log::info("Order {$orderNo}: Using pulling matrix {$matrixConfig->pulling_time} for {$route}|{$dock}|{$cycle}");
                 } else {
                     // Default: mundur 3 jam
                     $pullingDateTime = $deliveryDateTime->copy()->subHours(3);
-                    Log::info("Order {$orderNo}: Using default lead time 3 hours for {$route}|{$dock}|{$cycle}");
+                    Log::info("Order {$orderNo}: No matrix config, using default -3 hours for {$route}|{$dock}|{$cycle}");
                 }
 
                 // Auto-fill logistic partner dari config

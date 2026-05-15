@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Preparation;
 use App\Models\LpConfig;
+use App\Models\PullingMatrix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -226,6 +227,13 @@ class ImportTmminController extends Controller
             }
 
             // ========================================
+            // LOAD PULLING MATRIX CONFIG
+            // ========================================
+            $pullingMatrices = PullingMatrix::all()->keyBy(function ($item) {
+                return strtoupper($item->route) . '|' . strtoupper($item->dock) . '|' . $item->cycle;
+            });
+
+            // ========================================
             // BUILD PREPARATIONS DATA
             // ========================================
             
@@ -255,7 +263,32 @@ class ImportTmminController extends Controller
                     }
 
                     $deliveryCarbon = Carbon::parse($deliveryDateTime);
-                    $pullingCarbon = Carbon::parse($deliveryDateTime)->subHours(3);
+
+                    // ========================================
+                    // HITUNG PULLING TIME DARI PULLING MATRIX
+                    // FIX: cycleRaw pakai (int) casting untuk strip leading zero
+                    // contoh: "05" → (int)"05" = 5 → (string)5 = "5"
+                    // ========================================
+                    $cycleFormatted = sprintf('%02d', (int) $cycleValue); // "05"
+                    $cycleRaw       = (string)(int) $cycleValue;          // "5" ← strip leading zero
+
+                    $matrixKey1 = strtoupper($routeValue) . '|' . strtoupper($customerValue) . '|' . $cycleFormatted;
+                    $matrixKey2 = strtoupper($routeValue) . '|' . strtoupper($customerValue) . '|' . $cycleRaw;
+
+                    $matrixConfig = $pullingMatrices->get($matrixKey1) ?? $pullingMatrices->get($matrixKey2);
+
+                    if ($matrixConfig) {
+                        // Jam absolut dari matrix, tanggal ikut delivery date
+                        $pullingCarbon = Carbon::createFromFormat(
+                            'Y-m-d H:i:s',
+                            $deliveryCarbon->format('Y-m-d') . ' ' . $matrixConfig->pulling_time
+                        );
+                        Log::info("Order {$orderNo}: Using pulling matrix {$matrixConfig->pulling_time} for {$routeValue}|{$customerValue}|{$cycleValue}");
+                    } else {
+                        // Default: mundur 3 jam
+                        $pullingCarbon = $deliveryCarbon->copy()->subHours(3);
+                        Log::info("Order {$orderNo}: No matrix config, using default -3 hours for {$routeValue}|{$customerValue}|{$cycleValue}");
+                    }
 
                     $preparationData = [
                         'no_dn' => $d2['order_no'],
