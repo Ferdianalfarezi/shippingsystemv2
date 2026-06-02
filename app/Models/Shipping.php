@@ -59,8 +59,7 @@ class Shipping extends Model
      * Calculate status based on arrival and delivery time
      * - ON LOADING: sudah di-scan (arrival terisi)
      * - DELAY: delivery datetime sudah lewat (belum scan)
-     * - NORMAL: dalam 4 jam sebelum delivery time (belum scan)
-     * - ADVANCE: lebih dari 4 jam sebelum delivery time (belum scan)
+     * - NORMAL: belum lewat delivery time (belum scan)
      */
     public function calculateStatus(): string
     {
@@ -73,21 +72,13 @@ class Shipping extends Model
             $deliveryDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
             $now = Carbon::now();
             
-            // 4 jam sebelum delivery time
-            $normalStartTime = $deliveryDateTime->copy()->subHours(4);
-            
             // Jika sudah melewati delivery time = DELAY
             if ($now->greaterThan($deliveryDateTime)) {
                 return 'delay';
             }
             
-            // Jika dalam range 4 jam sebelum delivery time = NORMAL
-            if ($now->greaterThanOrEqualTo($normalStartTime)) {
-                return 'normal';
-            }
-            
-            // Jika lebih dari 4 jam sebelum delivery time = ADVANCE
-            return 'advance';
+            // Jika belum melewati delivery time = NORMAL
+            return 'normal';
             
         } catch (\Exception $e) {
             return 'normal';
@@ -110,7 +101,6 @@ class Shipping extends Model
         $status = $this->calculateStatus();
         
         return match($status) {
-            'advance' => 'bg-warning text-dark',
             'normal' => 'bg-success',
             'delay' => 'bg-danger',
             'on_loading' => 'bg-primary',
@@ -126,7 +116,6 @@ class Shipping extends Model
         $status = $this->calculateStatus();
         
         return match($status) {
-            'advance' => 'ADVANCE',
             'normal' => 'NORMAL',
             'delay' => 'DELAY',
             'on_loading' => 'ON LOADING',
@@ -174,21 +163,11 @@ class Shipping extends Model
     }
 
     /**
-     * Scope untuk filter ADVANCE (belum scan DAN > 4 jam sebelum delivery)
-     */
-    public function scopeAdvance($query)
-    {
-        return $query->whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) > DATE_ADD(NOW(), INTERVAL 4 HOUR)");
-    }
-
-    /**
-     * Scope untuk filter NORMAL (belum scan DAN <= 4 jam sebelum delivery DAN belum lewat)
+     * Scope untuk filter NORMAL (belum scan DAN belum lewat delivery time)
      */
     public function scopeNormal($query)
     {
         return $query->whereNull('arrival')
-            ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) <= DATE_ADD(NOW(), INTERVAL 4 HOUR)")
             ->whereRaw("CONCAT(delivery_date, ' ', delivery_time) >= NOW()");
     }
 

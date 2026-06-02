@@ -44,12 +44,11 @@
             </div>
         </div>
 
-        <!-- Status Filter - Advance, Normal, Delay, On Loading -->
+        <!-- Status Filter - Normal, Delay, On Loading -->
         <div class="card border-0 shadow-sm">
             <div class="card-body p-1">
                 <select class="form-select form-select-sm border-0" id="statusFilter" style="width: auto;">
                     <option value="all" {{ request('status') == 'all' || !request('status') ? 'selected' : '' }}>All Status</option>
-                    <option value="advance" {{ request('status') == 'advance' ? 'selected' : '' }}>Advance</option>
                     <option value="normal" {{ request('status') == 'normal' ? 'selected' : '' }}>Normal</option>
                     <option value="delay" {{ request('status') == 'delay' ? 'selected' : '' }}>Delay</option>
                     <option value="on_loading" {{ request('status') == 'on_loading' ? 'selected' : '' }}>On Loading</option>
@@ -81,21 +80,6 @@
                                 </a>
                             </li>
                         </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Advance Badge -->
-            <div class="bg-warning card border-0 shadow-sm">
-                <div class="card-body p-1">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-white bg-opacity-10 p-2 rounded me-2">
-                            <i class="bi bi-clock text-dark fs-5"></i>
-                        </div>
-                        <div>
-                            <small class="text-dark d-block fw-bold me-3" style="font-size: 0.7rem;">Advance</small>
-                            <h5 class="mb-0 fw-bold text-dark">{{ $totalAdvance }}</h5>
-                        </div>
                     </div>
                 </div>
             </div>

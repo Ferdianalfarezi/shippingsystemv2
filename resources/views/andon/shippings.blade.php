@@ -14,21 +14,6 @@
                 <i class="fa-solid fa-truck fs-4"></i>
             </a>
         </div>  
-        
-        <!-- Advance Badge -->
-        <div class="bg-warning card border-0 shadow-sm" id="badgeAdvanceBox">
-            <div class="card-body p-1">
-                <div class="d-flex align-items-center">
-                    <div class="bg-dark bg-opacity-10 p-2 rounded me-2">
-                        <i class="bi bi-clock-history text-dark fs-5"></i>
-                    </div>
-                    <div>
-                        <small class="text-dark d-block fw-bold me-3" style="font-size: 0.7rem;">Advance</small>
-                        <h5 class="mb-0 fw-bold text-dark">{{ $totalAdvance }}</h5>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Normal Badge -->
         <div class="bg-success card border-0 shadow-sm" id="badgeNormalBox">
@@ -191,7 +176,6 @@
                                 {{ in_array($ship->status_label, ['DELAY', 'WARNING']) ? 'blink-badge' : '' }}">
                                 {{ $ship->status_label }}
                             </span>
-
                         </td>
                     </tr>
                 @empty
@@ -246,7 +230,6 @@ $(document).ready(function () {
             // Refresh TABLE and BADGES
             $("#shippingsTable").load(location.href + " #shippingsTable>*");
             $("#recentScanBox").load(location.href + " #recentScanBox>*");
-            $("#badgeAdvanceBox").load(location.href + " #badgeAdvanceBox>*");
             $("#badgeNormalBox").load(location.href + " #badgeNormalBox>*");
             $("#badgeDelayBox").load(location.href + " #badgeDelayBox>*");
             $("#badgeLoadingBox").load(location.href + " #badgeLoadingBox>*");

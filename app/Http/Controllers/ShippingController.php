@@ -95,7 +95,6 @@ class ShippingController extends Controller
             . ' ' . $item->delivery_time
         );
         $now = Carbon::now();
-        $normalStartTime = $deliveryDateTime->copy()->subHours(4);
         
         if ($now->greaterThan($deliveryDateTime)) {
             return [
@@ -103,17 +102,11 @@ class ShippingController extends Controller
                 'status_label' => 'DELAY',
                 'status_badge' => 'bg-danger',
             ];
-        } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+        } else {
             return [
                 'status' => 'normal',
                 'status_label' => 'NORMAL',
                 'status_badge' => 'bg-success',
-            ];
-        } else {
-            return [
-                'status' => 'advance',
-                'status_label' => 'ADVANCE',
-                'status_badge' => 'bg-warning text-dark',
             ];
         }
     }
@@ -182,7 +175,6 @@ class ShippingController extends Controller
         
         // Calculate statistics from combined data - PLANNING tidak masuk summary
         $totalAll = $combined->count();
-        $totalAdvance = $combined->where('status', 'advance')->count();
         $totalNormal = $combined->where('status', 'normal')->count();
         $totalDelay = $combined->where('status', 'delay')->count();
         $totalOnLoading = $combined->where('status', 'on_loading')->count();
@@ -218,7 +210,6 @@ class ShippingController extends Controller
         return view('shippings.index', compact(
             'shippings', 
             'totalAll', 
-            'totalAdvance',
             'totalNormal', 
             'totalDelay',
             'totalOnLoading',
@@ -312,20 +303,15 @@ class ShippingController extends Controller
                     : $firstItem->delivery_date->format('Y-m-d');
                 $deliveryDateTime = Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time);
                 $now = Carbon::now();
-                $normalStartTime = $deliveryDateTime->copy()->subHours(4);
                 
                 if ($now->greaterThan($deliveryDateTime)) {
                     $statusLabel = 'DELAY';
                     $statusBadge = 'bg-danger';
                     $status = 'delay';
-                } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+                } else {
                     $statusLabel = 'NORMAL';
                     $statusBadge = 'bg-success';
                     $status = 'normal';
-                } else {
-                    $statusLabel = 'ADVANCE';
-                    $statusBadge = 'bg-warning text-dark';
-                    $status = 'advance';
                 }
             }
             
@@ -364,7 +350,6 @@ class ShippingController extends Controller
         })->sortBy('delivery_datetime')->values();
         
         // Calculate statistics
-        $totalAdvance = $grouped->where('status', 'advance')->count();
         $totalNormal = $grouped->where('status', 'normal')->count();
         $totalDelay = $grouped->where('status', 'delay')->count();
         $totalOnLoading = $grouped->where('status', 'on_loading')->count();
@@ -394,7 +379,6 @@ class ShippingController extends Controller
         
         return view('shippings.index-reverse', compact(
             'groupedShippings',
-            'totalAdvance',
             'totalNormal',
             'totalDelay',
             'totalOnLoading'
@@ -423,17 +407,14 @@ class ShippingController extends Controller
                 ], 422);
             }
             
-            // Calculate initial status - advance, normal, atau delay (belum scan)
+            // Calculate initial status - normal atau delay (belum scan)
             $deliveryDateTime = Carbon::parse($preparation->delivery_date->format('Y-m-d') . ' ' . $preparation->delivery_time);
             $now = Carbon::now();
-            $normalStartTime = $deliveryDateTime->copy()->subHours(4);
             
             if ($now->greaterThan($deliveryDateTime)) {
                 $status = 'delay';
-            } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
-                $status = 'normal';
             } else {
-                $status = 'advance';
+                $status = 'normal';
             }
             
             // Get user name dengan multiple fallback
@@ -1150,7 +1131,7 @@ class ShippingController extends Controller
             
             foreach ($shippings as $shipping) {
                 $shipping->arrival = $now;
-                // Status akan otomatis dihitung ulang (normal atau delay)
+                // Status akan otomatis dihitung ulang
                 $shipping->status = $shipping->calculateStatus();
                 $shipping->save();
                 $count++;
@@ -1242,7 +1223,6 @@ class ShippingController extends Controller
         
         // Calculate statistics from combined data - PLANNING tidak masuk summary
         $totalAll = $combined->count();
-        $totalAdvance = $combined->where('status', 'advance')->count();
         $totalNormal = $combined->where('status', 'normal')->count();
         $totalDelay = $combined->where('status', 'delay')->count();
         $totalOnLoading = $combined->where('status', 'on_loading')->count();
@@ -1276,7 +1256,6 @@ class ShippingController extends Controller
         
         return view('andon.shippings', compact(
             'shippings', 
-            'totalAdvance',
             'totalNormal', 
             'totalDelay', 
             'totalOnLoading',
@@ -1323,7 +1302,6 @@ class ShippingController extends Controller
                 $statusBadge = 'bg-primary';
                 $status = 'on_loading';
             } elseif ($allMirror) {
-                // Semua data adalah mirror - gunakan PLANNING atau DELAY
                 $deliveryDate = is_string($firstItem->delivery_date) 
                     ? $firstItem->delivery_date 
                     : $firstItem->delivery_date->format('Y-m-d');
@@ -1345,20 +1323,15 @@ class ShippingController extends Controller
                     : $firstItem->delivery_date->format('Y-m-d');
                 $deliveryDateTime = Carbon::parse($deliveryDate . ' ' . $firstItem->delivery_time);
                 $now = Carbon::now();
-                $normalStartTime = $deliveryDateTime->copy()->subHours(4);
                 
                 if ($now->greaterThan($deliveryDateTime)) {
                     $statusLabel = 'DELAY';
                     $statusBadge = 'bg-danger';
                     $status = 'delay';
-                } elseif ($now->greaterThanOrEqualTo($normalStartTime)) {
+                } else {
                     $statusLabel = 'NORMAL';
                     $statusBadge = 'bg-success';
                     $status = 'normal';
-                } else {
-                    $statusLabel = 'ADVANCE';
-                    $statusBadge = 'bg-warning text-dark';
-                    $status = 'advance';
                 }
             }
             
@@ -1392,7 +1365,6 @@ class ShippingController extends Controller
         })->sortBy('delivery_datetime')->values();
         
         // Statistics
-        $totalAdvance = $grouped->where('status', 'advance')->count();
         $totalNormal = $grouped->where('status', 'normal')->count();
         $totalDelay = $grouped->where('status', 'delay')->count();
         $totalOnLoading = $grouped->where('status', 'on_loading')->count();
@@ -1426,7 +1398,6 @@ class ShippingController extends Controller
         
         return view('andon.shippings-group', compact(
             'groupedShippings',
-            'totalAdvance',
             'totalNormal',
             'totalDelay',
             'totalOnLoading',
