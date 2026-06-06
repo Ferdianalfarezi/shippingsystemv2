@@ -21,6 +21,7 @@ use App\Http\Controllers\KanbanHpmController;
 use App\Http\Controllers\HpmAddressController;
 use App\Http\Controllers\SlipHpmController;
 use App\Http\Controllers\PullingMatrixController;
+use App\Http\Controllers\AdmaddressController; // << tambahan
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -98,7 +99,6 @@ Route::middleware(['auth'])->group(function () {
     | Preparations
     |----------------------------------------------------------------------
     */
-    // Aksi khusus HARUS di atas Route::resource supaya tidak tertutupi
     Route::delete('/preparations/delete-all', [PreparationController::class,  'deleteAll'])->name('preparations.deleteAll');
     Route::get('/preparations/find-by-dn',    [PreparationController::class,  'findByDn']) ->name('preparations.findByDn');
     Route::get('/preparations/scan',          [PreparationController::class,  'scan'])     ->name('preparations.scan');
@@ -156,7 +156,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reverse',  [ShippingController::class, 'indexReverse'])->name('indexReverse');
         Route::get('/checking-lp', [ShippingController::class, 'checkingLp'])->name('checkingLp');
 
-        // Aksi khusus — HARUS sebelum /{shipping}
         Route::delete('/delete-all',              [ShippingController::class, 'deleteAll'])            ->name('deleteAll');
         Route::post('/move-from-preparation',     [ShippingController::class, 'moveFromPreparation'])  ->name('moveFromPreparation');
         Route::post('/move-to-delivery',          [ShippingController::class, 'moveToDelivery'])       ->name('moveToDelivery');
@@ -167,7 +166,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-by-route',               [ShippingController::class, 'getByRoute'])           ->name('getByRoute');
         Route::get('/find-by-dn',                 [ShippingController::class, 'findByDn'])             ->name('findByDn');
 
-        // Parameter routes — HARUS di bawah aksi khusus
         Route::get('/{shipping}/edit', [ShippingController::class, 'edit'])   ->name('edit');
         Route::put('/{shipping}',      [ShippingController::class, 'update']) ->name('update');
         Route::delete('/{shipping}',   [ShippingController::class, 'destroy'])->name('destroy');
@@ -182,14 +180,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/',        [DeliveryController::class, 'index'])       ->name('index');
         Route::get('/reverse', [DeliveryController::class, 'indexReverse'])->name('indexReverse');
 
-        // Aksi khusus — HARUS sebelum /{delivery}
         Route::delete('/delete-all',         [DeliveryController::class, 'deleteAll'])      ->name('deleteAll');
         Route::post('/move-from-shipping',   [DeliveryController::class, 'moveFromShipping'])->name('moveFromShipping');
         Route::post('/move-by-route',        [DeliveryController::class, 'moveByRoute'])     ->name('moveByRoute');
         Route::get('/find-by-dn',            [DeliveryController::class, 'findByDn'])        ->name('findByDn');
         Route::get('/delay-data',            [DeliveryController::class, 'getDelayData'])    ->name('getDelayData');
 
-        // Parameter routes
         Route::get('/{delivery}/edit',        [DeliveryController::class, 'edit'])         ->name('edit');
         Route::put('/{delivery}',             [DeliveryController::class, 'update'])       ->name('update');
         Route::delete('/{delivery}',          [DeliveryController::class, 'destroy'])      ->name('destroy');
@@ -204,12 +200,10 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('milkruns')->name('milkruns.')->group(function () {
         Route::get('/', [MilkrunController::class, 'index'])->name('index');
 
-        // Aksi khusus — HARUS sebelum /{milkrun}
         Route::delete('/delete-all',   [MilkrunController::class, 'deleteAll'])  ->name('deleteAll');
         Route::post('/scan-arrival',   [MilkrunController::class, 'scanArrival'])->name('scanArrival');
         Route::get('/delay-data',      [MilkrunController::class, 'getDelayData'])->name('getDelayData');
 
-        // Parameter routes
         Route::get('/{milkrun}/dns',        [MilkrunController::class, 'getDnList'])       ->name('dns');
         Route::get('/{milkrun}/edit',       [MilkrunController::class, 'edit'])            ->name('edit');
         Route::put('/{milkrun}',            [MilkrunController::class, 'update'])          ->name('update');
@@ -226,11 +220,9 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('histories')->name('histories.')->group(function () {
         Route::get('/', [HistoryController::class, 'index'])->name('index');
 
-        // Aksi khusus — HARUS sebelum /{history}
         Route::delete('/delete-all',    [HistoryController::class, 'deleteAll'])   ->name('deleteAll');
         Route::post('/scan-to-history', [HistoryController::class, 'scanToHistory'])->name('scanToHistory');
 
-        // Parameter routes
         Route::get('/{history}',       [HistoryController::class, 'show'])   ->name('show');
         Route::delete('/{history}',    [HistoryController::class, 'destroy'])->name('destroy');
         Route::get('/{history}/print', [HistoryController::class, 'print'])  ->name('print');
@@ -252,7 +244,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/import',       [KanbanTmminsController::class, 'importTxt'])        ->name('import');
 
-        // Parameter routes
         Route::get('/print/{id}',    [KanbanTmminsController::class, 'print'])            ->name('print');
         Route::delete('/destroy-group/{manifest_no}', [KanbanTmminsController::class, 'destroyGroup'])
             ->where('manifest_no', '.*')
@@ -268,6 +259,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('kanbanhpms')->name('kanbanhpms.')->group(function () {
         Route::get('/',              [KanbanHpmController::class, 'index'])         ->name('index');
         Route::get('/printall',      [KanbanHpmController::class, 'printAll'])      ->name('printall');
+        Route::get('/filter-options',[KanbanHpmController::class, 'filterOptions']) ->name('filterOptions'); // ← INI
         Route::match(['get', 'post'], '/print-filtered', [KanbanHpmController::class, 'printFiltered'])->name('printFiltered');
 
         Route::post('/import',       [KanbanHpmController::class, 'importTxt'])     ->name('import');
@@ -315,6 +307,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import-rack', [AddressController::class, 'importRack']) ->name('import-rack');
     });
     Route::resource('addresses', AddressController::class)->except(['show']);
+
+    /*
+    |----------------------------------------------------------------------
+    | ADM Addresses
+    |----------------------------------------------------------------------
+    */
+    Route::delete('admaddresses/delete-all', [AdmaddressController::class, 'deleteAll'])->name('admaddresses.deleteAll');
+    Route::post('admaddresses/import',       [AdmaddressController::class, 'import'])    ->name('admaddresses.import');
+    Route::resource('admaddresses', AdmaddressController::class)->except(['show', 'create']);
 
     /*
     |----------------------------------------------------------------------

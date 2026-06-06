@@ -15,26 +15,73 @@ class KanbanHpmController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $latestDateRaw = KanbanHpm::where(function ($q) {
+                $q->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+            })
+            ->whereNotNull('datetime')
+            ->orderByRaw("STR_TO_DATE(SUBSTRING_INDEX(TRIM(datetime), ' ', 1), '%d-%m-%Y') DESC")
+            ->value('datetime');
+
+        $latestDate = $latestDateRaw
+            ? explode(' ', trim($latestDateRaw))[0]
+            : null;
+
         $kanbanhpms = KanbanHpm::orderBy('di_no')
             ->orderBy('item_seq')
             ->where(function ($q) {
                 $q->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', now());
+                ->orWhere('expires_at', '>', now());
             })
-            ->get();
+            ->when($latestDate, function ($q) use ($latestDate) {
+                $q->where('datetime', 'LIKE', $latestDate . '%');
+            })
+            ->paginate(20)
+            ->withQueryString();
+
+        $totalAll = KanbanHpm::where(function ($q) {
+                $q->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+            })->count();
 
         $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
 
-        $kanbanPrintData = $kanbanhpms->map(function ($i) {
-            return [
-                'date' => !empty($i->datetime) ? explode(' ', trim($i->datetime))[0] : '',
-                'dock' => !empty($i->ps_code)  ? substr(trim($i->ps_code), -2) : '',
-            ];
-        })->values();
+        return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'latestDate', 'totalAll'));
+    }
 
-        return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'kanbanPrintData'));
+    /**
+     * Endpoint AJAX: kembalikan unique dates & docks dari semua data aktif
+     */
+    public function filterOptions()
+    {
+        $activeData = KanbanHpm::where(function ($q) {
+                $q->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+            })
+            ->whereNotNull('adjusted_datetime')
+            ->where('adjusted_datetime', '!=', '')
+            ->get(['adjusted_datetime', 'ps_code']);
+
+        $dates = $activeData
+            ->map(fn($i) => explode(' ', trim($i->adjusted_datetime))[0])
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $docks = $activeData
+            ->filter(fn($i) => !empty($i->ps_code))
+            ->map(fn($i) => substr(trim($i->ps_code), -2))
+            ->unique()
+            ->sort()
+            ->values();
+
+        return response()->json([
+            'dates' => $dates,
+            'docks' => $docks,
+        ]);
     }
 
     /**
@@ -46,9 +93,9 @@ class KanbanHpmController extends Controller
             'file' => 'required|mimes:txt|max:5120',
         ]);
 
-        $file    = $request->file('file');
-        $path    = $file->getRealPath();
-        $lines   = file($path, FILE_IGNORE_NEW_LINES);
+        $file       = $request->file('file');
+        $path       = $file->getRealPath();
+        $lines      = file($path, FILE_IGNORE_NEW_LINES);
 
         $uploadedBy = 'System';
         if (Auth::check()) {
@@ -62,7 +109,7 @@ class KanbanHpmController extends Controller
 
             $importedCount = 0;
             $generator     = new BarcodeGeneratorPNG();
-            $year          = now()->year; // tahun sekarang untuk append ke datetime
+            $year          = now()->year;
 
             foreach ($lines as $rawLine) {
                 $line = rtrim($rawLine, "\r\n");
@@ -87,8 +134,7 @@ class KanbanHpmController extends Controller
                 $to       = trim($to_code) . '-' . trim($to_part1);
 
                 $supply_address = trim(substr($line, 98, 14));
-
-                $mid_area = trim(substr($line, 112, 22));
+                $mid_area       = trim(substr($line, 112, 22));
 
                 if (str_starts_with($mid_area, '*')) {
                     $ms_id              = preg_replace('/[^*].*/', '', $mid_area);
@@ -114,8 +160,7 @@ class KanbanHpmController extends Controller
 
                 $part_no_raw = substr($line, 134, 23);
                 $part_no     = preg_replace('/\s+/', '', $part_no_raw);
-
-                $part_name = trim(substr($line, 180, 41));
+                $part_name   = trim(substr($line, 180, 41));
 
                 $ps_area = substr($line, 221, 24);
                 preg_match('/(HPM\s+\d+[A-Z]+)\s+(\d+)/', $ps_area, $pMatch);
@@ -131,7 +176,6 @@ class KanbanHpmController extends Controller
 
                 preg_match('/(\d{2}-\d{2})\s+(\d{2}:\d{2})/', $dt_area, $dtMatch);
                 if (isset($dtMatch[1])) {
-                    // Format: "dd-mm-yyyy HH:MM"
                     $datetime = $dtMatch[1] . '-' . $year . ' ' . $dtMatch[2];
                     $datePos  = strpos($dt_area, $dtMatch[1]);
                     $ship_raw = substr($dt_area, $datePos - 2, 2);
@@ -202,6 +246,9 @@ class KanbanHpmController extends Controller
         }
     }
 
+    /**
+     * Adjust datetime dari Excel Weekly
+     */
     public function adjustWeekly(Request $request)
     {
         $request->validate([
@@ -244,7 +291,6 @@ class KanbanHpmController extends Controller
                     $adj         = $adjustMap[$key];
                     $newDatetime = $adj['date'] . ' ' . $adj['time'];
 
-                    // Simpan ke adjusted_datetime, TIDAK mengubah datetime (original dari TXT)
                     if ($item->adjusted_datetime !== $newDatetime) {
                         $item->adjusted_datetime = $newDatetime;
                         $item->save();
@@ -284,6 +330,9 @@ class KanbanHpmController extends Controller
         }
     }
 
+    /**
+     * Parse Excel untuk adjust datetime
+     */
     private function parseAdjustExcel(
         string $path,
         array  $sheetNames,
@@ -343,7 +392,7 @@ class KanbanHpmController extends Controller
     }
 
     /**
-     * Format nilai date dari Excel menjadi "dd-mm-yyyy"
+     * Format Excel date value ke string dd-mm-yyyy
      */
     private function formatExcelDate($value): ?string
     {
@@ -359,17 +408,14 @@ class KanbanHpmController extends Controller
             $value = trim($value);
             if ($value === '') return null;
 
-            // Format "YYYYMMDD" integer string (e.g. "20260410")
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $value, $m)) {
                 return $m[3] . '-' . $m[2] . '-' . $m[1];
             }
 
-            // Format ISO "2026-03-30"
             if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $value, $m)) {
                 return $m[3] . '-' . $m[2] . '-' . $m[1];
             }
 
-            // Format "dd-mm" tanpa tahun (dari TXT lama) → append tahun sekarang
             if (preg_match('/^(\d{2})-(\d{2})$/', $value)) {
                 return $value . '-' . $year;
             }
@@ -380,13 +426,11 @@ class KanbanHpmController extends Controller
         if (is_int($value) || is_float($value)) {
             $num = (int) $value;
 
-            // Format YYYYMMDD (e.g. 20260410)
             if ($num > 19000101 && $num < 21001231 && strlen((string) $num) === 8) {
                 $str = (string) $num;
                 return substr($str, 6, 2) . '-' . substr($str, 4, 2) . '-' . substr($str, 0, 4);
             }
 
-            // Excel serial date (e.g. 46118 = 2026-04-06)
             if ($num >= 1 && $num < 100000) {
                 $epoch = \Carbon\Carbon::create(1899, 12, 30, 0, 0, 0, 'UTC');
                 $dt    = $epoch->addDays($num);
@@ -400,7 +444,7 @@ class KanbanHpmController extends Controller
     }
 
     /**
-     * Format nilai time dari Excel menjadi "HH:MM"
+     * Format Excel time value ke string HH:mm
      */
     private function formatExcelTime($value): ?string
     {
@@ -428,8 +472,8 @@ class KanbanHpmController extends Controller
 
         if (is_float($value) && $value >= 0 && $value < 1) {
             $totalSecs = (int) round($value * 86400);
-            $h = intdiv($totalSecs, 3600);
-            $i = intdiv($totalSecs % 3600, 60);
+            $h         = intdiv($totalSecs, 3600);
+            $i         = intdiv($totalSecs % 3600, 60);
             return str_pad($h, 2, '0', STR_PAD_LEFT) . ':' . str_pad($i, 2, '0', STR_PAD_LEFT);
         }
 
@@ -442,12 +486,92 @@ class KanbanHpmController extends Controller
     }
 
     /**
+     * Parse address step string jadi komponen untuk sorting.
+     * Format: "K2-17-A", "G1-09-B", dll
+     */
+    private function parseScheduleAddress(string $addr): array
+    {
+        $addr = strtoupper(trim($addr));
+
+        if (preg_match('/^([A-Z]+)(\d+)-(\d+)(?:-([A-Z0-9]+))?/', $addr, $m)) {
+            return [
+                'prefix' => $m[1],
+                'num1'   => (int) $m[2],
+                'num2'   => (int) $m[3],
+                'suffix' => $m[4] ?? '',
+            ];
+        }
+
+        return [
+            'prefix' => $addr,
+            'num1'   => 0,
+            'num2'   => 0,
+            'suffix' => '',
+        ];
+    }
+
+    /**
+     * Sort koleksi KanbanHpm berdasarkan ADDRESS STEP (field: schedule).
+     *
+     * Urutan cetak (index array):
+     *   - Grup K  : DESC → K terbesar dicetak duluan → posisi paling bawah di tumpukan fisik
+     *   - Grup non-K : ASC → dicetak belakangan → posisi paling atas di tumpukan fisik
+     *
+     * Dalam satu grup sorting key: prefix → num1 → num2 → suffix
+     */
+    private function sortByScheduleAddress($collection)
+    {
+        return $collection->sort(function ($a, $b) {
+            $aParsed = $this->parseScheduleAddress($a->schedule ?? '');
+            $bParsed = $this->parseScheduleAddress($b->schedule ?? '');
+
+            $aIsK = $aParsed['prefix'] === 'K';
+            $bIsK = $bParsed['prefix'] === 'K';
+
+            // Grup K selalu di atas (dicetak duluan)
+            if ($aIsK !== $bIsK) {
+                return $aIsK ? -1 : 1;
+            }
+
+            if ($aIsK) {
+                // Grup K: DESC — K terbesar (num1 besar, num2 besar) dicetak duluan
+                if ($aParsed['num1'] !== $bParsed['num1']) {
+                    return $bParsed['num1'] - $aParsed['num1'];
+                }
+                if ($aParsed['num2'] !== $bParsed['num2']) {
+                    return $bParsed['num2'] - $aParsed['num2'];
+                }
+                return strcmp($bParsed['suffix'], $aParsed['suffix']);
+            }
+
+            // Grup non-K: ASC — prefix → num1 → num2 → suffix naik
+            $prefixCmp = strcmp($aParsed['prefix'], $bParsed['prefix']);
+            if ($prefixCmp !== 0) {
+                return $prefixCmp;
+            }
+            if ($aParsed['num1'] !== $bParsed['num1']) {
+                return $aParsed['num1'] - $bParsed['num1'];
+            }
+            if ($aParsed['num2'] !== $bParsed['num2']) {
+                return $aParsed['num2'] - $bParsed['num2'];
+            }
+            return strcmp($aParsed['suffix'], $bParsed['suffix']);
+        })->values();
+    }
+
+    /**
      * Print All records
      */
     public function printAll(Request $request)
     {
         try {
-            $kanbanhpms = KanbanHpm::orderBy('di_no')->orderBy('item_seq')->get();
+            $kanbanhpms = KanbanHpm::orderBy('di_no')
+                ->orderBy('item_seq')
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')
+                      ->orWhere('expires_at', '>', now());
+                })
+                ->get();
 
             if ($kanbanhpms->isEmpty()) {
                 return redirect()->route('kanbanhpms.index')
@@ -458,10 +582,7 @@ class KanbanHpmController extends Controller
             $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
                             ->pluck('rack_no', 'part_no');
 
-            $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
-                $rack = $rackMap[$item->part_no] ?? '';
-                return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
-            })->values();
+            $kanbanhpms = $this->sortByScheduleAddress($kanbanhpms);
 
             return view('kanbanhpms.printnew', compact('kanbanhpms', 'rackMap'));
 
@@ -495,18 +616,28 @@ class KanbanHpmController extends Controller
         }
     }
 
+    /**
+     * Print filtered — support GET (preview iframe) & POST (direct print)
+     */
     public function printFiltered(Request $request)
     {
         try {
             $dates = $request->input('dates', []);
             $docks = $request->input('docks', []);
 
-            $query = KanbanHpm::orderBy('di_no')->orderBy('item_seq');
+            $query = KanbanHpm::orderBy('di_no')
+                ->orderBy('item_seq')
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+                })
+                ->whereNotNull('adjusted_datetime')
+                ->where('adjusted_datetime', '!=', '');
 
             if (!empty($dates)) {
                 $query->where(function ($q) use ($dates) {
                     foreach ($dates as $date) {
-                        $q->orWhere('datetime', 'LIKE', $date . '%');
+                        $q->orWhere('adjusted_datetime', 'LIKE', $date . '%');
                     }
                 });
             }
@@ -523,7 +654,9 @@ class KanbanHpmController extends Controller
 
             if ($kanbanhpms->isEmpty()) {
                 return response('<div style="font-family:Arial;padding:40px;text-align:center;color:#888;">
-                    <h3>Tidak ada data yang sesuai filter.</h3></div>', 200)
+                    <h3>Tidak ada data yang sesuai filter.</h3>
+                    <p>Pastikan data sudah di-adjust via Excel Weekly terlebih dahulu.</p>
+                </div>', 200)
                     ->header('Content-Type', 'text/html');
             }
 
@@ -531,12 +664,9 @@ class KanbanHpmController extends Controller
             $rackMap = \App\Models\HpmAddress::whereIn('part_no', $partNos)
                             ->pluck('rack_no', 'part_no');
 
-            $kanbanhpms = $kanbanhpms->sortBy(function ($item) use ($rackMap) {
-                $rack = $rackMap[$item->part_no] ?? '';
-                return str_starts_with(strtoupper(trim($rack)), 'K') ? 1 : 0;
-            })->values();
+            $kanbanhpms = $this->sortByScheduleAddress($kanbanhpms);
 
-            return view('kanbanhpms.printnew', compact('kanbanhpms'));
+            return view('kanbanhpms.printnew', compact('kanbanhpms', 'rackMap'));
 
         } catch (\Exception $e) {
             Log::error('KanbanHpm printFiltered error: ' . $e->getMessage());

@@ -598,6 +598,10 @@
                                 <i class="fas fa-address-book"></i> HPM Address
                             </a>
 
+                            <a href="{{ route('admaddresses.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> ADM Address
+                            </a>
+
                             {{-- MENU ANDON UTAMA (klik untuk collapse) --}}
                             <a href="#" class="andon-toggle d-flex justify-content-between align-items-center fs-6">
                                 <span><i class="fas fa-desktop"></i> Andon</span>

@@ -40,9 +40,9 @@
         }
 
         .line { position: absolute; border: 0; }
-        .line-14  { border-top: 2px solid #000; width: 480px; left: 23px;   top: 88px; }
-        .line-15  { border-top: 2px solid #000; width: 480px; left: 23px;   top: 119px; }
-        .line-17  { border-top: 2px solid #000; width: 599px; left: 23px;   top: 147px; }
+        .line-14  { border-top: 2px solid #000; width: 360px; left: 142px;   top: 88px; }
+        .line-15  { border-top: 2px solid #000; width: 360px; left: 142px;   top: 119px; }
+        .line-17  { border-top: 2px solid #000; width: 480px; left: 142px;   top: 147px; }
         .line-6   { border-top: 2px solid #000; width: 599px; left: 23px;   top: 184px; }
         .line-16  { border-top: 2px solid #000; width: 480px; left: 142px;  top: 206px; }
         .line-13  { border-top: 2px solid #000; width: 480px; left: 142px;  top: 227px; }
@@ -53,8 +53,11 @@
         .line-10  { border-top: 2px solid #000; width: 599px; left: 23px;   top: 341px; }
         .line-7   { border-top: 2px solid #000; width: 599px; left: 23px;   top: 362px; }
         .line-8   { border-top: 2px solid #000; width: 599px; left: 23px;   top: 441px; }
-        .line-21  { border-top: 2px solid #000; width: 120px; left: 22px;   top: 63px; }
+        .line-21  { border-top: 2px solid #000; width: 120px; left: 22px;   top: 60px; }
         .line-22  { border-top: 2px solid #000; width: 119px; left: 503px;  top: 63px; }
+        .line-23  { border-top: 2px solid #000; width: 120px; left: 22px;   top: 206px; }
+        .line-24  { border-top: 2px solid #000; width: 120px; left: 22px;   top: 227px; }
+        .line-25  { border-top: 2px solid #000; width: 120px; left: 22px;   top: 255px; }
         .line-1  { border-top: 2px solid #000; width: 328px; left: 142px; top: 35px; transform-origin: 0 0; transform: rotate(90deg); }
         .line-18 { border-top: 2px solid #000; width: 172px; left: 503px; top: 35px; transform-origin: 0 0; transform: rotate(90deg); }
         .line-2  { border-top: 2px solid #000; width: 193px; left: 385.21px; top: 148px; transform-origin: 0 0; transform: rotate(90.05deg); }
@@ -67,9 +70,9 @@
         .val { position: absolute; font-size: 11px; font-weight: 400; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .parts-contents-card-lbl { left: 260px; top: 17px; font-size: 14px; }
-        .from-lbl       { left: 29px;  top: 38px;  font-size: 15px; }
-        .to-lbl         { left: 28px;  top: 93px;  font-size: 15px; }
-        .qr-code-lbl    { left: 29px;  top: 150px; font-size: 15px; }
+        .from-lbl       { left: 29px;  top: 188px; font-size: 15px; }
+        .to-lbl         { left: 28px;  top: 234px;  font-size: 15px; }
+        .qr-code-lbl    { left: 29px;  top: 38px;  font-size: 15px; }
         .part-color-lbl       { left: 149px; top: 123px; font-size: 13px; }
         .prod-seq-no-lbl      { left: 150px; top: 209px; font-size: 13px; }
         .inv-cat-lbl          { left: 148px; top: 258px; font-size: 13px; }
@@ -88,11 +91,16 @@
         .prod-day-lbl         { left: 510px; top: 300px; }
         .check-lbl            { left: 435px; top: 347px; }
 
-        .from-val            { left: 29px;  top: 68px;  width: 110px; font-size: 13px; font-weight: bold; }
-        .to-val              { left: 28px;  top: 127px; width: 110px; font-size: 13px; font-weight: bold; }
-        .part-no-val         { left: 183px; top: 42px;  width: 340px; font-size: 35px; font-weight: 700; }
+        /* ── part-no: JS yang handle font-size via data-autoshrink ── */
+        .part-no-val         { left: 195px; top: 42px;  width: 305px; font-size: 35px; font-weight: 700; overflow: hidden; white-space: nowrap; }
+
+        .from-val            { left: 29px;  top: 210px;  width: 110px; font-size: 13px; font-weight: bold; }
+        .to-val              { left: 28px;  top: 270px; width: 110px; font-size: 13px; font-weight: bold; }
         .part-name-val       { left: 220px; top: 95px;  width: 340px; font-size: 16px; font-weight: 700; }
-        .ship-val            { left: 530px; top: 73px;  width: 110px; font-size: 55px; font-weight: 700; }
+
+        /* ── FIX: ship center di kolom antara line-18 (503px) s/d rectangle kanan (622px) ── */
+        .ship-val            { left: 503px; top: 72px;  width: 119px; font-size: 55px; font-weight: 700; text-align: center; }
+
         .part-color-val      { left: 210px; top: 122px; width: 150px; font-size: 11px; }
         .ps-code-val         { left: 149px; top: 188px; width: 110px; font-size: 13px; font-weight: 700; }
         .supply-adr-val      { left: 269px; top: 188px; width: 110px; font-size: 13px; font-weight: 700; }
@@ -140,7 +148,7 @@
         .barcode-wrap svg {
             display: block;
             height: 100%;
-            width: auto;       /* proporsional, tidak di-stretch */
+            width: auto;
             max-width: 100%;
         }
 
@@ -164,7 +172,7 @@
         .qr-wrapper {
             position: absolute;
             left: 29px;
-            top: 187px;
+            top: 67px;
             width: 108px;
             height: 108px;
             display: flex;
@@ -197,8 +205,8 @@
     $barcodeSvg = $barcodeGenerator->getBarcode(
         $barcodeValue,
         BarcodeGeneratorSVG::TYPE_CODE_128,
-        2.5,    // widthFactor → bar lebih tebal & terbaca
-        50     // height
+        2.5,
+        50
     );
 
     $rackNo = \App\Models\HpmAddress::where('part_no', $item->part_no)
@@ -218,6 +226,9 @@
 
     <div class="line line-21"></div>
     <div class="line line-22"></div>
+    <div class="line line-23"></div>
+    <div class="line line-24"></div>
+    <div class="line line-25"></div>
     <div class="line line-14"></div>
     <div class="line line-15"></div>
     <div class="line line-17"></div>
@@ -263,7 +274,7 @@
 
     <div class="val from-val">{{ fmtAddr($item->from) }}</div>
     <div class="val to-val">{{ fmtAddr($item->to) }}</div>
-    <div class="val part-no-val">{{ $item->part_no }}</div>
+    <div class="val part-no-val" data-autoshrink>{{ $item->part_no }}</div>
     <div class="val part-name-val">{{ $item->part_name }}</div>
     <div class="val ship-val">{{ $item->ship }}</div>
     <div class="val part-color-val">{{ $item->part_color_code }}</div>
@@ -307,6 +318,8 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    // QR Code
     document.querySelectorAll('div[data-qr]').forEach(function (div) {
         var val = div.getAttribute('data-qr');
         if (!val) return;
@@ -319,6 +332,29 @@ document.addEventListener('DOMContentLoaded', function () {
             correctLevel: QRCode.CorrectLevel.L
         });
     });
+
+    // Auto font-size part-no berdasarkan panjang teks
+    document.querySelectorAll('[data-autoshrink]').forEach(function (el) {
+        var text = el.textContent.trim();
+        var len  = text.length;
+
+        // Tentukan font-size awal berdasarkan panjang string
+        var size;
+        if (len <= 10)       size = 38;
+        else if (len <= 13)  size = 35;
+        else if (len <= 16)  size = 30;
+        else if (len <= 19)  size = 26;
+        else                 size = 22;
+
+        el.style.fontSize = size + 'px';
+
+        // Safety: shrink lagi kalau masih overflow
+        while (el.scrollWidth > el.clientWidth && size > 14) {
+            size--;
+            el.style.fontSize = size + 'px';
+        }
+    });
+
 });
 </script>
 

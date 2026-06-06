@@ -14,6 +14,9 @@
             @if($latestUploadInfo)
                 <strong>Last Upload:</strong> {{ $latestUploadInfo->last_upload_at }}
                 by <strong>{{ $latestUploadInfo->uploaded_by }}</strong>
+                @if($latestDate)
+                    &nbsp;|&nbsp; <span class="badge bg-primary">Tanggal: {{ $latestDate }}</span>
+                @endif
             @else
                 <span class="text-muted">Belum ada data diimport</span>
             @endif
@@ -26,37 +29,18 @@
                 <i class="bi bi-file-earmark-text me-1"></i> Slip
             </a>
 
-            <div class="btn-group" role="group">
-                <button type="button" class="btn btn-primary"
-                        data-bs-toggle="modal" data-bs-target="#printFilterModal">
-                    <i class="bi bi-printer me-1"></i> Print
-                </button>
-            </div>
-
-            <!-- Supply Address Filter -->
-            <select class="form-select" id="supplyFilterSelect" style="width: 140px;">
-                <option value="all">All Supply</option>
-                @foreach($kanbanhpms->pluck('supply_address')->unique()->filter()->sort() as $sa)
-                    <option value="{{ $sa }}">{{ $sa }}</option>
-                @endforeach
-            </select>
+            <button type="button" class="btn btn-primary"
+                    data-bs-toggle="modal" data-bs-target="#printFilterModal">
+                <i class="bi bi-printer me-1"></i> Print
+            </button>
 
             <!-- Search Bar -->
             <div class="input-group" style="width: 280px;">
                 <input type="text" class="form-control" id="searchInput" placeholder="Cari Part No, DI No...">
-                <button class="btn btn-secondary" type="button" id="searchButton">
+                <button class="btn btn-secondary" type="button" id="searchBtn">
                     <i class="bi bi-search"></i>
                 </button>
             </div>
-
-            <!-- Per Page -->
-            <select class="form-select" id="perPageSelect" style="width: 85px;">
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="all">All</option>
-            </select>
 
             <!-- Dropdown Menu -->
             <div class="card border-0 shadow-sm">
@@ -95,7 +79,7 @@
                         </div>
                         <div>
                             <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Total</small>
-                            <h5 class="mb-0 fw-bold text-white">{{ count($kanbanhpms) }}</h5>
+                            <h5 class="mb-0 fw-bold text-white">{{ $totalAll }}</h5>
                         </div>
                     </div>
                 </div>
@@ -109,7 +93,6 @@
         <table class="table table-compact w-100 mt-1" id="kanbanhpmsTable">
             <thead>
                 <tr class="fs-6">
-                    <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
                     <th>DI No</th>
                     <th>Seq</th>
                     <th>Part No</th>
@@ -124,12 +107,9 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="tableBody">
+            <tbody>
                 @forelse($kanbanhpms as $item)
-                    <tr class="fs-6 hpm-row"
-                        data-supply="{{ $item->supply_address }}"
-                        data-id="{{ $item->id }}">
-                        <td><input type="checkbox" class="form-check-input row-select" value="{{ $item->id }}"></td>
+                    <tr class="fs-6">
                         <td><strong>{{ $item->di_no }}</strong></td>
                         <td>{{ $item->item_seq }}</td>
                         <td>{{ $item->part_no }}</td>
@@ -156,8 +136,8 @@
                         </td>
                     </tr>
                 @empty
-                    <tr class="empty-row">
-                        <td colspan="13" class="text-center py-4">
+                    <tr>
+                        <td colspan="12" class="text-center py-4">
                             <div class="text-muted">
                                 <i class="bi bi-inbox" style="font-size: 3rem;"></i>
                                 <p class="mt-2">Belum ada data kanban HPM. Silakan import file TXT.</p>
@@ -169,16 +149,9 @@
         </table>
     </div>
 
-    <!-- Pagination -->
-    <div class="d-flex justify-content-between align-items-center mt-3 me-3" id="paginationContainer">
-        <div class="text-muted" id="paginationInfo">
-            Showing <span id="showingFrom">1</span> to
-            <span id="showingTo">10</span> of
-            <span id="totalFiltered">{{ count($kanbanhpms) }}</span> entries
-        </div>
-        <nav aria-label="Page navigation">
-            <ul class="pagination mb-0" id="paginationNav"></ul>
-        </nav>
+    <!-- Server-side Pagination -->
+    <div class="d-flex justify-content-end mt-3 me-3">
+        {{ $kanbanhpms->links('pagination::bootstrap-5') }}
     </div>
 
 
@@ -198,8 +171,7 @@
                     <div class="modal-body">
                         <div class="alert alert-warning">
                             <i class="bi bi-exclamation-triangle me-2"></i>
-                            <strong>Perhatian!</strong> Import akan menghapus semua data yang ada
-                            dan menggantinya dengan data baru dari file TXT.
+                            <strong>Perhatian!</strong> Jangan Import data yang sama 2x. jika dilakukan maka kanban yang di cetak akan duplikat
                         </div>
                         <div class="mb-3">
                             <label for="txtFile" class="form-label text-dark">Pilih File TXT</label>
@@ -239,8 +211,6 @@
                       enctype="multipart/form-data" id="adjustWeeklyForm">
                     @csrf
                     <div class="modal-body">
-
-                        {{-- Info --}}
                         <div class="alert alert-info d-flex align-items-start gap-2 mb-4">
                             <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
                             <div>
@@ -253,8 +223,6 @@
                                 </small>
                             </div>
                         </div>
-
-                        {{-- File Weekly --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-dark">
                                 <i class="bi bi-file-earmark-excel text-success me-1"></i>
@@ -263,7 +231,7 @@
                             <input type="file" class="form-control" id="fileWeekly"
                                    name="file_weekly" accept=".xlsx,.xls" required>
                             <div class="form-text">
-                                Format: 1 file Excel dengan 1 sheet &mdash; kolom <strong>KD Lot Number</strong>,
+                                Format: 1 file Excel &mdash; kolom <strong>KD Lot Number</strong>,
                                 <strong>Adjustment Delivery Schedule Ship Date</strong> &amp;
                                 <strong>Adjustment Delivery Schedule Ship Time</strong>
                             </div>
@@ -274,13 +242,10 @@
                                 </span>
                             </div>
                         </div>
-
-                        {{-- Progress --}}
                         <div class="progress d-none mt-3" id="adjustWeeklyProgress">
                             <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
                                  role="progressbar" style="width: 100%"></div>
                         </div>
-
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -295,150 +260,118 @@
         </div>
     </div>
 
-   {{-- ==================== MODAL: Print Filter ==================== --}}
-<div class="modal fade" id="printFilterModal" tabindex="-2"
-     aria-labelledby="printFilterModalLabel" aria-hidden="true">
-    <div class="modal-dialog" style="max-width: 1000px; width: 95vw;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title text-dark" id="printFilterModalLabel">
-                    <i class="bi bi-printer me-2 text-primary"></i>Print Kanban HPM
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-dark p-0">
-                <div class="d-flex" style="min-height: 75vh;">
 
-                    {{-- ── LEFT: Filter Panel ── --}}
-                    <div class="flex-shrink-0 border-end p-3" style="width: 240px; background: #f8f9fa;">
+    {{-- ==================== MODAL: Print Filter ==================== --}}
+    <div class="modal fade" id="printFilterModal" tabindex="-1"
+         aria-labelledby="printFilterModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 1000px; width: 95vw;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-dark" id="printFilterModalLabel">
+                        <i class="bi bi-printer me-2 text-primary"></i>Print Kanban HPM
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-dark p-0">
+                    <div class="d-flex" style="min-height: 75vh;">
 
-                        {{-- Filter Tanggal --}}
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-calendar3 text-primary me-1"></i>Tanggal
-                            </label>
-                            <div class="border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
-                                <div class="form-check mb-1">
-                                    <input class="form-check-input" type="checkbox"
-                                           id="checkAllDates" onchange="toggleAllDates(this)">
-                                    <label class="form-check-label fw-semibold small" for="checkAllDates">
-                                        Semua Tanggal
+                        {{-- ── LEFT: Filter Panel ── --}}
+                        <div class="flex-shrink-0 border-end p-3" style="width: 240px; background: #f8f9fa;">
+
+                            {{-- Loading filter --}}
+                            <div id="filterLoadingSpinner" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <p class="small text-muted mt-2">Memuat filter...</p>
+                            </div>
+
+                            <div id="filterContent" class="d-none">
+
+                                {{-- Filter Tanggal --}}
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-calendar3 text-primary me-1"></i>Tanggal
                                     </label>
-                                </div>
-                                <hr class="my-1">
-                                @php
-                                    $uniqueDates = $kanbanhpms
-                                        ->filter(fn($i) => !empty($i->datetime))
-                                        ->map(fn($i) => explode(' ', trim($i->datetime))[0])
-                                        ->unique()->sort()->values();
-                                @endphp
-                                @forelse($uniqueDates as $date)
-                                    <div class="form-check">
-                                        <input class="form-check-input date-check" type="checkbox"
-                                               value="{{ $date }}" id="date_{{ $loop->index }}">
-                                        <label class="form-check-label small" for="date_{{ $loop->index }}">
-                                            {{ $date }}
-                                        </label>
+                                    <div class="border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input" type="checkbox"
+                                                   id="checkAllDates" onchange="toggleAllDates(this)">
+                                            <label class="form-check-label fw-semibold small" for="checkAllDates">
+                                                Semua Tanggal
+                                            </label>
+                                        </div>
+                                        <hr class="my-1">
+                                        <div id="dateCheckList"></div>
                                     </div>
-                                @empty
-                                    <span class="text-muted small">Tidak ada tanggal</span>
-                                @endforelse
+                                </div>
+
+                                <hr>
+
+                                {{-- Filter Dock --}}
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-signpost-split text-success me-1"></i>Dock
+                                    </label>
+                                    <div class="border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input" type="checkbox"
+                                                   id="checkAllDocks" onchange="toggleAllDocks(this)">
+                                            <label class="form-check-label fw-semibold small" for="checkAllDocks">
+                                                Semua Dock
+                                            </label>
+                                        </div>
+                                        <hr class="my-1">
+                                        <div id="dockCheckList"></div>
+                                    </div>
+                                </div>
+
+                                <hr>
+
+                                {{-- Preview Count --}}
+                                <div class="p-2 bg-white border rounded text-center">
+                                    <div class="text-muted small">Akan diprint</div>
+                                    <div class="fw-bold fs-4 text-primary" id="printPreviewCount">0</div>
+                                    <div class="text-muted small">kanban</div>
+                                </div>
+
                             </div>
                         </div>
 
-                        <hr>
+                        {{-- ── RIGHT: Preview Iframe ── --}}
+                        <div class="flex-grow-1 p-0">
+                            <div style="background: #e9ecef; height: 75vh; overflow: hidden; position: relative;">
 
-                        {{-- Filter Dock --}}
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-signpost-split text-success me-1"></i>Dock
-                            </label>
-                            <div class="border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
-                                <div class="form-check mb-1">
-                                    <input class="form-check-input" type="checkbox"
-                                           id="checkAllDocks" onchange="toggleAllDocks(this)">
-                                    <label class="form-check-label fw-semibold small" for="checkAllDocks">
-                                        Semua Dock
-                                    </label>
+                                <div id="hpmPreviewLoading" class="text-center py-5 d-none"
+                                     style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <p class="mt-3 text-dark">Memuat preview...</p>
                                 </div>
-                                <hr class="my-1">
-                                @php
-                                    $uniqueDocks = $kanbanhpms
-                                        ->filter(fn($i) => !empty($i->ps_code))
-                                        ->map(fn($i) => substr(trim($i->ps_code), -2))
-                                        ->unique()->sort()->values();
-                                @endphp
-                                @forelse($uniqueDocks as $dock)
-                                    <div class="form-check">
-                                        <input class="form-check-input dock-check" type="checkbox"
-                                               value="{{ $dock }}" id="dock_{{ $loop->index }}">
-                                        <label class="form-check-label small" for="dock_{{ $loop->index }}">
-                                            Dock {{ $dock }}
-                                        </label>
-                                    </div>
-                                @empty
-                                    <span class="text-muted small">Tidak ada dock</span>
-                                @endforelse
+
+                                <div id="hpmPreviewEmpty"
+                                     class="text-center text-muted py-5"
+                                     style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                                    <i class="bi bi-funnel" style="font-size: 4rem; opacity: 0.4;"></i>
+                                    <p class="mt-3">Pilih filter untuk melihat preview</p>
+                                </div>
+
+                                <iframe id="hpmPrintPreviewIframe"
+                                        style="width: 100%; height: 100%; border: none; display: none;"></iframe>
                             </div>
-                        </div>
-
-                        <hr>
-
-                        {{-- Preview Count --}}
-                        <div class="p-2 bg-white border rounded text-center">
-                            <div class="text-muted small">Akan diprint</div>
-                            <div class="fw-bold fs-4 text-primary" id="printPreviewCount">{{ count($kanbanhpms) }}</div>
-                            <div class="text-muted small">kanban</div>
                         </div>
 
                     </div>
-
-                    {{-- ── RIGHT: Preview Iframe ── --}}
-                    <div class="flex-grow-1 p-0">
-                        <div style="background: #e9ecef; height: 75vh; overflow: hidden; position: relative;">
-
-                            {{-- Loading --}}
-                            <div id="hpmPreviewLoading" class="text-center py-5 d-none"
-                                 style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <p class="mt-3 text-dark">Memuat preview...</p>
-                            </div>
-
-                            {{-- Empty State --}}
-                            <div id="hpmPreviewEmpty"
-                                 class="text-center text-muted py-5"
-                                 style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-                                <i class="bi bi-funnel" style="font-size: 4rem; opacity: 0.4;"></i>
-                                <p class="mt-3">Pilih filter untuk melihat preview</p>
-                            </div>
-
-                            {{-- Iframe --}}
-                            <iframe id="hpmPrintPreviewIframe"
-                                    style="width: 100%; height: 100%; border: none; display: none;"></iframe>
-                        </div>
-                    </div>
-
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Tutup
+                    </button>
+                    <button type="button" class="btn btn-primary" id="hpmDoPrintBtn" disabled
+                            onclick="triggerHpmPrint()">
+                        <i class="bi bi-printer-fill me-2"></i>Print
+                    </button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-lg me-1"></i>Tutup
-                </button>
-                <button type="button" class="btn btn-primary" id="hpmDoPrintBtn" disabled
-                        onclick="triggerHpmPrint()">
-                    <i class="bi bi-printer-fill me-2"></i>Print
-                </button>
-            </div>
-
-            {{-- Hidden form --}}
-            <form id="printFilterForm" action="{{ route('kanbanhpms.printFiltered') }}"
-                  method="POST" target="_blank">
-                @csrf
-                <div id="printFilterInputs"></div>
-            </form>
         </div>
     </div>
-</div>
 
 @endsection
 
@@ -447,129 +380,6 @@
 @push('scripts')
 <script>
 $(document).ready(function () {
-
-    // ===================== PAGINATION =====================
-    let currentPage = 1;
-    let perPage = 10;
-    let allRows = [];
-    let filteredRows = [];
-
-    function initRows() {
-        allRows = $('.hpm-row').not('.empty-row').toArray();
-        filteredRows = [...allRows];
-    }
-    initRows();
-
-    function applyPagination() {
-        $(allRows).hide();
-
-        if (perPage === 'all') {
-            $(filteredRows).show();
-            updatePaginationInfo(1, filteredRows.length, filteredRows.length);
-            renderPagination(1, 1);
-        } else {
-            const totalPages = Math.ceil(filteredRows.length / perPage);
-            if (currentPage > totalPages) currentPage = totalPages || 1;
-
-            const start = (currentPage - 1) * perPage;
-            const end   = start + perPage;
-
-            filteredRows.slice(start, end).forEach(row => $(row).show());
-            updatePaginationInfo(start + 1, Math.min(end, filteredRows.length), filteredRows.length);
-            renderPagination(currentPage, totalPages);
-        }
-    }
-
-    function updatePaginationInfo(from, to, total) {
-        if (total === 0) {
-            $('#paginationInfo').html('No entries found');
-        } else {
-            $('#showingFrom').text(from);
-            $('#showingTo').text(to);
-            $('#totalFiltered').text(total);
-        }
-    }
-
-    function renderPagination(current, total) {
-        if (total <= 1) { $('#paginationNav').html(''); return; }
-
-        let html = `<li class="page-item ${current === 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" data-page="${current - 1}">«</a></li>`;
-
-        let start = Math.max(1, current - 2);
-        let end   = Math.min(total, current + 2);
-
-        if (start > 1) {
-            html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
-            if (start > 2) html += `<li class="page-item disabled"><span class="page-link">…</span></li>`;
-        }
-        for (let i = start; i <= end; i++) {
-            html += `<li class="page-item ${i === current ? 'active' : ''}">
-                <a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
-        }
-        if (end < total) {
-            if (end < total - 1) html += `<li class="page-item disabled"><span class="page-link">…</span></li>`;
-            html += `<li class="page-item"><a class="page-link" href="#" data-page="${total}">${total}</a></li>`;
-        }
-        html += `<li class="page-item ${current === total ? 'disabled' : ''}">
-            <a class="page-link" href="#" data-page="${current + 1}">»</a></li>`;
-
-        $('#paginationNav').html(html);
-    }
-
-    $(document).on('click', '#paginationNav .page-link', function (e) {
-        e.preventDefault();
-        const page = $(this).data('page');
-        if (page && !$(this).parent().hasClass('disabled')) {
-            currentPage = page;
-            applyPagination();
-        }
-    });
-
-    $('#perPageSelect').on('change', function () {
-        const val = $(this).val();
-        perPage = val === 'all' ? 'all' : parseInt(val);
-        currentPage = 1;
-        applyPagination();
-    });
-
-    // ===================== FILTER =====================
-    function filterTable() {
-        const search       = $('#searchInput').val().toLowerCase();
-        const supplyFilter = $('#supplyFilterSelect').val();
-
-        filteredRows = allRows.filter(function (row) {
-            const $row   = $(row);
-            const supply = String($row.data('supply'));
-            const text   = $row.text().toLowerCase();
-
-            return (search === '' || text.includes(search)) &&
-                   (supplyFilter === 'all' || supply === supplyFilter);
-        });
-
-        currentPage = 1;
-        applyPagination();
-        $('#selectAll').prop('checked', false);
-    }
-
-    $('#searchButton').on('click', filterTable);
-    $('#searchInput').on('input', filterTable);
-    $('#searchInput').on('keypress', function (e) { if (e.which === 13) filterTable(); });
-    $('#supplyFilterSelect').on('change', filterTable);
-
-    applyPagination();
-
-    // ===================== SELECT ALL =====================
-    $('#selectAll').on('change', function () {
-        const checked = $(this).is(':checked');
-        $('.hpm-row:visible .row-select').prop('checked', checked);
-    });
-
-    $(document).on('change', '.row-select', function () {
-        const totalVisible   = $('.hpm-row:visible .row-select').length;
-        const checkedVisible = $('.hpm-row:visible .row-select:checked').length;
-        $('#selectAll').prop('checked', totalVisible > 0 && totalVisible === checkedVisible);
-    });
 
     // ===================== DELETE =====================
     $(document).on('submit', '.delete-form', function (e) {
@@ -624,7 +434,6 @@ $(document).ready(function () {
     // ===================== IMPORT TXT =====================
     $('#importTxtForm').on('submit', function (e) {
         e.preventDefault();
-        const formData  = new FormData(this);
         const fileInput = $('#txtFile')[0];
 
         if (!fileInput.files.length) {
@@ -647,6 +456,7 @@ $(document).ready(function () {
                 $('#importProgress').removeClass('d-none');
                 $('#importButton').prop('disabled', true);
 
+                const formData = new FormData($('#importTxtForm')[0]);
                 $.ajax({
                     url: '{{ route("kanbanhpms.import") }}',
                     type: 'POST',
@@ -671,7 +481,6 @@ $(document).ready(function () {
                             title: 'Gagal!',
                             text: xhr.responseJSON?.message || 'Terjadi kesalahan saat import',
                             icon: 'error',
-                            confirmButtonColor: '#dc2626',
                         });
                     },
                 });
@@ -679,7 +488,6 @@ $(document).ready(function () {
         });
     });
 
-    // Reset modal import saat ditutup
     $('#importTxtModal').on('hidden.bs.modal', function () {
         $('#txtFile').val('');
         $('#importProgress').addClass('d-none');
@@ -687,8 +495,6 @@ $(document).ready(function () {
     });
 
     // ===================== ADJUST WEEKLY =====================
-
-    // File preview
     $('#fileWeekly').on('change', function () {
         const file = this.files[0];
         if (file) {
@@ -699,7 +505,6 @@ $(document).ready(function () {
         }
     });
 
-    // Reset modal saat ditutup
     $('#adjustWeeklyModal').on('hidden.bs.modal', function () {
         $('#fileWeekly').val('');
         $('#fileWeeklyPreview').addClass('d-none');
@@ -707,7 +512,6 @@ $(document).ready(function () {
         $('#adjustWeeklyButton').prop('disabled', false);
     });
 
-    // Submit
     $('#adjustWeeklyForm').on('submit', function (e) {
         e.preventDefault();
 
@@ -716,7 +520,6 @@ $(document).ready(function () {
                 title: 'Perhatian!',
                 text: 'Pilih file Excel Weekly terlebih dahulu.',
                 icon: 'warning',
-                confirmButtonColor: '#3085d6',
             });
             return;
         }
@@ -754,11 +557,75 @@ $(document).ready(function () {
 
 });
 
-/// ===================== PRINT FILTER =====================
 
-const kanbanData = @json($kanbanPrintData);
+// ===================== PRINT FILTER =====================
 
+let hpmFilterData   = { dates: [], docks: [] };
 let hpmPreviewDebounce = null;
+
+// Buka modal → fetch filter options via AJAX
+document.getElementById('printFilterModal').addEventListener('show.bs.modal', function () {
+    // Reset state
+    document.getElementById('filterLoadingSpinner').classList.remove('d-none');
+    document.getElementById('filterContent').classList.add('d-none');
+    document.getElementById('hpmPreviewLoading').classList.add('d-none');
+    document.getElementById('hpmPreviewEmpty').classList.remove('d-none');
+    document.getElementById('hpmPrintPreviewIframe').style.display = 'none';
+    document.getElementById('hpmPrintPreviewIframe').src = 'about:blank';
+    document.getElementById('hpmDoPrintBtn').disabled = true;
+    document.getElementById('printPreviewCount').textContent = '0';
+
+    // Fetch filter options
+    fetch('{{ route("kanbanhpms.filterOptions") }}')
+        .then(r => r.json())
+        .then(data => {
+            hpmFilterData = data;
+            renderDateChecks(data.dates);
+            renderDockChecks(data.docks);
+
+            document.getElementById('filterLoadingSpinner').classList.add('d-none');
+            document.getElementById('filterContent').classList.remove('d-none');
+        })
+        .catch(() => {
+            document.getElementById('filterLoadingSpinner').innerHTML =
+                '<p class="text-danger small">Gagal memuat filter.</p>';
+        });
+});
+
+// Tutup modal → reset iframe
+document.getElementById('printFilterModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('hpmPrintPreviewIframe').src = 'about:blank';
+});
+
+function renderDateChecks(dates) {
+    const container = document.getElementById('dateCheckList');
+    if (!dates.length) {
+        container.innerHTML = '<span class="text-muted small">Tidak ada tanggal</span>';
+        return;
+    }
+    container.innerHTML = dates.map((d, i) => `
+        <div class="form-check">
+            <input class="form-check-input date-check" type="checkbox"
+                   value="${d}" id="date_${i}" onchange="onHpmFilterChange()">
+            <label class="form-check-label small" for="date_${i}">${d}</label>
+        </div>
+    `).join('');
+}
+
+function renderDockChecks(docks) {
+    const container = document.getElementById('dockCheckList');
+    if (!docks.length) {
+        container.innerHTML = '<span class="text-muted small">Tidak ada dock</span>';
+        return;
+    }
+    container.innerHTML = docks.map((d, i) => `
+        <div class="form-check">
+            <input class="form-check-input dock-check" type="checkbox"
+                   value="${d}" id="dock_${i}" onchange="onHpmFilterChange()">
+            <label class="form-check-label small" for="dock_${i}">Dock ${d}</label>
+        </div>
+    `).join('');
+}
 
 function toggleAllDates(cb) {
     document.querySelectorAll('.date-check').forEach(c => c.checked = cb.checked);
@@ -768,44 +635,32 @@ function toggleAllDocks(cb) {
     document.querySelectorAll('.dock-check').forEach(c => c.checked = cb.checked);
     onHpmFilterChange();
 }
-function selectAllDocks() {
-    document.querySelectorAll('.dock-check').forEach(c => c.checked = true);
-    document.getElementById('checkAllDocks').checked = true;
-    onHpmFilterChange();
-}
-function deselectAllDocks() {
-    document.querySelectorAll('.dock-check').forEach(c => c.checked = false);
-    document.getElementById('checkAllDocks').checked = false;
-    onHpmFilterChange();
-}
 
-function getHpmSelectedDates() {
+function getSelectedDates() {
     return [...document.querySelectorAll('.date-check:checked')].map(c => c.value);
 }
-function getHpmSelectedDocks() {
+function getSelectedDocks() {
     return [...document.querySelectorAll('.dock-check:checked')].map(c => c.value);
 }
 
-function updateHpmPreviewCount() {
-    const selectedDates = getHpmSelectedDates();
-    const selectedDocks = getHpmSelectedDocks();
+function onHpmFilterChange() {
+    const selDates = getSelectedDates();
+    const selDocks = getSelectedDocks();
 
-    const count = kanbanData.filter(item => {
-        const dateOk = selectedDates.length === 0 || selectedDates.includes(item.date);
-        const dockOk = selectedDocks.length === 0 || selectedDocks.includes(item.dock);
-        return dateOk && dockOk;
-    }).length;
+    // Sync "semua" checkboxes
+    const allDates    = document.querySelectorAll('.date-check');
+    const allDocks    = document.querySelectorAll('.dock-check');
+    document.getElementById('checkAllDates').checked = allDates.length > 0 && allDates.length === selDates.length;
+    document.getElementById('checkAllDocks').checked = allDocks.length > 0 && allDocks.length === selDocks.length;
 
-    document.getElementById('printPreviewCount').textContent = count;
-    return count;
-}
+    // Hitung preview count dari data yg di-fetch
+    // (estimasi client-side berdasarkan filter date+dock)
+    // Karena filterOptions hanya return dates & docks (bukan per-item),
+    // kita tampilkan "?" dan biarkan server yang hitung via iframe
+    const hasFilter = selDates.length > 0 || selDocks.length > 0;
+    document.getElementById('printPreviewCount').textContent = hasFilter ? '...' : '0';
 
-function loadHpmPreview() {
-    const selectedDates = getHpmSelectedDates();
-    const selectedDocks = getHpmSelectedDocks();
-    const count = updateHpmPreviewCount();
-
-    if (count === 0) {
+    if (!hasFilter) {
         document.getElementById('hpmPreviewLoading').classList.add('d-none');
         document.getElementById('hpmPreviewEmpty').classList.remove('d-none');
         document.getElementById('hpmPrintPreviewIframe').style.display = 'none';
@@ -813,69 +668,44 @@ function loadHpmPreview() {
         return;
     }
 
+    // Debounce load preview
+    clearTimeout(hpmPreviewDebounce);
+    hpmPreviewDebounce = setTimeout(loadHpmPreview, 500);
+}
+
+function loadHpmPreview() {
+    const selDates = getSelectedDates();
+    const selDocks = getSelectedDocks();
+
     document.getElementById('hpmPreviewLoading').classList.remove('d-none');
     document.getElementById('hpmPreviewEmpty').classList.add('d-none');
     document.getElementById('hpmPrintPreviewIframe').style.display = 'none';
     document.getElementById('hpmDoPrintBtn').disabled = true;
 
-    // Build query params
-    let params = new URLSearchParams();
-    selectedDates.forEach(d => params.append('dates[]', d));
-    selectedDocks.forEach(d => params.append('docks[]', d));
+    // Build GET params
+    const params = new URLSearchParams();
+    selDates.forEach(d => params.append('dates[]', d));
+    selDocks.forEach(d => params.append('docks[]', d));
     params.append('_token', '{{ csrf_token() }}');
 
-    // GET request untuk preview (controller perlu support GET)
     const url = '{{ route("kanbanhpms.printFiltered") }}?' + params.toString();
-
     const iframe = document.getElementById('hpmPrintPreviewIframe');
+
     iframe.onload = function () {
         document.getElementById('hpmPreviewLoading').classList.add('d-none');
-        document.getElementById('hpmPrintPreviewIframe').style.display = 'block';
+        iframe.style.display = 'block';
         document.getElementById('hpmDoPrintBtn').disabled = false;
+
+        // Hitung jumlah kanban dari iframe (frame-1 = 1 kanban)
+        try {
+            const count = iframe.contentDocument.querySelectorAll('.frame-1').length;
+            document.getElementById('printPreviewCount').textContent = count;
+        } catch(e) {
+            document.getElementById('printPreviewCount').textContent = '✓';
+        }
     };
     iframe.src = url;
 }
-
-function onHpmFilterChange() {
-    updateHpmPreviewCount();
-    // Sync "Semua" checkboxes
-    const allDates = document.querySelectorAll('.date-check');
-    const checkedDates = document.querySelectorAll('.date-check:checked');
-    document.getElementById('checkAllDates').checked = allDates.length > 0 && allDates.length === checkedDates.length;
-
-    const allDocks = document.querySelectorAll('.dock-check');
-    const checkedDocks = document.querySelectorAll('.dock-check:checked');
-    document.getElementById('checkAllDocks').checked = allDocks.length > 0 && allDocks.length === checkedDocks.length;
-
-    // Debounce preview load
-    clearTimeout(hpmPreviewDebounce);
-    hpmPreviewDebounce = setTimeout(loadHpmPreview, 400);
-}
-
-// Trigger dari checkbox change
-document.addEventListener('change', function (e) {
-    if (e.target.classList.contains('date-check') || e.target.classList.contains('dock-check')) {
-        onHpmFilterChange();
-    }
-});
-
-// Reset & load saat modal dibuka
-document.getElementById('printFilterModal').addEventListener('show.bs.modal', function () {
-    document.querySelectorAll('.date-check, .dock-check').forEach(c => c.checked = false);
-    document.getElementById('checkAllDates').checked = false;
-    document.getElementById('checkAllDocks').checked = false;
-    document.getElementById('printPreviewCount').textContent = kanbanData.length;
-    document.getElementById('hpmPreviewLoading').classList.add('d-none');
-    document.getElementById('hpmPreviewEmpty').classList.remove('d-none');
-    document.getElementById('hpmPrintPreviewIframe').style.display = 'none';
-    document.getElementById('hpmPrintPreviewIframe').src = 'about:blank';
-    document.getElementById('hpmDoPrintBtn').disabled = true;
-});
-
-// Reset saat modal ditutup
-document.getElementById('printFilterModal').addEventListener('hidden.bs.modal', function () {
-    document.getElementById('hpmPrintPreviewIframe').src = 'about:blank';
-});
 
 function triggerHpmPrint() {
     const iframe = document.getElementById('hpmPrintPreviewIframe');
