@@ -9,17 +9,41 @@
     <!-- Top Bar -->
     <div class="d-flex justify-content-between align-items-center gap-2 mb-3 mt-3">
 
-        <!-- Left: Last Upload Info -->
-        <div class="d-flex align-items-center gap-2 ms-3">
+        <!-- Left: Last Upload Info + Adjust Summary -->
+        <div class="d-flex align-items-center gap-3 ms-3">
+
+            {{-- Last Upload --}}
             @if($latestUploadInfo)
-                <strong>Last Upload:</strong> {{ $latestUploadInfo->last_upload_at }}
-                by <strong>{{ $latestUploadInfo->uploaded_by }}</strong>
+                <span><strong>Last Upload:</strong> {{ $latestUploadInfo->last_upload_at }}
+                by <strong>{{ $latestUploadInfo->uploaded_by }}</strong></span>
                 @if($latestDate)
-                    &nbsp;|&nbsp; <span class="badge bg-primary">Tanggal: {{ $latestDate }}</span>
+                    <span class="badge bg-primary">Tanggal: {{ $latestDate }}</span>
                 @endif
             @else
                 <span class="text-muted">Belum ada data diimport</span>
             @endif
+
+            <div class="vr"></div>
+
+            {{-- Adjust Summary --}}
+            <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-1 px-2 py-1 rounded"
+                     style="background: #EAF3DE; border: 0.5px solid #C0DD97;">
+                    <i class="bi bi-calendar-check" style="color: #3B6D11;"></i>
+                    <span style="font-size: 0.78rem; color: #3B6D11; font-weight: 500;">
+                        Adjusted: <strong>{{ $totalAdjusted }}</strong>
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-1 px-2 py-1 rounded"
+                     style="background: #FAEEDA; border: 0.5px solid #FAC775;">
+                    <i class="bi bi-calendar-x" style="color: #854F0B;"></i>
+                    <span style="font-size: 0.78rem; color: #854F0B; font-weight: 500;">
+                        Belum: <strong>{{ $totalUnadjusted }}</strong>
+                    </span>
+                </div>
+                
+            </div>
+
         </div>
 
         <!-- Right: Controls -->
@@ -126,10 +150,8 @@
                                   method="POST" class="d-inline delete-form">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit"
-                                        class="btn btn-danger btn-sm"
-                                        style="border-radius: 6px;"
-                                        title="Hapus">
+                                <button type="submit" class="btn btn-danger btn-sm"
+                                        style="border-radius: 6px;" title="Hapus">
                                     <i class="bi bi-trash-fill"></i>
                                 </button>
                             </form>
@@ -149,7 +171,7 @@
         </table>
     </div>
 
-    <!-- Server-side Pagination -->
+    <!-- Pagination -->
     <div class="d-flex justify-content-end mt-3 me-3">
         {{ $kanbanhpms->links('pagination::bootstrap-5') }}
     </div>
@@ -171,7 +193,7 @@
                     <div class="modal-body">
                         <div class="alert alert-warning">
                             <i class="bi bi-exclamation-triangle me-2"></i>
-                            <strong>Perhatian!</strong> Jangan Import data yang sama 2x. jika dilakukan maka kanban yang di cetak akan duplikat
+                            <strong>Perhatian!</strong> Jangan import data yang sama 2x, kanban yang dicetak akan duplikat.
                         </div>
                         <div class="mb-3">
                             <label for="txtFile" class="form-label text-dark">Pilih File TXT</label>
@@ -225,8 +247,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-dark">
-                                <i class="bi bi-file-earmark-excel text-success me-1"></i>
-                                File Weekly
+                                <i class="bi bi-file-earmark-excel text-success me-1"></i>File Weekly
                             </label>
                             <input type="file" class="form-control" id="fileWeekly"
                                    name="file_weekly" accept=".xlsx,.xls" required>
@@ -275,10 +296,9 @@
                 <div class="modal-body text-dark p-0">
                     <div class="d-flex" style="min-height: 75vh;">
 
-                        {{-- ── LEFT: Filter Panel ── --}}
+                        <!-- Left: Filter Panel -->
                         <div class="flex-shrink-0 border-end p-3" style="width: 240px; background: #f8f9fa;">
 
-                            {{-- Loading filter --}}
                             <div id="filterLoadingSpinner" class="text-center py-4">
                                 <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
                                 <p class="small text-muted mt-2">Memuat filter...</p>
@@ -286,7 +306,7 @@
 
                             <div id="filterContent" class="d-none">
 
-                                {{-- Filter Tanggal --}}
+                                <!-- Filter Tanggal -->
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">
                                         <i class="bi bi-calendar3 text-primary me-1"></i>Tanggal
@@ -306,7 +326,7 @@
 
                                 <hr>
 
-                                {{-- Filter Dock --}}
+                                <!-- Filter Dock -->
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">
                                         <i class="bi bi-signpost-split text-success me-1"></i>Dock
@@ -326,7 +346,7 @@
 
                                 <hr>
 
-                                {{-- Preview Count --}}
+                                <!-- Preview Count -->
                                 <div class="p-2 bg-white border rounded text-center">
                                     <div class="text-muted small">Akan diprint</div>
                                     <div class="fw-bold fs-4 text-primary" id="printPreviewCount">0</div>
@@ -336,7 +356,7 @@
                             </div>
                         </div>
 
-                        {{-- ── RIGHT: Preview Iframe ── --}}
+                        <!-- Right: Preview Iframe -->
                         <div class="flex-grow-1 p-0">
                             <div style="background: #e9ecef; height: 75vh; overflow: hidden; position: relative;">
 
@@ -346,8 +366,7 @@
                                     <p class="mt-3 text-dark">Memuat preview...</p>
                                 </div>
 
-                                <div id="hpmPreviewEmpty"
-                                     class="text-center text-muted py-5"
+                                <div id="hpmPreviewEmpty" class="text-center text-muted py-5"
                                      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
                                     <i class="bi bi-funnel" style="font-size: 4rem; opacity: 0.4;"></i>
                                     <p class="mt-3">Pilih filter untuk melihat preview</p>
@@ -405,7 +424,6 @@ $(document).ready(function () {
                     allowEscapeKey: false,
                     didOpen: () => Swal.showLoading(),
                 });
-
                 $.ajax({
                     url: url,
                     type: 'POST',
@@ -516,11 +534,7 @@ $(document).ready(function () {
         e.preventDefault();
 
         if ($('#fileWeekly')[0].files.length === 0) {
-            Swal.fire({
-                title: 'Perhatian!',
-                text: 'Pilih file Excel Weekly terlebih dahulu.',
-                icon: 'warning',
-            });
+            Swal.fire({ title: 'Perhatian!', text: 'Pilih file Excel Weekly terlebih dahulu.', icon: 'warning' });
             return;
         }
 
@@ -560,12 +574,10 @@ $(document).ready(function () {
 
 // ===================== PRINT FILTER =====================
 
-let hpmFilterData   = { dates: [], docks: [] };
+let hpmFilterData      = { dates: [], docks: [] };
 let hpmPreviewDebounce = null;
 
-// Buka modal → fetch filter options via AJAX
 document.getElementById('printFilterModal').addEventListener('show.bs.modal', function () {
-    // Reset state
     document.getElementById('filterLoadingSpinner').classList.remove('d-none');
     document.getElementById('filterContent').classList.add('d-none');
     document.getElementById('hpmPreviewLoading').classList.add('d-none');
@@ -575,14 +587,12 @@ document.getElementById('printFilterModal').addEventListener('show.bs.modal', fu
     document.getElementById('hpmDoPrintBtn').disabled = true;
     document.getElementById('printPreviewCount').textContent = '0';
 
-    // Fetch filter options
     fetch('{{ route("kanbanhpms.filterOptions") }}')
         .then(r => r.json())
         .then(data => {
             hpmFilterData = data;
             renderDateChecks(data.dates);
             renderDockChecks(data.docks);
-
             document.getElementById('filterLoadingSpinner').classList.add('d-none');
             document.getElementById('filterContent').classList.remove('d-none');
         })
@@ -592,7 +602,6 @@ document.getElementById('printFilterModal').addEventListener('show.bs.modal', fu
         });
 });
 
-// Tutup modal → reset iframe
 document.getElementById('printFilterModal').addEventListener('hidden.bs.modal', function () {
     document.getElementById('hpmPrintPreviewIframe').src = 'about:blank';
 });
@@ -631,6 +640,7 @@ function toggleAllDates(cb) {
     document.querySelectorAll('.date-check').forEach(c => c.checked = cb.checked);
     onHpmFilterChange();
 }
+
 function toggleAllDocks(cb) {
     document.querySelectorAll('.dock-check').forEach(c => c.checked = cb.checked);
     onHpmFilterChange();
@@ -639,6 +649,7 @@ function toggleAllDocks(cb) {
 function getSelectedDates() {
     return [...document.querySelectorAll('.date-check:checked')].map(c => c.value);
 }
+
 function getSelectedDocks() {
     return [...document.querySelectorAll('.dock-check:checked')].map(c => c.value);
 }
@@ -647,16 +658,11 @@ function onHpmFilterChange() {
     const selDates = getSelectedDates();
     const selDocks = getSelectedDocks();
 
-    // Sync "semua" checkboxes
-    const allDates    = document.querySelectorAll('.date-check');
-    const allDocks    = document.querySelectorAll('.dock-check');
+    const allDates = document.querySelectorAll('.date-check');
+    const allDocks = document.querySelectorAll('.dock-check');
     document.getElementById('checkAllDates').checked = allDates.length > 0 && allDates.length === selDates.length;
     document.getElementById('checkAllDocks').checked = allDocks.length > 0 && allDocks.length === selDocks.length;
 
-    // Hitung preview count dari data yg di-fetch
-    // (estimasi client-side berdasarkan filter date+dock)
-    // Karena filterOptions hanya return dates & docks (bukan per-item),
-    // kita tampilkan "?" dan biarkan server yang hitung via iframe
     const hasFilter = selDates.length > 0 || selDocks.length > 0;
     document.getElementById('printPreviewCount').textContent = hasFilter ? '...' : '0';
 
@@ -668,7 +674,6 @@ function onHpmFilterChange() {
         return;
     }
 
-    // Debounce load preview
     clearTimeout(hpmPreviewDebounce);
     hpmPreviewDebounce = setTimeout(loadHpmPreview, 500);
 }
@@ -682,25 +687,22 @@ function loadHpmPreview() {
     document.getElementById('hpmPrintPreviewIframe').style.display = 'none';
     document.getElementById('hpmDoPrintBtn').disabled = true;
 
-    // Build GET params
     const params = new URLSearchParams();
     selDates.forEach(d => params.append('dates[]', d));
     selDocks.forEach(d => params.append('docks[]', d));
     params.append('_token', '{{ csrf_token() }}');
 
-    const url = '{{ route("kanbanhpms.printFiltered") }}?' + params.toString();
+    const url    = '{{ route("kanbanhpms.printFiltered") }}?' + params.toString();
     const iframe = document.getElementById('hpmPrintPreviewIframe');
 
     iframe.onload = function () {
         document.getElementById('hpmPreviewLoading').classList.add('d-none');
         iframe.style.display = 'block';
         document.getElementById('hpmDoPrintBtn').disabled = false;
-
-        // Hitung jumlah kanban dari iframe (frame-1 = 1 kanban)
         try {
             const count = iframe.contentDocument.querySelectorAll('.frame-1').length;
             document.getElementById('printPreviewCount').textContent = count;
-        } catch(e) {
+        } catch (e) {
             document.getElementById('printPreviewCount').textContent = '✓';
         }
     };

@@ -21,22 +21,23 @@ class KanbanHpmController extends Controller
                 $q->whereNull('expires_at')
                 ->orWhere('expires_at', '>', now());
             })
-            ->whereNotNull('datetime')
-            ->orderByRaw("STR_TO_DATE(SUBSTRING_INDEX(TRIM(datetime), ' ', 1), '%d-%m-%Y') DESC")
-            ->value('datetime');
+            ->whereNotNull('adjusted_datetime')
+            ->where('adjusted_datetime', '!=', '')
+            ->orderByRaw("STR_TO_DATE(SUBSTRING_INDEX(TRIM(adjusted_datetime), ' ', 1), '%d-%m-%Y') DESC")
+            ->value('adjusted_datetime');
 
         $latestDate = $latestDateRaw
-            ? explode(' ', trim($latestDateRaw))[0]
-            : null;
+                    ? explode(' ', trim($latestDateRaw))[0]
+                    : null;
 
-        $kanbanhpms = KanbanHpm::orderBy('di_no')
+                $kanbanhpms = KanbanHpm::orderBy('di_no')
             ->orderBy('item_seq')
             ->where(function ($q) {
                 $q->whereNull('expires_at')
                 ->orWhere('expires_at', '>', now());
             })
             ->when($latestDate, function ($q) use ($latestDate) {
-                $q->where('datetime', 'LIKE', $latestDate . '%');
+                $q->where('adjusted_datetime', 'LIKE', $latestDate . '%');
             })
             ->paginate(20)
             ->withQueryString();
@@ -46,9 +47,19 @@ class KanbanHpmController extends Controller
                 ->orWhere('expires_at', '>', now());
             })->count();
 
+            $totalAdjusted = KanbanHpm::where(function ($q) {
+                $q->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+            })
+            ->whereNotNull('adjusted_datetime')
+            ->where('adjusted_datetime', '!=', '')
+            ->count();
+
+        $totalUnadjusted = $totalAll - $totalAdjusted;
+
         $latestUploadInfo = KanbanHpm::getLatestUploadInfo();
 
-        return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'latestDate', 'totalAll'));
+       return view('kanbanhpms.index', compact('kanbanhpms', 'latestUploadInfo', 'latestDate', 'totalAll', 'totalAdjusted', 'totalUnadjusted'));
     }
 
     /**
@@ -262,7 +273,7 @@ class KanbanHpmController extends Controller
             $sheet     = $spreadsheet->getActiveSheet();
             $sheetName = $sheet->getTitle();
 
-            $adjustMap = $this->parseAdjustExcel($path, [$sheetName], 16, 10, 12, 5);
+            $adjustMap = $this->parseAdjustExcel($path, [$sheetName], 8, 10, 12, 5);
 
             Log::info("AdjustWeekly: parsed sheet='{$sheetName}', entries=" . count($adjustMap));
 
@@ -284,8 +295,8 @@ class KanbanHpmController extends Controller
 
             $kanbanhpms = KanbanHpm::all();
 
-            foreach ($kanbanhpms as $item) {
-                $key = trim($item->kd_lot_no);
+           foreach ($kanbanhpms as $item) {
+                $key = trim(preg_replace('/^DI/i', '', $item->di_no));
 
                 if (isset($adjustMap[$key])) {
                     $adj         = $adjustMap[$key];
@@ -360,7 +371,7 @@ class KanbanHpmController extends Controller
                 $adjTime = $sheet->getCellByColumnAndRow($colAdjTime + 1, $rowIdx)->getValue();
 
                 if ($debugSamples < 3) {
-                    Log::debug("AdjustWeekly row {$rowIdx}: KD=" . var_export($kdRaw, true)
+                    Log::debug("AdjustWeekly row {$rowIdx}: SlipNo=" . var_export($kdRaw, true)
                         . " | Date=" . var_export($adjDate, true) . " (" . gettype($adjDate) . ")"
                         . " | Time=" . var_export($adjTime, true) . " (" . gettype($adjTime) . ")");
                     $debugSamples++;

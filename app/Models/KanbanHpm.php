@@ -38,7 +38,7 @@ class KanbanHpm extends Model
      * Get latest upload info
      */
     public static function getLatestUploadInfo()
-    {
+    {                 
         return static::orderBy('created_at', 'desc')->first();
     }
 }

@@ -570,6 +570,11 @@
                                 HPM
                             </a>
                         </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanbanadms.index') }}">
+                                ADM
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
@@ -600,6 +605,10 @@
 
                             <a href="{{ route('admaddresses.index') }}" class="fs-6">
                                 <i class="fas fa-address-book"></i> ADM Address
+                            </a>
+
+                            <a href="{{ route('arsadms.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> ADM ARS
                             </a>
 
                             {{-- MENU ANDON UTAMA (klik untuk collapse) --}}

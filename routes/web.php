@@ -21,7 +21,9 @@ use App\Http\Controllers\KanbanHpmController;
 use App\Http\Controllers\HpmAddressController;
 use App\Http\Controllers\SlipHpmController;
 use App\Http\Controllers\PullingMatrixController;
-use App\Http\Controllers\AdmaddressController; // << tambahan
+use App\Http\Controllers\AdmaddressController; 
+use App\Http\Controllers\KanbanadmController;
+use App\Http\Controllers\ArsAdmController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -340,6 +342,31 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/data',    [RunningTextController::class, 'getData'])->name('data');
         Route::post('/update', [RunningTextController::class, 'update']) ->name('update');
     });
+    
+     /*
+    |----------------------------------------------------------------------
+    | Kanban ADM
+    |----------------------------------------------------------------------
+    */
+    Route::prefix('kanbanadms')->name('kanbanadms.')->group(function () {
+        Route::get('/',               [KanbanadmController::class, 'index'])         ->name('index');
+        Route::get('/printall',       [KanbanadmController::class, 'printAll'])      ->name('printall');
+        Route::get('/print-selected', [KanbanadmController::class, 'printSelected']) ->name('printselected');
+        Route::post('/import',        [KanbanadmController::class, 'import'])        ->name('import');
+        Route::delete('/{id}',        [KanbanadmController::class, 'destroy'])       ->name('destroy');
+    });
+
+    Route::prefix('arsadms')->name('arsadms.')->group(function () {
+        Route::get('/',              [ArsAdmController::class, 'index'])->name('index');
+        Route::post('/',             [ArsAdmController::class, 'store'])->name('store');
+        Route::get('/{arsadm}/edit', [ArsAdmController::class, 'edit'])->name('edit');
+        Route::put('/{arsadm}',      [ArsAdmController::class, 'update'])->name('update');
+        Route::delete('/delete-all', [ArsAdmController::class, 'deleteAll'])->name('deleteAll');
+        Route::delete('/{arsadm}',   [ArsAdmController::class, 'destroy'])->name('destroy');
+        Route::post('/import',       [ArsAdmController::class, 'import'])->name('import');
+    });
+
+ 
 
 }); // end middleware auth
 
