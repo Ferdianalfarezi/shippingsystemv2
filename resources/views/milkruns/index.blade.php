@@ -53,6 +53,13 @@
                 <i class="bi bi-printer-fill"></i>
             </button>
         </div>
+
+        <!-- Export Excel Button -->
+        <div class="card border-0 shadow-sm p-1 bg-success">
+            <button type="button" class="btn btn-success" id="exportExcelButton" title="Export Excel">
+                <i class="bi bi-file-earmark-excel-fill"></i>
+            </button>
+        </div>
         
         <!-- Date Filter -->
         <div class="card border-0 shadow-sm">
@@ -403,6 +410,24 @@
                     });
                 }
             });
+        });
+
+        // Export Excel Button
+        $('#exportExcelButton').on('click', function() {
+            const dateFilter = $('#dateFilter').val();
+            const status = $('#statusFilter').val();
+            const search = $('#searchInput').val();
+
+            let url = '{{ route("milkruns.export") }}?date=' + dateFilter;
+
+            if (status && status !== 'all') {
+                url += '&status=' + status;
+            }
+            if (search && search.trim() !== '') {
+                url += '&search=' + encodeURIComponent(search);
+            }
+
+            window.location.href = url;
         });
 
         // Handle Search

@@ -260,61 +260,77 @@ class KanbanTmminsController extends Controller
     }
 
     /**
-     * Extract part_address from D1
+     * Cari part_address DAN index kolom tempat nilainya ketemu di $d1.
+     * Logic pencarian (4 tahap fallback) SAMA PERSIS dengan versi sebelumnya —
+     * cuma sekarang index-nya ikut dikembalikan, supaya bisa dipakai lagi oleh
+     * extractUniqueNo() untuk ambil "3 kolom setelah part_address".
      */
-    private function extractPartAddress($d1)
+    private function findPartAddress($d1)
     {
         $part_address = 'UNKNOWN';
-        
+        $foundIndex = null;
+
         foreach ($d1 as $index => $value) {
             if (preg_match('/^[A-Z0-9]{12}$/', trim($value))) {
                 if (isset($d1[$index + 1])) {
                     $candidate = trim($d1[$index + 1]);
                     if (strpos($candidate, '-') !== false) {
                         $part_address = preg_replace('/\s*-\s*/', ' - ', $candidate);
+                        $foundIndex = $index + 1;
                         break;
                     }
                 }
             }
         }
-        
+
         if ($part_address === 'UNKNOWN') {
             $addressPatterns = ['/[A-Z][0-9]-[0-9]+/', '/[A-Z][0-9]-[0-9]+-[A-Z]/', '/UB[0-9][\s\-]+[0-9]+/'];
-            foreach ($d1 as $value) {
+            foreach ($d1 as $index => $value) {
                 $cleanValue = trim($value);
                 foreach ($addressPatterns as $pattern) {
                     if (preg_match($pattern, $cleanValue)) {
                         $part_address = $cleanValue;
+                        $foundIndex = $index;
                         break 2;
                     }
                 }
             }
         }
-        
+
         if ($part_address === 'UNKNOWN') {
             foreach ($d1 as $index => $value) {
                 if (trim($value) === 'UB1') {
                     for ($i = 1; $i <= 3; $i++) {
                         if (isset($d1[$index + $i]) && strpos(trim($d1[$index + $i]), '-') !== false) {
                             $part_address = trim($d1[$index + $i]);
+                            $foundIndex = $index + $i;
                             break 2;
                         }
                     }
                 }
             }
         }
-        
+
         if ($part_address === 'UNKNOWN') {
             $addressColumns = [11, 12, 13];
             foreach ($addressColumns as $col) {
                 if (isset($d1[$col]) && strpos(trim($d1[$col]), '-') !== false) {
                     $part_address = trim($d1[$col]);
+                    $foundIndex = $col;
                     break;
                 }
             }
         }
-        
-        return $part_address;
+
+        return ['value' => $part_address, 'index' => $foundIndex];
+    }
+
+    /**
+     * Extract part_address from D1
+     */
+    private function extractPartAddress($d1)
+    {
+        return $this->findPartAddress($d1)['value'];
     }
 
     /**
@@ -723,20 +739,25 @@ class KanbanTmminsController extends Controller
     }
 
     /**
-     * Extract unique_no from D1
+     * Extract unique_no.
+     *
+     * Diambil dari posisi 3 kolom SETELAH kolom tempat part_address ditemukan
+     * (pakai index yang sama persis dengan yang dipakai extractPartAddress(),
+     * lewat helper findPartAddress()). Posisi ini terbukti konsisten untuk
+     * kedua format file (TMMIN/KRW: hasilnya mis. "163D"; ADM/TSTP: mis. "T029").
      */
     private function extractUniqueNo($d1, $manifestNo)
     {
         $unique_no = 'UNKNOWN';
-        $uniqueNoPattern = '/^(\d{3}[A-Z]|\d{4})$/';
-        $targetColumns = [12, 13];
 
-        foreach ($targetColumns as $col) {
-            if (isset($d1[$col])) {
-                $cleanValue = trim($d1[$col]);
-                if (preg_match($uniqueNoPattern, $cleanValue)) {
+        $partAddressIndex = $this->findPartAddress($d1)['index'];
+
+        if ($partAddressIndex !== null) {
+            $targetIndex = $partAddressIndex + 3;
+            if (isset($d1[$targetIndex])) {
+                $cleanValue = trim($d1[$targetIndex]);
+                if ($cleanValue !== '') {
                     $unique_no = $cleanValue;
-                    break;
                 }
             }
         }
@@ -946,173 +967,170 @@ class KanbanTmminsController extends Controller
 
     /**
      * Print all records by dock codes
+     * 
+     * FIXED VERSION - Properly orders by Plant (Plant 1 first, then Plant 2)
+     * and correctly sets separator page between plants
      */
-    /**
- * Print all records by dock codes
- * 
- * FIXED VERSION - Properly orders by Plant (Plant 1 first, then Plant 2)
- * and correctly sets separator page between plants
- */
-public function printAll(Request $request)
-{
-    try {
-        $generator = new BarcodeGeneratorPNG();
-        
-        if (!$request->has('dock_codes') || empty($request->input('dock_codes'))) {
-            return redirect()->back()->with('error', 'No dock codes provided');
-        }
-        
-        $dockCodesString = $request->input('dock_codes');
-        $selectedDockCodes = explode(',', $dockCodesString);
-        $selectedDockCodes = array_filter(array_map('trim', $selectedDockCodes));
-        
-        if (empty($selectedDockCodes)) {
-            return redirect()->back()->with('error', 'No valid dock codes found');
-        }
-        
-        // Get plant filter parameter
-        $plantFilter = $request->input('plant', 'all'); // all, 1, 2
-        
-        $allData = KanbanTmmins::whereIn('dock_code', $selectedDockCodes)
-                             ->orderByDesc('manifest_no')
-                             ->orderByDesc('address')
-                             ->orderBy('dock_code')
-                             ->orderBy('created_at')
-                             ->get();
-        
-        if ($allData->isEmpty()) {
-            $allData = KanbanTmmins::where(function($query) use ($selectedDockCodes) {
-                foreach ($selectedDockCodes as $dockCode) {
-                    $query->orWhereRaw('LOWER(TRIM(dock_code)) = ?', [strtolower(trim($dockCode))]);
-                }
-            })
-            ->orderByDesc('manifest_no')
-            ->orderByDesc('address')
-            ->orderBy('dock_code')
-            ->orderBy('created_at')
-            ->get();
-        }
-        
-        if ($allData->isEmpty()) {
-            return redirect()->back()->with('error', 'No data found for selected dock codes');
-        }
-        
-        // Sorting function - DESC manifest, DESC address
-        $sortFunction = function ($item) {
-            $manifestNo = $item->manifest_no ?? '';
-            $address = $item->address ?? 'No Address';
+    public function printAll(Request $request)
+    {
+        try {
+            $generator = new BarcodeGeneratorPNG();
             
-            // Reverse for DESC sort
-            $reversedManifestNo = str_pad((999999999999 - (int)$manifestNo), 12, '0', STR_PAD_LEFT);
-            
-            $reversedAddress = '';
-            for ($i = 0; $i < strlen($address); $i++) {
-                $char = strtolower($address[$i]);
-                if (ctype_alpha($char)) {
-                    $reversedChar = chr(ord('z') - ord($char) + ord('a'));
-                    $reversedAddress .= $reversedChar;
-                } elseif (ctype_digit($char)) {
-                    $reversedChar = (string)(9 - (int)$char);
-                    $reversedAddress .= $reversedChar;
-                } else {
-                    $reversedAddress .= $char;
-                }
+            if (!$request->has('dock_codes') || empty($request->input('dock_codes'))) {
+                return redirect()->back()->with('error', 'No dock codes provided');
             }
             
-            return $reversedManifestNo . '|' . $reversedAddress;
-        };
-        
-        // Separate Plant 1 and Plant 2
-        // Plant 1: address NOT starting with 'K'
-        $plant1Items = $allData->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return !str_starts_with($address, 'K');
-        })->sortBy($sortFunction)->values();
-        
-        // Plant 2: address starting with 'K'
-        $plant2Items = $allData->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return str_starts_with($address, 'K');
-        })->sortBy($sortFunction)->values();
-        
-        // Build final ordered collection based on plant filter
-        $orderedItems = collect();
-        $separatorAfterIndex = -1;
-        $showPlantSeparator = false;
-        
-        if ($plantFilter === '1') {
-            // Only Plant 1
-            $orderedItems = $plant1Items;
-        } elseif ($plantFilter === '2') {
-            // Only Plant 2
-            $orderedItems = $plant2Items;
-        } else {
-            // All - Plant 1 first, then Plant 2
-            if ($plant1Items->count() > 0) {
-                $orderedItems = $orderedItems->merge($plant1Items);
+            $dockCodesString = $request->input('dock_codes');
+            $selectedDockCodes = explode(',', $dockCodesString);
+            $selectedDockCodes = array_filter(array_map('trim', $selectedDockCodes));
+            
+            if (empty($selectedDockCodes)) {
+                return redirect()->back()->with('error', 'No valid dock codes found');
             }
             
-            // Check if we need separator (only when both plants have data)
-            if ($plant1Items->count() > 0 && $plant2Items->count() > 0) {
-                $showPlantSeparator = true;
-                $separatorAfterIndex = $plant1Items->count() - 1; // Index of last Plant 1 item
+            // Get plant filter parameter
+            $plantFilter = $request->input('plant', 'all'); // all, 1, 2
+            
+            $allData = KanbanTmmins::whereIn('dock_code', $selectedDockCodes)
+                                 ->orderByDesc('manifest_no')
+                                 ->orderByDesc('address')
+                                 ->orderBy('dock_code')
+                                 ->orderBy('created_at')
+                                 ->get();
+            
+            if ($allData->isEmpty()) {
+                $allData = KanbanTmmins::where(function($query) use ($selectedDockCodes) {
+                    foreach ($selectedDockCodes as $dockCode) {
+                        $query->orWhereRaw('LOWER(TRIM(dock_code)) = ?', [strtolower(trim($dockCode))]);
+                    }
+                })
+                ->orderByDesc('manifest_no')
+                ->orderByDesc('address')
+                ->orderBy('dock_code')
+                ->orderBy('created_at')
+                ->get();
             }
             
-            if ($plant2Items->count() > 0) {
-                $orderedItems = $orderedItems->merge($plant2Items);
+            if ($allData->isEmpty()) {
+                return redirect()->back()->with('error', 'No data found for selected dock codes');
             }
-        }
-        
-        $orderedItems = $orderedItems->values();
-        
-        if ($orderedItems->isEmpty()) {
-            return redirect()->back()->with('error', 'No data found for selected plant filter');
-        }
-        
-        // Generate barcodes for ordered items
-        foreach ($orderedItems as $item) {
-            try {
-                $addressToUse = $item->address;
-                if (empty($addressToUse) || $addressToUse === 'No Address') {
-                    $addressToUse = $item->part_address ?? $item->dock_code . '-' . $item->unique_no;
+            
+            // Sorting function - DESC manifest, DESC address
+            $sortFunction = function ($item) {
+                $manifestNo = $item->manifest_no ?? '';
+                $address = $item->address ?? 'No Address';
+                
+                // Reverse for DESC sort
+                $reversedManifestNo = str_pad((999999999999 - (int)$manifestNo), 12, '0', STR_PAD_LEFT);
+                
+                $reversedAddress = '';
+                for ($i = 0; $i < strlen($address); $i++) {
+                    $char = strtolower($address[$i]);
+                    if (ctype_alpha($char)) {
+                        $reversedChar = chr(ord('z') - ord($char) + ord('a'));
+                        $reversedAddress .= $reversedChar;
+                    } elseif (ctype_digit($char)) {
+                        $reversedChar = (string)(9 - (int)$char);
+                        $reversedAddress .= $reversedChar;
+                    } else {
+                        $reversedAddress .= $char;
+                    }
                 }
                 
-                $barcodeData = base64_encode($generator->getBarcode(
-                    $addressToUse,
-                    $generator::TYPE_CODE_128
-                ));
-                $item->barcode_image = $barcodeData;
-                $item->barcode_text = $addressToUse;
-            } catch (\Exception $e) {
-                $item->barcode_image = null;
-                $item->barcode_text = $item->address ?? $item->dock_code . '-' . $item->id;
+                return $reversedManifestNo . '|' . $reversedAddress;
+            };
+            
+            // Separate Plant 1 and Plant 2
+            // Plant 1: address NOT starting with 'K'
+            $plant1Items = $allData->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return !str_starts_with($address, 'K');
+            })->sortBy($sortFunction)->values();
+            
+            // Plant 2: address starting with 'K'
+            $plant2Items = $allData->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return str_starts_with($address, 'K');
+            })->sortBy($sortFunction)->values();
+            
+            // Build final ordered collection based on plant filter
+            $orderedItems = collect();
+            $separatorAfterIndex = -1;
+            $showPlantSeparator = false;
+            
+            if ($plantFilter === '1') {
+                // Only Plant 1
+                $orderedItems = $plant1Items;
+            } elseif ($plantFilter === '2') {
+                // Only Plant 2
+                $orderedItems = $plant2Items;
+            } else {
+                // All - Plant 1 first, then Plant 2
+                if ($plant1Items->count() > 0) {
+                    $orderedItems = $orderedItems->merge($plant1Items);
+                }
+                
+                // Check if we need separator (only when both plants have data)
+                if ($plant1Items->count() > 0 && $plant2Items->count() > 0) {
+                    $showPlantSeparator = true;
+                    $separatorAfterIndex = $plant1Items->count() - 1; // Index of last Plant 1 item
+                }
+                
+                if ($plant2Items->count() > 0) {
+                    $orderedItems = $orderedItems->merge($plant2Items);
+                }
             }
+            
+            $orderedItems = $orderedItems->values();
+            
+            if ($orderedItems->isEmpty()) {
+                return redirect()->back()->with('error', 'No data found for selected plant filter');
+            }
+            
+            // Generate barcodes for ordered items
+            foreach ($orderedItems as $item) {
+                try {
+                    $addressToUse = $item->address;
+                    if (empty($addressToUse) || $addressToUse === 'No Address') {
+                        $addressToUse = $item->part_address ?? $item->dock_code . '-' . $item->unique_no;
+                    }
+                    
+                    $barcodeData = base64_encode($generator->getBarcode(
+                        $addressToUse,
+                        $generator::TYPE_CODE_128
+                    ));
+                    $item->barcode_image = $barcodeData;
+                    $item->barcode_text = $addressToUse;
+                } catch (\Exception $e) {
+                    $item->barcode_image = null;
+                    $item->barcode_text = $item->address ?? $item->dock_code . '-' . $item->id;
+                }
+            }
+            
+            // For backward compatibility, also create groupedData (but this won't be used for ordering)
+            $groupedData = collect();
+            foreach ($orderedItems->groupBy('dock_code') as $dockCode => $items) {
+                $groupedData->put($dockCode, $items->values());
+            }
+            
+            // Pass all necessary data to view
+            // IMPORTANT: orderedItems is the main data source, already sorted by Plant
+            return view('kanbantmmins.printall', compact(
+                'orderedItems',
+                'groupedData', 
+                'selectedDockCodes', 
+                'plantFilter', 
+                'showPlantSeparator',
+                'separatorAfterIndex',
+                'plant1Items',
+                'plant2Items'
+            ));
+            
+        } catch (\Exception $e) {
+            Log::error('Print All Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
-        
-        // For backward compatibility, also create groupedData (but this won't be used for ordering)
-        $groupedData = collect();
-        foreach ($orderedItems->groupBy('dock_code') as $dockCode => $items) {
-            $groupedData->put($dockCode, $items->values());
-        }
-        
-        // Pass all necessary data to view
-        // IMPORTANT: orderedItems is the main data source, already sorted by Plant
-        return view('kanbantmmins.printall', compact(
-            'orderedItems',
-            'groupedData', 
-            'selectedDockCodes', 
-            'plantFilter', 
-            'showPlantSeparator',
-            'separatorAfterIndex',
-            'plant1Items',
-            'plant2Items'
-        ));
-        
-    } catch (\Exception $e) {
-        Log::error('Print All Error: ' . $e->getMessage());
-        return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
     }
-}
 
     /**
      * Print group by manifest_no
@@ -1135,204 +1153,204 @@ public function printAll(Request $request)
     }
 
     public function printSelected(Request $request)
-{
-    try {
-        $generator = new BarcodeGeneratorPNG();
-        
-        if (!$request->has('ids') || empty($request->input('ids'))) {
-            return redirect()->back()->with('error', 'No IDs provided');
-        }
-        
-        $idsString = $request->input('ids');
-        $selectedIds = explode(',', $idsString);
-        $selectedIds = array_filter(array_map('trim', $selectedIds));
-        
-        if (empty($selectedIds)) {
-            return redirect()->back()->with('error', 'No valid IDs found');
-        }
-        
-        // Get plant filter parameter (sama seperti printAll)
-        $plantFilter = $request->input('plant', 'all');
-        
-        $allData = KanbanTmmins::whereIn('id', $selectedIds)->get();
-        
-        if ($allData->isEmpty()) {
-            return redirect()->back()->with('error', 'No data found for selected IDs');
-        }
-        
-        // Sorting function - DESC manifest, DESC address (sama seperti printAll)
-        $sortFunction = function ($item) {
-            $manifestNo = $item->manifest_no ?? '';
-            $address = $item->address ?? 'No Address';
+    {
+        try {
+            $generator = new BarcodeGeneratorPNG();
             
-            $reversedManifestNo = str_pad((999999999999 - (int)$manifestNo), 12, '0', STR_PAD_LEFT);
-            
-            $reversedAddress = '';
-            for ($i = 0; $i < strlen($address); $i++) {
-                $char = strtolower($address[$i]);
-                if (ctype_alpha($char)) {
-                    $reversedChar = chr(ord('z') - ord($char) + ord('a'));
-                    $reversedAddress .= $reversedChar;
-                } elseif (ctype_digit($char)) {
-                    $reversedChar = (string)(9 - (int)$char);
-                    $reversedAddress .= $reversedChar;
-                } else {
-                    $reversedAddress .= $char;
-                }
+            if (!$request->has('ids') || empty($request->input('ids'))) {
+                return redirect()->back()->with('error', 'No IDs provided');
             }
             
-            return $reversedManifestNo . '|' . $reversedAddress;
-        };
-        
-        // Separate Plant 1 and Plant 2
-        $plant1Items = $allData->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return !str_starts_with($address, 'K');
-        })->sortBy($sortFunction)->values();
-        
-        $plant2Items = $allData->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return str_starts_with($address, 'K');
-        })->sortBy($sortFunction)->values();
-        
-        // Build final ordered collection based on plant filter
-        $orderedItems = collect();
-        $separatorAfterIndex = -1;
-        $showPlantSeparator = false;
-        
-        if ($plantFilter === '1') {
-            $orderedItems = $plant1Items;
-        } elseif ($plantFilter === '2') {
-            $orderedItems = $plant2Items;
-        } else {
-            if ($plant1Items->count() > 0) {
-                $orderedItems = $orderedItems->merge($plant1Items);
+            $idsString = $request->input('ids');
+            $selectedIds = explode(',', $idsString);
+            $selectedIds = array_filter(array_map('trim', $selectedIds));
+            
+            if (empty($selectedIds)) {
+                return redirect()->back()->with('error', 'No valid IDs found');
             }
             
-            if ($plant1Items->count() > 0 && $plant2Items->count() > 0) {
-                $showPlantSeparator = true;
-                $separatorAfterIndex = $plant1Items->count() - 1;
+            // Get plant filter parameter (sama seperti printAll)
+            $plantFilter = $request->input('plant', 'all');
+            
+            $allData = KanbanTmmins::whereIn('id', $selectedIds)->get();
+            
+            if ($allData->isEmpty()) {
+                return redirect()->back()->with('error', 'No data found for selected IDs');
             }
             
-            if ($plant2Items->count() > 0) {
-                $orderedItems = $orderedItems->merge($plant2Items);
-            }
-        }
-        
-        $orderedItems = $orderedItems->values();
-        
-        if ($orderedItems->isEmpty()) {
-            return redirect()->back()->with('error', 'No data found for selected plant filter');
-        }
-        
-        // Generate barcodes
-        foreach ($orderedItems as $item) {
-            try {
-                $addressToUse = $item->address;
-                if (empty($addressToUse) || $addressToUse === 'No Address') {
-                    $addressToUse = $item->part_address ?? $item->dock_code . '-' . $item->unique_no;
+            // Sorting function - DESC manifest, DESC address (sama seperti printAll)
+            $sortFunction = function ($item) {
+                $manifestNo = $item->manifest_no ?? '';
+                $address = $item->address ?? 'No Address';
+                
+                $reversedManifestNo = str_pad((999999999999 - (int)$manifestNo), 12, '0', STR_PAD_LEFT);
+                
+                $reversedAddress = '';
+                for ($i = 0; $i < strlen($address); $i++) {
+                    $char = strtolower($address[$i]);
+                    if (ctype_alpha($char)) {
+                        $reversedChar = chr(ord('z') - ord($char) + ord('a'));
+                        $reversedAddress .= $reversedChar;
+                    } elseif (ctype_digit($char)) {
+                        $reversedChar = (string)(9 - (int)$char);
+                        $reversedAddress .= $reversedChar;
+                    } else {
+                        $reversedAddress .= $char;
+                    }
                 }
                 
-                $barcodeData = base64_encode($generator->getBarcode(
-                    $addressToUse,
-                    $generator::TYPE_CODE_128
-                ));
-                $item->barcode_image = $barcodeData;
-                $item->barcode_text = $addressToUse;
-            } catch (\Exception $e) {
-                $item->barcode_image = null;
-                $item->barcode_text = $item->address ?? $item->dock_code . '-' . $item->id;
+                return $reversedManifestNo . '|' . $reversedAddress;
+            };
+            
+            // Separate Plant 1 and Plant 2
+            $plant1Items = $allData->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return !str_starts_with($address, 'K');
+            })->sortBy($sortFunction)->values();
+            
+            $plant2Items = $allData->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return str_starts_with($address, 'K');
+            })->sortBy($sortFunction)->values();
+            
+            // Build final ordered collection based on plant filter
+            $orderedItems = collect();
+            $separatorAfterIndex = -1;
+            $showPlantSeparator = false;
+            
+            if ($plantFilter === '1') {
+                $orderedItems = $plant1Items;
+            } elseif ($plantFilter === '2') {
+                $orderedItems = $plant2Items;
+            } else {
+                if ($plant1Items->count() > 0) {
+                    $orderedItems = $orderedItems->merge($plant1Items);
+                }
+                
+                if ($plant1Items->count() > 0 && $plant2Items->count() > 0) {
+                    $showPlantSeparator = true;
+                    $separatorAfterIndex = $plant1Items->count() - 1;
+                }
+                
+                if ($plant2Items->count() > 0) {
+                    $orderedItems = $orderedItems->merge($plant2Items);
+                }
             }
+            
+            $orderedItems = $orderedItems->values();
+            
+            if ($orderedItems->isEmpty()) {
+                return redirect()->back()->with('error', 'No data found for selected plant filter');
+            }
+            
+            // Generate barcodes
+            foreach ($orderedItems as $item) {
+                try {
+                    $addressToUse = $item->address;
+                    if (empty($addressToUse) || $addressToUse === 'No Address') {
+                        $addressToUse = $item->part_address ?? $item->dock_code . '-' . $item->unique_no;
+                    }
+                    
+                    $barcodeData = base64_encode($generator->getBarcode(
+                        $addressToUse,
+                        $generator::TYPE_CODE_128
+                    ));
+                    $item->barcode_image = $barcodeData;
+                    $item->barcode_text = $addressToUse;
+                } catch (\Exception $e) {
+                    $item->barcode_image = null;
+                    $item->barcode_text = $item->address ?? $item->dock_code . '-' . $item->id;
+                }
+            }
+            
+            // Get unique dock codes
+            $selectedDockCodes = $orderedItems->pluck('dock_code')->unique()->toArray();
+            
+            // Group by dock_code
+            $groupedData = collect();
+            foreach ($orderedItems->groupBy('dock_code') as $dockCode => $items) {
+                $groupedData->put($dockCode, $items->values());
+            }
+            
+            return view('kanbantmmins.printall', compact(
+                'orderedItems',
+                'groupedData', 
+                'selectedDockCodes', 
+                'plantFilter',
+                'showPlantSeparator',
+                'separatorAfterIndex',
+                'plant1Items',
+                'plant2Items'
+            ));
+            
+        } catch (\Exception $e) {
+            Log::error('Print Selected Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
-        
-        // Get unique dock codes
-        $selectedDockCodes = $orderedItems->pluck('dock_code')->unique()->toArray();
-        
-        // Group by dock_code
-        $groupedData = collect();
-        foreach ($orderedItems->groupBy('dock_code') as $dockCode => $items) {
-            $groupedData->put($dockCode, $items->values());
-        }
-        
-        return view('kanbantmmins.printall', compact(
-            'orderedItems',
-            'groupedData', 
-            'selectedDockCodes', 
-            'plantFilter',
-            'showPlantSeparator',
-            'separatorAfterIndex',
-            'plant1Items',
-            'plant2Items'
-        ));
-        
-    } catch (\Exception $e) {
-        Log::error('Print Selected Error: ' . $e->getMessage());
-        return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
     }
-}
 
-/**
- * Get plant counts for selected IDs (for Print Selected modal)
- */
-public function getPlantCountsByIds(Request $request)
-{
-    try {
-        $ids = $request->input('ids', []);
-        
-        if (empty($ids)) {
+    /**
+     * Get plant counts for selected IDs (for Print Selected modal)
+     */
+    public function getPlantCountsByIds(Request $request)
+    {
+        try {
+            $ids = $request->input('ids', []);
+            
+            if (empty($ids)) {
+                return response()->json(['plant1' => 0, 'plant2' => 0]);
+            }
+            
+            $items = KanbanTmmins::whereIn('id', $ids)->get();
+            
+            $plant1Count = $items->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return !str_starts_with($address, 'K');
+            })->count();
+            
+            $plant2Count = $items->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return str_starts_with($address, 'K');
+            })->count();
+            
+            return response()->json([
+                'plant1' => $plant1Count,
+                'plant2' => $plant2Count
+            ]);
+            
+        } catch (\Exception $e) {
             return response()->json(['plant1' => 0, 'plant2' => 0]);
         }
-        
-        $items = KanbanTmmins::whereIn('id', $ids)->get();
-        
-        $plant1Count = $items->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return !str_starts_with($address, 'K');
-        })->count();
-        
-        $plant2Count = $items->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return str_starts_with($address, 'K');
-        })->count();
-        
-        return response()->json([
-            'plant1' => $plant1Count,
-            'plant2' => $plant2Count
-        ]);
-        
-    } catch (\Exception $e) {
-        return response()->json(['plant1' => 0, 'plant2' => 0]);
     }
-}
     
     public function getPlantCounts(Request $request)
-{
-    try {
-        $dockCodes = $request->input('dock_codes', []);
-        
-        if (empty($dockCodes)) {
+    {
+        try {
+            $dockCodes = $request->input('dock_codes', []);
+            
+            if (empty($dockCodes)) {
+                return response()->json(['plant1' => 0, 'plant2' => 0]);
+            }
+            
+            $items = KanbanTmmins::whereIn('dock_code', $dockCodes)->get();
+            
+            $plant1Count = $items->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return !str_starts_with($address, 'K');
+            })->count();
+            
+            $plant2Count = $items->filter(function($item) {
+                $address = strtoupper(trim($item->address ?? ''));
+                return str_starts_with($address, 'K');
+            })->count();
+            
+            return response()->json([
+                'plant1' => $plant1Count,
+                'plant2' => $plant2Count
+            ]);
+            
+        } catch (\Exception $e) {
             return response()->json(['plant1' => 0, 'plant2' => 0]);
         }
-        
-        $items = KanbanTmmins::whereIn('dock_code', $dockCodes)->get();
-        
-        $plant1Count = $items->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return !str_starts_with($address, 'K');
-        })->count();
-        
-        $plant2Count = $items->filter(function($item) {
-            $address = strtoupper(trim($item->address ?? ''));
-            return str_starts_with($address, 'K');
-        })->count();
-        
-        return response()->json([
-            'plant1' => $plant1Count,
-            'plant2' => $plant2Count
-        ]);
-        
-    } catch (\Exception $e) {
-        return response()->json(['plant1' => 0, 'plant2' => 0]);
     }
-}
 }

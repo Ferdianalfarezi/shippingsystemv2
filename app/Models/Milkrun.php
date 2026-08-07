@@ -53,23 +53,14 @@ class Milkrun extends Model
         $targetDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
         $arrivalDateTime = Carbon::parse($this->arrival);
         
-        // Hitung selisih: arrival - target (dalam menit)
-        // Negatif = arrival lebih awal dari target
-        // Positif = arrival lebih lambat dari target
-        $diffInMinutes = $arrivalDateTime->diffInMinutes($targetDateTime, false) * -1;
-        
-        // Atau lebih simpel: langsung hitung arrival relatif terhadap target
-        // $diffInMinutes positif = arrival terlambat
-        // $diffInMinutes negatif = arrival lebih awal
+        // Bulatkan biar gak ada sisa desimal
+        $diffInMinutes = round($arrivalDateTime->diffInMinutes($targetDateTime, false) * -1);
         
         if ($diffInMinutes < -15) {
-            // Arrival lebih dari 15 menit sebelum target
             return 'advance';
         } elseif ($diffInMinutes > 30) {
-            // Arrival lebih dari 30 menit setelah target
             return 'delay';
         } else {
-            // Arrival dalam range -15 s/d +30 menit dari target
             return 'on_time';
         }
     }
@@ -118,8 +109,8 @@ class Milkrun extends Model
         $targetDateTime = Carbon::parse($this->delivery_date->format('Y-m-d') . ' ' . $this->delivery_time);
         $arrivalDateTime = Carbon::parse($this->arrival);
         
-        // Hitung selisih dalam menit (positif = terlambat, negatif = lebih awal)
-        $diffInMinutes = $arrivalDateTime->diffInMinutes($targetDateTime, false) * -1;
+        // Bulatkan ke menit terdekat
+        $diffInMinutes = round($arrivalDateTime->diffInMinutes($targetDateTime, false) * -1);
         
         if ($diffInMinutes < 0) {
             return abs($diffInMinutes) . " menit lebih awal";

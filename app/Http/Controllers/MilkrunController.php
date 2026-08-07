@@ -535,4 +535,21 @@ class MilkrunController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Export data milkrun ke Excel
+     */
+    public function exportExcel(Request $request)
+    {
+        $dateFilter = $request->get('date', Carbon::today()->format('Y-m-d'));
+        $statusFilter = $request->get('status');
+        $search = $request->get('search');
+
+        $fileName = 'Milkrun_' . $dateFilter . '_' . now()->format('His') . '.xlsx';
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\MilkrunExport($dateFilter, $statusFilter, $search),
+            $fileName
+        );
+    }
 }

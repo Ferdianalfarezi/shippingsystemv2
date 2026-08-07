@@ -24,6 +24,8 @@ use App\Http\Controllers\PullingMatrixController;
 use App\Http\Controllers\AdmaddressController; 
 use App\Http\Controllers\KanbanadmController;
 use App\Http\Controllers\ArsAdmController;
+use App\Http\Controllers\KanbanAdmSplitController;
+use App\Http\Controllers\AdmAddressControllerv2;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -205,6 +207,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/delete-all',   [MilkrunController::class, 'deleteAll'])  ->name('deleteAll');
         Route::post('/scan-arrival',   [MilkrunController::class, 'scanArrival'])->name('scanArrival');
         Route::get('/delay-data',      [MilkrunController::class, 'getDelayData'])->name('getDelayData');
+        Route::get('/export',          [MilkrunController::class, 'exportExcel'])->name('export'); // <-- fix di sini
 
         Route::get('/{milkrun}/dns',        [MilkrunController::class, 'getDnList'])       ->name('dns');
         Route::get('/{milkrun}/edit',       [MilkrunController::class, 'edit'])            ->name('edit');
@@ -365,6 +368,23 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{arsadm}',   [ArsAdmController::class, 'destroy'])->name('destroy');
         Route::post('/import',       [ArsAdmController::class, 'import'])->name('import');
     });
+
+    Route::get('/split-kanban', [KanbanAdmSplitController::class, 'index'])->name('kanban-split.index');
+    Route::post('/split-kanban', [KanbanAdmSplitController::class, 'process'])->name('kanban-split.process');
+    Route::get('/split-kanban/meta/{token}', [KanbanAdmSplitController::class, 'labelsMeta'])
+        ->name('kanban-split.labels-meta');
+    Route::get('/split-kanban/recent', [KanbanAdmSplitController::class, 'recent'])
+        ->name('kanban-split.recent');
+    Route::get('/split-kanban/{token}/download', [KanbanAdmSplitController::class, 'download'])
+        ->name('kanban-split.download');
+
+    Route::get('/admadressesv2', [AdmAddressControllerv2::class, 'index'])->name('admadressesv2.index');
+    Route::post('/admadressesv2', [AdmAddressControllerv2::class, 'store'])->name('admadressesv2.store');
+    Route::get('/admadressesv2/{admaddressv2}/edit', [AdmAddressControllerv2::class, 'edit'])->name('admadressesv2.edit');
+    Route::put('/admadressesv2/{admaddressv2}', [AdmAddressControllerv2::class, 'update'])->name('admadressesv2.update');
+    Route::delete('/admadressesv2/{admaddressv2}', [AdmAddressControllerv2::class, 'destroy'])->name('admadressesv2.destroy');
+    Route::delete('/admadressesv2/delete-all', [AdmAddressControllerv2::class, 'deleteAll'])->name('admadressesv2.deleteAll');
+    Route::post('/admadressesv2/import', [AdmAddressControllerv2::class, 'import'])->name('admadressesv2.import');
 
  
 

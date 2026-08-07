@@ -570,9 +570,14 @@
                                 HPM
                             </a>
                         </li>
-                        <li>
+                        {{-- <li>
                             <a class="dropdown-item" href="{{ route('kanbanadms.index') }}">
                                 ADM
+                            </a>
+                        </li> --}}
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanban-split.index') }}">
+                                ADM 
                             </a>
                         </li>
                     </ul>
@@ -603,7 +608,7 @@
                                 <i class="fas fa-address-book"></i> HPM Address
                             </a>
 
-                            <a href="{{ route('admaddresses.index') }}" class="fs-6">
+                            <a href="{{ route('admadressesv2.index') }}" class="fs-6">
                                 <i class="fas fa-address-book"></i> ADM Address
                             </a>
 
