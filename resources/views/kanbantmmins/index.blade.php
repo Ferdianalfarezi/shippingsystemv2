@@ -14,8 +14,12 @@
         
         <!-- Left Side - Print Buttons -->
         <div class="d-flex align-items-center gap-2 ms-3">
-            <strong>Last Upload:</strong> {{ $latestUploadInfo->last_upload_at->format('d M Y H:i:s') }} 
-            by <strong>{{ $latestUploadInfo->uploaded_by }}</strong>
+            @if($latestUploadInfo)
+                <strong>Last Upload:</strong> {{ $latestUploadInfo->last_upload_at->format('d M Y H:i:s') }} 
+                by <strong>{{ $latestUploadInfo->uploaded_by }}</strong>
+            @else
+                <span class="text-muted"><i class="bi bi-info-circle"></i> Belum ada data yang diimport</span>
+            @endif
         </div>
 
         <!-- Right Side - Search & Menu -->

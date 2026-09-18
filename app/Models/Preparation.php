@@ -22,6 +22,7 @@ class Preparation extends Model
         'pulling_date',     
         'pulling_time', 
         'arrival',
+        'qty_kbn',
         'cycle',
         'address',
         'status',

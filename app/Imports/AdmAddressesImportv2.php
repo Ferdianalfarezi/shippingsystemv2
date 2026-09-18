@@ -3,47 +3,34 @@
 namespace App\Imports;
 
 use App\Models\AdmAddressv2;
-use Maatwebsite\Excel\Concerns\ToModel;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
-use Maatwebsite\Excel\Concerns\WithBatchInserts;
-use Maatwebsite\Excel\Concerns\WithChunkReading;
 
-class AdmAddressesImportv2 implements ToModel, WithHeadingRow, SkipsEmptyRows, WithBatchInserts, WithChunkReading
+class AdmAddressesImportv2 implements ToCollection, WithHeadingRow
 {
-    /**
-     * Baris 1 di excel = judul "Master Part List", jadi header
-     * kolom sebenarnya ada di baris ke-2.
-     */
-    public function headingRow(): int
+    public function collection(Collection $rows)
     {
-        return 2;
-    }
+        foreach ($rows as $row) {
+            $partNo = trim((string) ($row['part_no'] ?? ''));
 
-    public function model(array $row)
-    {
-        // key otomatis jadi snake_case dari header excel,
-        // misal PART_NO -> part_no, QTY_KBN -> qty_kbn
-        if (empty($row['part_no'])) {
-            return null;
+            // dukung header "ADDRES" atau "ADDRESS" biar aman
+            $rackNo = trim((string) ($row['addres'] ?? $row['address'] ?? ''));
+
+            if ($partNo === '') {
+                continue; // skip baris tanpa part_no
+            }
+
+            // guard: kalau value masih berupa formula mentah (excel-nya belum
+            // di-paste-as-value / cached value-nya ilang), skip biar ga nyimpen sampah
+            if ($rackNo !== '' && str_starts_with($rackNo, '=')) {
+                continue;
+            }
+
+            AdmAddressv2::updateOrCreate(
+                ['part_no' => $partNo],
+                ['rack_no' => $rackNo]
+            );
         }
-
-        return new AdmAddressv2([
-            'part_no'       => $row['part_no'],
-            'customer_code' => $row['customer_code'] ?? null,
-            'part_name'     => $row['part_name'] ?? null,
-            'qty_kbn'       => $row['qty_kbn'] ?? null,
-            'rack_no'       => $row['rack_no'] ?? null,
-        ]);
-    }
-
-    public function batchSize(): int
-    {
-        return 500;
-    }
-
-    public function chunkSize(): int
-    {
-        return 500;
     }
 }

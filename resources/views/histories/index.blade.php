@@ -7,7 +7,14 @@
 @section('content')
     <!-- Stats Badges dan Dropdown di kanan -->
     <div class="d-flex justify-content-end align-items-center gap-2 mb-3 mt-3">
-        
+
+        <!-- Export Excel Button -->
+        <div class="card border-0 shadow-sm p-1 bg-success">
+            <a href="#" class="btn btn-success" id="exportExcelButton" title="Export ke Excel">
+                <i class="bi bi-file-earmark-excel-fill" id="exportExcelIcon"></i>
+            </a>
+        </div>
+
         <!-- Delete All Button -->
         <div class="card border-0 shadow-sm p-1 bg-danger">
             <button type="button" class="btn btn-danger" id="deleteAllButton" title="Hapus Semua Data">
@@ -276,6 +283,59 @@
             });
         });
 
+        // Export Excel — ikut filter search & date range yang lagi aktif di halaman
+        $('#exportExcelButton').on('click', function(e) {
+            e.preventDefault();
+
+            const $btn  = $(this);
+            const $icon = $('#exportExcelIcon');
+
+            // Cegah double click selama proses
+            if ($btn.hasClass('disabled')) {
+                return;
+            }
+
+            const search   = $('#searchInput').val();
+            const dateFrom = $('#dateFrom').val();
+            const dateTo   = $('#dateTo').val();
+
+            // Wajib pilih range tanggal dulu sebelum export
+            if (!dateFrom && !dateTo) {
+                Swal.fire({
+                    title: 'Pilih Tanggal Dulu',
+                    text: 'Silakan pilih range tanggal terlebih dahulu sebelum export.',
+                    icon: 'warning',
+                    confirmButtonColor: '#059669'
+                });
+                return;
+            }
+
+            // Ganti icon jadi spinner
+            $icon.removeClass('bi-file-earmark-excel-fill').addClass('spinner-border spinner-border-sm text-white');
+            $btn.addClass('disabled');
+
+            const url = new URL('{{ route("histories.export") }}');
+
+            if (search && search.trim() !== '') {
+                url.searchParams.set('search', search);
+            }
+            if (dateFrom) {
+                url.searchParams.set('date_from', dateFrom);
+            }
+            if (dateTo) {
+                url.searchParams.set('date_to', dateTo);
+            }
+
+            window.location.href = url.toString();
+
+            // Balikin icon setelah beberapa detik (karena ini file download,
+            // bukan reload halaman, jadi harus di-revert manual)
+            setTimeout(function() {
+                $icon.removeClass('spinner-border spinner-border-sm text-white').addClass('bi-file-earmark-excel-fill');
+                $btn.removeClass('disabled');
+            }, 3000);
+        });
+
         // Handle Search
         $('#searchButton').on('click', function() {
             updateUrl();
@@ -343,6 +403,7 @@
                     
                     // Basic Info
                     $('#detail_no_dn').text(data.no_dn);
+                    
                     $('#detail_route').text(data.route);
                     $('#detail_logistic_partners').text(data.logistic_partners);
                     $('#detail_customers').text(data.customers);

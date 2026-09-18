@@ -6,6 +6,7 @@ use App\Models\Shipping;
 use App\Models\Preparation;
 use App\Models\Delivery;
 use App\Models\Milkrun;
+use App\Models\ShippingMatrix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -385,11 +386,15 @@ class ShippingController extends Controller
         ));
     }
 
+    /**
+     * Move preparation to Shipping. Address ditentukan OTOMATIS
+     * berdasarkan Matrix Shipping (customers + dock + cycle),
+     * default "Shipping 10" kalau kombinasi tidak ditemukan.
+     */
     public function moveFromPreparation(Request $request)
     {
         $validated = $request->validate([
             'preparation_id' => 'required|exists:preparations,id',
-            'address' => 'required|string|max:50',
         ]);
 
         DB::beginTransaction();
@@ -406,6 +411,9 @@ class ShippingController extends Controller
                     'message' => 'Data dengan No DN ini sudah ada di Shipping!'
                 ], 422);
             }
+            
+            // Tentukan address otomatis dari Matrix Shipping
+            $address = $this->determineShippingAddress($preparation);
             
             // Calculate initial status - normal atau delay (belum scan)
             $deliveryDateTime = Carbon::parse($preparation->delivery_date->format('Y-m-d') . ' ' . $preparation->delivery_time);
@@ -435,7 +443,7 @@ class ShippingController extends Controller
                 'delivery_time' => $preparation->delivery_time,
                 'arrival' => null, // Belum di-scan
                 'cycle' => $preparation->cycle,
-                'address' => $validated['address'],
+                'address' => $address,
                 'status' => $status,
                 'scan_to_shipping' => Carbon::now(),
                 'moved_by' => $movedBy,
@@ -450,7 +458,7 @@ class ShippingController extends Controller
             
             return response()->json([
                 'success' => true,
-                'message' => 'Data berhasil dipindahkan ke Shipping!',
+                'message' => 'Data berhasil dipindahkan ke ' . $address . '!',
                 'data' => $shipping
             ]);
             
@@ -462,6 +470,25 @@ class ShippingController extends Controller
                 'message' => 'Gagal memindahkan data: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Tentukan address Shipping otomatis dari Matrix Shipping
+     * (customers + dock + cycle). Case-insensitive, sensitif spasi.
+     * Default "Shipping 10" kalau kombinasi ga ketemu.
+     */
+    private function determineShippingAddress(Preparation $preparation): string
+    {
+        $customers = trim($preparation->customers);
+        $dock      = trim($preparation->dock);
+        $cycle     = trim((string) $preparation->cycle);
+
+        $matrix = ShippingMatrix::whereRaw('LOWER(customers) = ?', [mb_strtolower($customers)])
+            ->whereRaw('LOWER(dock) = ?', [mb_strtolower($dock)])
+            ->where('cycle', $cycle)
+            ->first();
+
+        return $matrix ? $matrix->address : 'Shipping 10';
     }
 
     public function moveToDelivery(Request $request)

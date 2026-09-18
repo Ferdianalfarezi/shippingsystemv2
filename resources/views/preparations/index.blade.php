@@ -69,6 +69,9 @@
                                 <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#pullingMatrixModal">
                                     <i class="bi bi-table me-2"></i> Matrix Pulling
                                 </a>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shippingMatrixModal">
+                                    <i class="bi bi-signpost-split me-2"></i> Matrix Shipping
+                                </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                                 <li>
@@ -219,6 +222,7 @@
                     <th>Delv Date</th>
                     <th>Delv Time</th>
                     <th>Cyc</th>
+                    <th>Qty Kbn</th>
                     <th>Pull Date</th>
                     <th>Finish Pulling</th>
                     <th>Status</th>
@@ -236,6 +240,7 @@
                         <td>{{ $prep->delivery_date->format('d-m-y') }}</td>
                         <td>{{ date('H:i:s', strtotime($prep->delivery_time)) }}</td>
                         <td><strong>{{ $prep->cycle }}</strong></td>
+                        <td>{{ $prep->qty_kbn ?? '-' }}</td>
                         <td>{{ $prep->pulling_date->format('d-m-y') }}</td>
                         <td>{{ date('H:i:s', strtotime($prep->pulling_time)) }}</td>
                         <td>
@@ -288,6 +293,41 @@
         {{ $preparations->links() }}
     </div>
 
+    <!-- Modal Pilih PR & Shipping (kombinasi baru via halaman Preparation) -->
+    <div class="modal fade" id="selectPrShippingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Pilih PR & Shipping</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="selectPrShippingInfo" class="mb-3 small text-muted"></div>
+
+                    <label class="form-label fw-bold">Preparation (PR)</label>
+                    <div class="row g-2 mb-3">
+                        <div class="col-3"><button type="button" class="btn btn-outline-primary w-100 pr-shipping-pr-btn" data-pr="1">PR 1</button></div>
+                        <div class="col-3"><button type="button" class="btn btn-outline-primary w-100 pr-shipping-pr-btn" data-pr="2">PR 2</button></div>
+                        <div class="col-3"><button type="button" class="btn btn-outline-primary w-100 pr-shipping-pr-btn" data-pr="3">PR 3</button></div>
+                        <div class="col-3"><button type="button" class="btn btn-outline-primary w-100 pr-shipping-pr-btn" data-pr="4">PR 4</button></div>
+                    </div>
+
+                    <label class="form-label fw-bold">Shipping</label>
+                    <select class="form-select mb-3" id="shippingAddressSelect">
+                        <option value="">-- Pilih Shipping --</option>
+                        @for($i = 1; $i <= 10; $i++)
+                            <option value="Shipping {{ $i }}">Shipping {{ $i }}</option>
+                        @endfor
+                    </select>
+
+                    <button type="button" class="btn btn-success w-100" id="confirmPrShippingBtn">
+                        <i class="bi bi-check-circle me-1"></i> Konfirmasi & Pindahkan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @include('preparations.create')
     @include('preparations.edit')
     @include('preparations.import')
@@ -296,6 +336,7 @@
     @include('preparations.import-adm')
     {{-- adm-lead-time-config dihapus, diganti pulling-matrix-config --}}
     @include('preparations.pulling-matrix-config')
+    @include('preparations.matrix-shipping')
 
     
 @endsection
@@ -304,18 +345,134 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 @push('scripts')
 <script>
+    // ==================== SCAN DN TO SHIPPING (langsung, address manual) ====================
+    // Scope GLOBAL (di luar $(document).ready) supaya bisa dipanggil juga dari
+    // openMoveToShippingModal() yang dipicu onclick panah di kolom Actions.
+    let scanTimeout;
+    let pendingNoDn = null;
+    let selectedPrNumber = null;
+
+    // withConfirm = true dipakai buat klik panah "Move to Shipping" di Actions
+    // (biar ga langsung eksekusi tanpa konfirmasi kalau kombinasinya udah ada)
+    function checkDnForShipping(noDn, withConfirm) {
+        $.ajax({
+            url: '{{ route("prep-monitoring.check-dn") }}',
+            type: 'GET',
+            data: { no_dn: noDn },
+            success: function(response) {
+                if (!response.success) {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: response.message,
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626',
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+                    $('#scanDnInput').val('').focus();
+                    return;
+                }
+
+                if (response.needs_pr_selection) {
+                    pendingNoDn = noDn;
+                    const d = response.data;
+                    $('#selectPrShippingInfo').html(`
+                        <strong>DN:</strong> ${d.no_dn}<br>
+                        <strong>Customer:</strong> ${d.customers} | <strong>Cycle:</strong> ${d.cycle} | <strong>Dock:</strong> ${d.dock}<br>
+                        <strong>Kbn:</strong> ${d.kbn} &nbsp;|&nbsp; <strong>Skid (target):</strong> ${d.skid}
+                    `);
+                    new bootstrap.Modal(document.getElementById('selectPrShippingModal')).show();
+                    return;
+                }
+
+                const d = response.data;
+
+                if (withConfirm) {
+                    Swal.fire({
+                        title: 'Pindahkan ke Shipping?',
+                        html: `
+                            <div class="text-start">
+                                <small><strong>DN:</strong> ${d.no_dn}</small><br>
+                                <small><strong>Route:</strong> ${d.route} | <strong>Dock:</strong> ${d.dock} | <strong>Cycle:</strong> ${d.cycle}</small>
+                            </div>
+                            <div class="text-muted small mt-2">Tujuan: <strong>${d.shipping_address}</strong> (Progress saat ini: ${d.progress})</div>
+                        `,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#0d6efd',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Ya, Pindahkan!',
+                        cancelButtonText: 'Batal',
+                        reverseButtons: true
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            executeScanDirect(noDn, null, null);
+                        } else {
+                            $('#scanDnInput').val('').focus();
+                        }
+                    });
+                } else {
+                    executeScanDirect(noDn, null, null);
+                }
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mencari DN',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+                $('#scanDnInput').val('').focus();
+            }
+        });
+    }
+
+    function executeScanDirect(noDn, prNumber, shippingAddress) {
+        $.ajax({
+            url: '{{ route("prep-monitoring.scan-direct") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                no_dn: noDn,
+                pr_number: prNumber,
+                shipping_address: shippingAddress
+            },
+            success: function(response) {
+                $('#scanDnInput').val('');
+                Swal.fire({
+                    title: 'Berhasil!',
+                    html: response.message,
+                    icon: 'success',
+                    confirmButtonColor: '#059669',
+                    timer: 2500,
+                    timerProgressBar: true
+                }).then(() => {
+                    window.location.reload();
+                });
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    title: 'Gagal!',
+                    text: xhr.responseJSON?.message || 'Terjadi kesalahan saat memindahkan data',
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+                $('#scanDnInput').focus();
+            }
+        });
+    }
+    // ==================== END SCAN DN TO SHIPPING (global functions) ====================
+
     $(document).ready(function() {
-        
-        // ==================== SCAN DN TO SHIPPING ====================
-        let scanTimeout;
+
         $('#scanDnInput').on('input', function() {
             clearTimeout(scanTimeout);
             const noDn = $(this).val().trim();
-            
+
             if (noDn.length > 0) {
                 // Delay 500ms untuk menunggu scanner selesai input
                 scanTimeout = setTimeout(function() {
-                    processScanDn(noDn);
+                    checkDnForShipping(noDn, false);
                 }, 500);
             }
         });
@@ -327,132 +484,39 @@
                 clearTimeout(scanTimeout);
                 const noDn = $(this).val().trim();
                 if (noDn.length > 0) {
-                    processScanDn(noDn);
+                    checkDnForShipping(noDn, false);
                 }
             }
         });
 
-        // Function untuk proses scan DN
-        function processScanDn(noDn) {
-            $.ajax({
-                url: '{{ route("preparations.findByDn") }}',
-                type: 'GET',
-                data: { no_dn: noDn },
-                success: function(response) {
-                    if (response.success && response.data) {
-                        $('#scanDnInput').val('');
-                        showScanAddressModal(response.data);
-                    } else {
-                        Swal.fire({
-                            title: 'DN Tidak Ditemukan!',
-                            html: `No DN <strong>${noDn}</strong> tidak ditemukan di tabel preparation`,
-                            icon: 'error',
-                            confirmButtonColor: '#dc2626',
-                            timer: 3000,
-                            timerProgressBar: true
-                        });
-                        $('#scanDnInput').val('').focus();
-                    }
-                },
-                error: function(xhr) {
-                    Swal.fire({
-                        title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat mencari DN',
-                        icon: 'error',
-                        confirmButtonColor: '#dc2626'
-                    });
-                    $('#scanDnInput').val('').focus();
-                }
-            });
-        }
+        $(document).on('click', '.pr-shipping-pr-btn', function() {
+            selectedPrNumber = $(this).data('pr');
+            $('.pr-shipping-pr-btn').removeClass('btn-primary').addClass('btn-outline-primary');
+            $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+        });
 
-        function showScanAddressModal(preparation) {
-            Swal.fire({
-                title: 'Move to Shipping',
-                html: `
-                    <div class="mb-3 text-center">
-                        <div class=" py-2">
-                            <small><strong>DN:</strong> ${preparation.no_dn}</small><br>
-                            <small><strong>Route:</strong> ${preparation.route} | <strong>Dock:</strong> ${preparation.dock} | <strong>Cycle:</strong> ${preparation.cycle}</small>
-                        </div>
-                    </div>
-                    <div class="container">
-                        <div class="row g-2 mb-2">
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 1">1</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 2">2</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 3">3</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 4">4</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 5">5</button></div>
-                        </div>
-                        <div class="row g-2 mb-2">
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 6">6</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 7">7</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 8">8</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 9">9</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping 10">10</button></div>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 1">Ex 1</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 2">Ex 2</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 3">Ex 3</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 4">Ex 4</button></div>
-                            <div class="col"><button type="button" class="btn btn-outline-secondary w-100 scan-address-btn" data-address="Shipping Ex 5">Ex 5</button></div>
-                        </div>
-                    </div>
-                `,
-                showConfirmButton: false,
-                showCancelButton: true,
-                cancelButtonText: 'Cancel',
-                cancelButtonColor: '#6c757d',
-                width: 500,
-                didOpen: () => {
-                    document.querySelectorAll('.scan-address-btn').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            const address = this.getAttribute('data-address');
-                            Swal.close();
-                            executeMoveToShipping(preparation.id, address, preparation.no_dn);
-                        });
-                    });
-                },
-                didClose: () => {
-                    $('#scanDnInput').focus();
-                }
-            });
-        }
+        $('#confirmPrShippingBtn').on('click', function() {
+            const shippingAddress = $('#shippingAddressSelect').val();
 
-        function executeMoveToShipping(preparationId, address, noDn) {
-            $.ajax({
-                url: '{{ route("shippings.moveFromPreparation") }}',
-                type: 'POST',
-                data: {
-                    _token: '{{ csrf_token() }}',
-                    preparation_id: preparationId,
-                    address: address
-                },
-                success: function(response) {
-                    Swal.fire({
-                        title: 'Berhasil!',
-                        html: `DN <strong>${noDn}</strong> dipindahkan ke <strong>${address}</strong>`,
-                        icon: 'success',
-                        confirmButtonColor: '#059669',
-                        timer: 2000,
-                        timerProgressBar: true
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                },
-                error: function(xhr) {
-                    Swal.fire({
-                        title: 'Gagal!',
-                        text: xhr.responseJSON?.message || 'Terjadi kesalahan saat memindahkan data',
-                        icon: 'error',
-                        confirmButtonColor: '#dc2626'
-                    });
-                    $('#scanDnInput').focus();
-                }
-            });
-        }
-        // ==================== END SCAN DN TO SHIPPING ====================
+            if (!selectedPrNumber) {
+                Swal.fire({ title: 'Pilih PR dulu!', icon: 'warning', confirmButtonColor: '#dc2626', timer: 1800, timerProgressBar: true });
+                return;
+            }
+            if (!shippingAddress) {
+                Swal.fire({ title: 'Pilih Shipping dulu!', icon: 'warning', confirmButtonColor: '#dc2626', timer: 1800, timerProgressBar: true });
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('selectPrShippingModal')).hide();
+            executeScanDirect(pendingNoDn, selectedPrNumber, shippingAddress);
+        });
+
+        $('#selectPrShippingModal').on('hidden.bs.modal', function() {
+            pendingNoDn = null;
+            selectedPrNumber = null;
+            $('#shippingAddressSelect').val('');
+            $('.pr-shipping-pr-btn').removeClass('btn-primary').addClass('btn-outline-primary');
+        });
 
         // Delete confirmation dengan SweetAlert
         $('.delete-form').on('submit', function(e) {
@@ -934,106 +998,16 @@
         });
     }
 
-    // Open Move to Shipping SweetAlert
+    // Open Move to Shipping (lewat panah Actions)
     function openMoveToShippingModal(preparationId) {
         $.ajax({
             url: `/preparations/${preparationId}/edit`,
             type: 'GET',
             success: function(preparation) {
-                Swal.fire({
-                    title: 'Move to Shipping',
-                    html: `
-                        <div class="mb-3 text-center">
-                            <div class="py-2">
-                                <small><strong>DN:</strong> ${preparation.no_dn}</small><br>
-                                <small><strong>Route:</strong> ${preparation.route} | <strong>Dock:</strong> ${preparation.dock} | <strong>Cycle:</strong> ${preparation.cycle}</small>
-                            </div>
-                        </div>
-                        <div class="container">
-                            <div class="row g-2 mb-2">
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 1">1</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 2">2</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 3">3</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 4">4</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 5">5</button></div>
-                            </div>
-                            <div class="row g-2 mb-2">
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 6">6</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 7">7</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 8">8</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 9">9</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping 10">10</button></div>
-                            </div>
-                            <div class="row g-2">
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 1">Ex 1</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 2">Ex 2</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 3">Ex 3</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 4">Ex 4</button></div>
-                                <div class="col"><button type="button" class="btn btn-outline-secondary w-100 address-select-btn" data-address="Shipping Ex 5">Ex 5</button></div>
-                            </div>
-                        </div>
-                    `,
-                    showConfirmButton: false,
-                    showCancelButton: true,
-                    cancelButtonText: 'Cancel',
-                    cancelButtonColor: '#6c757d',
-                    width: 500,
-                    didOpen: () => {
-                        document.querySelectorAll('.address-select-btn').forEach(btn => {
-                            btn.addEventListener('click', function() {
-                                const address = this.getAttribute('data-address');
-                                Swal.close();
-                                confirmMoveToShipping(preparationId, address);
-                            });
-                        });
-                    }
-                });
+                checkDnForShipping(preparation.no_dn, true); // true = pakai konfirmasi dulu
             },
             error: function() {
                 Swal.fire({ title: 'Error!', text: 'Gagal mengambil data preparation', icon: 'error', confirmButtonColor: '#dc2626' });
-            }
-        });
-    }
-
-    function confirmMoveToShipping(preparationId, address) {
-        Swal.fire({
-            title: 'Konfirmasi',
-            html: `Pindahkan data ke <strong>${address}</strong>?`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#0d6efd',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Ya, Pindahkan!',
-            cancelButtonText: 'Batal',
-            reverseButtons: true
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $.ajax({
-                    url: '{{ route("shippings.moveFromPreparation") }}',
-                    type: 'POST',
-                    data: {
-                        _token: '{{ csrf_token() }}',
-                        preparation_id: preparationId,
-                        address: address
-                    },
-                    success: function(response) {
-                        Swal.fire({
-                            title: 'Berhasil!',
-                            text: response.message,
-                            icon: 'success',
-                            showConfirmButton: false,
-                            timer: 1000,
-                        }).then(() => window.location.reload());
-                    },
-                    error: function(xhr) {
-                        Swal.fire({
-                            title: 'Gagal!',
-                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat memindahkan data',
-                            icon: 'error',
-                            confirmButtonColor: '#dc2626'
-                        });
-                    }
-                });
             }
         });
     }

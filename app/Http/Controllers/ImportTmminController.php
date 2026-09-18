@@ -46,6 +46,9 @@ class ImportTmminController extends Controller
             $hasD2Below = [];
             $lastValidRoute = null;
 
+            // Posisi kolom qty_kbn: index 16 dari $columns (index 0 = token "D1").
+            // index 15 = kode unik (163D/164D/dst — kadang isinya angka), index 16 = qty kbn beneran.
+
             // ========================================
             // PARSING FILE TXT
             // ========================================
@@ -88,6 +91,10 @@ class ImportTmminController extends Controller
                     if ($customer === 'UNKNOWN') {
                         $customer = 'TMMIN';
                     }
+
+                    // Extract qty_kbn: kolom index 16 (persis setelah kode unik 163D/164D/dst)
+                    $qtyKbnRaw = $columns[16] ?? null;
+                    $qtyKbn = (is_numeric(trim((string) $qtyKbnRaw))) ? (int) trim($qtyKbnRaw) : null;
 
                     // Extract route dan cycle
                     $route = 'UNKNOWN';
@@ -166,6 +173,7 @@ class ImportTmminController extends Controller
                             'cycle' => $cycleValue,
                             'route' => $route,
                             'customer' => $customer,
+                            'qty_kbn' => $qtyKbn,
                         ];
                     }
 
@@ -255,6 +263,7 @@ class ImportTmminController extends Controller
                     $cycleValue = $nearestD1['cycle'] ?? "1";
                     $routeValue = $nearestD1['route'] ?? "UNKNOWN";
                     $customerValue = $nearestD1['customer'] ?? "TMMIN";
+                    $qtyKbnValue = $nearestD1['qty_kbn'] ?? null;
 
                     // Fallback delivery datetime jika tidak ada
                     if (!$deliveryDateTime || !preg_match('/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/', $deliveryDateTime)) {
@@ -300,6 +309,7 @@ class ImportTmminController extends Controller
                         'cycle' => $cycleValue,
                         'pulling_date' => $pullingCarbon->toDateString(),
                         'pulling_time' => $pullingCarbon->toTimeString(),
+                        'qty_kbn' => $qtyKbnValue,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];

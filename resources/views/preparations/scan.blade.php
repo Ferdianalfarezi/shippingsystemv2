@@ -1,7 +1,7 @@
 @extends('layouts.mobile')
 
-@section('title', 'Scan to Shipping')
-@section('page-title', 'SCAN TO SHIPPING')
+@section('title', 'Scan Preparation')
+@section('page-title', 'SCAN PREPARATION')
 @section('body-class', 'scan-mobile-page')
 
 @section('content')
@@ -13,7 +13,7 @@
             <div class="text-center mb-3">
                 <i class="bi bi-qr-code-scan text-dark" style="font-size: 3rem;"></i>
                 <h4 class="mt-2  fw-bold">Scan DN Barcode</h4>
-                <small class="text-muted">Scan atau ketik nomor DN untuk memindahkan data ke Shipping</small>
+                <small class="text-muted">Scan atau ketik nomor DN untuk masuk ke Monitoring Preparation</small>
             </div>
             
             <div class="input-group input-group-lg">
@@ -97,13 +97,13 @@
 
 </div>
 
-<!-- Address Selection Modal (Full Screen for Mobile) -->
-<div class="modal fade" id="addressModal" tabindex="-1" data-bs-backdrop="static">
+<!-- PR Selection Modal (Full Screen for Mobile) -->
+<div class="modal fade" id="prModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
                 <h5 class="modal-title">
-                    <i class="bi bi-geo-alt-fill me-2"></i>Pilih Lokasi Shipping
+                    <i class="bi bi-box-seam me-2"></i>Pilih Preparation (PR)
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -112,40 +112,19 @@
                 <div class="alert alert-light border text-center mb-4">
                     <small class="text-muted d-block">No DN</small>
                     <h4 class="mb-1 fw-bold text-dark" id="modalDnNumber">-</h4>
-                    <small id="modalDnInfo" class="text-muted">-</small>
+                    <small id="modalDnInfo" class="text-muted d-block">-</small>
+                    <hr class="my-2">
+                    <small id="modalDnMeta" class="text-muted d-block">-</small>
                 </div>
                 
-                <!-- Address Buttons -->
-                <div class="row g-2 mb-3">
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 1"><strong>1</strong></button></div>
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 2"><strong>2</strong></button></div>
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 3"><strong>3</strong></button></div>
+                <!-- PR Buttons -->
+                <div class="row g-2 mb-2">
+                    <div class="col-6"><button type="button" class="btn btn-outline-dark w-100 py-4 pr-btn" data-pr="1"><strong>PR 1</strong></button></div>
+                    <div class="col-6"><button type="button" class="btn btn-outline-dark w-100 py-4 pr-btn" data-pr="2"><strong>PR 2</strong></button></div>
                 </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 4"><strong>4</strong></button></div>
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 5"><strong>5</strong></button></div>
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 6"><strong>6</strong></button></div>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 7"><strong>7</strong></button></div>
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 8"><strong>8</strong></button></div>
-                    <div class="col-4"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 9"><strong>9</strong></button></div>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-12"><button type="button" class="btn btn-outline-dark w-100 py-3 address-btn" data-address="Shipping 10"><strong>10</strong></button></div>
-                </div>
-                
-                <hr>
-                <p class="text-center text-muted small mb-2">Export Area</p>
-                
                 <div class="row g-2">
-                    <div class="col"><button type="button" class="btn btn-outline-secondary w-100 py-3 address-btn" data-address="Shipping Ex 1"><strong>Ex 1</strong></button></div>
-                    <div class="col"><button type="button" class="btn btn-outline-secondary w-100 py-3 address-btn" data-address="Shipping Ex 2"><strong>Ex 2</strong></button></div>
-                    <div class="col"><button type="button" class="btn btn-outline-secondary w-100 py-3 address-btn" data-address="Shipping Ex 3"><strong>Ex 3</strong></button></div>
-                </div>
-                <div class="row g-2 mt-1">
-                    <div class="col"><button type="button" class="btn btn-outline-secondary w-100 py-3 address-btn" data-address="Shipping Ex 4"><strong>Ex 4</strong></button></div>
-                    <div class="col"><button type="button" class="btn btn-outline-secondary w-100 py-3 address-btn" data-address="Shipping Ex 5"><strong>Ex 5</strong></button></div>
+                    <div class="col-6"><button type="button" class="btn btn-outline-dark w-100 py-4 pr-btn" data-pr="3"><strong>PR 3</strong></button></div>
+                    <div class="col-6"><button type="button" class="btn btn-outline-dark w-100 py-4 pr-btn" data-pr="4"><strong>PR 4</strong></button></div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -176,16 +155,16 @@
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
     }
     
-    .address-btn {
-        font-size: 1.2rem;
+    .pr-btn {
+        font-size: 1.4rem;
         transition: all 0.2s ease;
     }
     
-    .address-btn:active {
+    .pr-btn:active {
         transform: scale(0.95);
     }
     
-    .address-btn:hover {
+    .pr-btn:hover {
         background-color: #0d6efd;
         border-color: #0d6efd;
         color: white;
@@ -214,16 +193,16 @@
 $(document).ready(function() {
     
     let scanTimeout;
-    let currentPreparation = null;
-    const addressModal = new bootstrap.Modal(document.getElementById('addressModal'));
+    let pendingNoDn = null;
+    const prModal = new bootstrap.Modal(document.getElementById('prModal'));
     
     // Auto focus on load
     $('#scanDnInput').focus();
     
     // Re-focus after modal closes
-    $('#addressModal').on('hidden.bs.modal', function() {
+    $('#prModal').on('hidden.bs.modal', function() {
         $('#scanDnInput').val('').focus();
-        currentPreparation = null;
+        pendingNoDn = null;
     });
     
     // Handle scan input
@@ -234,7 +213,7 @@ $(document).ready(function() {
         if (noDn.length > 0) {
             // Delay 500ms untuk menunggu scanner selesai input
             scanTimeout = setTimeout(function() {
-                processScanDn(noDn);
+                checkDn(noDn);
             }, 500);
         }
     });
@@ -246,32 +225,36 @@ $(document).ready(function() {
             clearTimeout(scanTimeout);
             const noDn = $(this).val().trim();
             if (noDn.length > 0) {
-                processScanDn(noDn);
+                checkDn(noDn);
             }
         }
     });
     
-    // Process scan DN
-    function processScanDn(noDn) {
-        // Show loading
+    // Cek DN: nentuin perlu modal PR atau langsung diproses
+    function checkDn(noDn) {
         $('#scanStatus').removeClass('d-none');
         $('#scanDnInput').prop('disabled', true);
         
         $.ajax({
-            url: '{{ route("preparations.findByDn") }}',
+            url: '{{ route("prep-monitoring.check-dn") }}',
             type: 'GET',
             data: { no_dn: noDn },
             success: function(response) {
                 $('#scanStatus').addClass('d-none');
                 $('#scanDnInput').prop('disabled', false);
                 
-                if (response.success && response.data) {
-                    currentPreparation = response.data;
-                    showAddressModal(response.data);
-                } else {
-                    // DN tidak ditemukan
-                    showError('DN Tidak Ditemukan', `No DN <strong>${noDn}</strong> tidak ada di preparation`);
+                if (!response.success) {
+                    showError('Gagal', response.message);
                     $('#scanDnInput').val('').focus();
+                    return;
+                }
+                
+                if (response.needs_pr_selection) {
+                    pendingNoDn = noDn;
+                    showPrModal(response.data);
+                } else {
+                    // Kombinasi udah jalan, langsung diproses tanpa modal
+                    executeScan(noDn, null);
                 }
             },
             error: function(xhr) {
@@ -284,61 +267,73 @@ $(document).ready(function() {
         });
     }
     
-    // Show address selection modal
-    function showAddressModal(preparation) {
-        $('#modalDnNumber').text(preparation.no_dn);
+    // Show PR selection modal
+    function showPrModal(data) {
+        $('#modalDnNumber').text(data.no_dn);
         $('#modalDnInfo').html(`
-            <span class="me-2"><strong>Route:</strong> ${preparation.route}</span>
-            <span class="me-2"><strong>Dock:</strong> ${preparation.dock}</span>
-            <span><strong>Cycle:</strong> ${preparation.cycle}</span>
+            <span class="me-2"><strong>Route:</strong> ${data.route}</span>
+            <span class="me-2"><strong>Dock:</strong> ${data.dock}</span>
+            <span><strong>Cycle:</strong> ${data.cycle}</span>
         `);
-        addressModal.show();
+        $('#modalDnMeta').html(`
+            <strong>Kbn:</strong> ${data.kbn} &nbsp;|&nbsp;
+            <strong>Skid (target):</strong> ${data.skid} &nbsp;|&nbsp;
+            <strong>Address:</strong> ${data.shipping_address}
+        `);
+        prModal.show();
     }
     
-    // Handle address button click
-    $('.address-btn').on('click', function() {
-        if (!currentPreparation) return;
+    // Handle PR button click
+    $('.pr-btn').on('click', function() {
+        if (!pendingNoDn) return;
         
-        const address = $(this).data('address');
+        const prNumber = $(this).data('pr');
         const btn = $(this);
         
-        // Disable all buttons
-        $('.address-btn').prop('disabled', true);
+        $('.pr-btn').prop('disabled', true);
         btn.html('<span class="spinner-border spinner-border-sm"></span>');
         
-        // Execute move
-        $.ajax({
-            url: '{{ route("shippings.moveFromPreparation") }}',
-            type: 'POST',
-            data: {
-                _token: '{{ csrf_token() }}',
-                preparation_id: currentPreparation.id,
-                address: address
-            },
-            success: function(response) {
-                addressModal.hide();
-                showSuccess(currentPreparation.no_dn, address);
-            },
-            error: function(xhr) {
-                $('.address-btn').prop('disabled', false);
-                btn.html(`<strong>${address.replace('Shipping ', '').replace('Ex ', 'Ex ')}</strong>`);
-                
-                showError('Gagal', xhr.responseJSON?.message || 'Terjadi kesalahan');
-            }
+        executeScan(pendingNoDn, prNumber, function() {
+            prModal.hide();
+        }, function() {
+            // restore button kalau gagal
+            $('.pr-btn').prop('disabled', false);
+            btn.html(`<strong>PR ${prNumber}</strong>`);
         });
     });
     
+    // Eksekusi scan (bikin row baru / nambah progress row existing)
+    function executeScan(noDn, prNumber, onSuccessCallback, onErrorCallback) {
+        $.ajax({
+            url: '{{ route("prep-monitoring.scan") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                no_dn: noDn,
+                pr_number: prNumber
+            },
+            success: function(response) {
+                if (onSuccessCallback) onSuccessCallback();
+                showSuccess(noDn, response.message);
+            },
+            error: function(xhr) {
+                if (onErrorCallback) onErrorCallback();
+                showError('Gagal', xhr.responseJSON?.message || 'Terjadi kesalahan saat memproses scan');
+            }
+        });
+    }
+    
     // Show success message
-    function showSuccess(noDn, address) {
+    function showSuccess(noDn, message) {
         Swal.fire({
             title: 'Berhasil!',
             html: `<div class="text-center">
                 <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
                 <h4 class="mt-3 mb-1">${noDn}</h4>
-                <p class="text-muted mb-0">Dipindahkan ke <strong>${address}</strong></p>
+                <p class="text-muted mb-0">${message}</p>
             </div>`,
             showConfirmButton: false,
-            timer: 1500,
+            timer: 2000,
             timerProgressBar: true
         }).then(() => {
             window.location.reload();

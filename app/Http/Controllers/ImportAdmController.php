@@ -53,6 +53,7 @@ class ImportAdmController extends Controller
                 'delivery_date' => null,
                 'delivery_time' => null,
                 'cycle'         => null,
+                'qty_kbn'       => null,
             ];
 
             // Pemetaan header berdasarkan file Excel
@@ -71,6 +72,8 @@ class ImportAdmController extends Controller
                     $headerMap['delivery_time'] = $index;
                 } elseif (str_contains($header, 'del. cycle') || str_contains($header, 'cycle')) {
                     $headerMap['cycle'] = $index;
+                } elseif (str_contains($header, 'qty/kbn') || (str_contains($header, 'qty') && str_contains($header, 'kbn'))) {
+                    $headerMap['qty_kbn'] = $index;
                 }
             }
 
@@ -118,6 +121,10 @@ class ImportAdmController extends Controller
                 $cycle = $row[$headerMap['cycle']] ?? 1;
                 $route = trim((string) ($row[$headerMap['route']] ?? ''));
                 $dock = trim((string) ($row[$headerMap['dock']] ?? ''));
+
+                // Qty/Kbn
+                $qtyKbnRaw = $row[$headerMap['qty_kbn']] ?? null;
+                $qtyKbn = is_numeric($qtyKbnRaw) ? (int) $qtyKbnRaw : null;
 
                 // Parsing tanggal
                 if (is_numeric($originalDeliveryDate)) {
@@ -191,6 +198,7 @@ class ImportAdmController extends Controller
                     'cycle'             => $cycleFormatted,
                     'pulling_date'      => $pullingDateTime->format('Y-m-d'),
                     'pulling_time'      => $pullingDateTime->format('H:i:s'),
+                    'qty_kbn'           => $qtyKbn,
                     'created_at'        => now(),
                     'updated_at'        => now(),
                 ];

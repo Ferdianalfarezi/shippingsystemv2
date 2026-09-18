@@ -169,6 +169,10 @@ class ImportExcelController extends Controller
                 $dock  = strtoupper(trim((string) ($row[3] ?? '')));
                 $cycle = $row[6] ?? 1;
 
+                // Qty Kbn (index 7, kolom H — persis di kanan cycle)
+                $qtyKbnRaw = $row[7] ?? null;
+                $qtyKbn = is_numeric($qtyKbnRaw) ? (int) $qtyKbnRaw : null;
+
                 // ========================================
                 // HITUNG PULLING TIME DARI PULLING MATRIX
                 // ========================================
@@ -194,7 +198,7 @@ class ImportExcelController extends Controller
                             $pullingTime = $pullingDateTime->format('H:i:s');
                             Log::info("[$noDn] Matrix hit → pulling_time = {$matrixConfig->pulling_time}");
                         } else {
-                            // Tidak ada di matrix → baca dari kolom Excel (index 7 & 8) seperti semula
+                            // Tidak ada di matrix → baca dari kolom Excel (index 8 & 9) seperti semula
                             Log::info("[$noDn] No matrix config → pakai kolom pulling dari Excel");
                         }
                     } catch (\Exception $e) {
@@ -204,40 +208,40 @@ class ImportExcelController extends Controller
 
                 // Kalau pulling masih null (tidak ada matrix & tidak ada di Excel), baca dari Excel seperti aslinya
                 if (!$pullingDate) {
-                    // Handle pulling_date (index 7)
-                    if (isset($row[7]) && !empty($row[7])) {
+                    // Handle pulling_date (index 8, kolom I)
+                    if (isset($row[8]) && !empty($row[8])) {
                         try {
-                            if (is_string($row[7]) && strpos($row[7], '=') === 0) {
+                            if (is_string($row[8]) && strpos($row[8], '=') === 0) {
                                 if ($deliveryDate) {
                                     $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
                                 }
-                            } elseif ($row[7] instanceof \DateTime) {
-                                $pullingDate = $row[7]->format('Y-m-d');
-                            } elseif (is_numeric($row[7])) {
-                                $pullingDate = Carbon::createFromFormat('Y-m-d', \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[7])->format('Y-m-d'))->format('Y-m-d');
+                            } elseif ($row[8] instanceof \DateTime) {
+                                $pullingDate = $row[8]->format('Y-m-d');
+                            } elseif (is_numeric($row[8])) {
+                                $pullingDate = Carbon::createFromFormat('Y-m-d', \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[8])->format('Y-m-d'))->format('Y-m-d');
                             } else {
-                                $pullingDate = Carbon::parse($row[7])->format('Y-m-d');
+                                $pullingDate = Carbon::parse($row[8])->format('Y-m-d');
                             }
                         } catch (\Exception $e) {
-                            Log::warning('Invalid pulling date format for no_dn ' . $noDn . ': ' . $row[7]);
+                            Log::warning('Invalid pulling date format for no_dn ' . $noDn . ': ' . $row[8]);
                             if ($deliveryDate) {
                                 $pullingDate = Carbon::parse($deliveryDate)->subDay()->format('Y-m-d');
                             }
                         }
                     }
 
-                    // Handle pulling_time (index 8)
-                    if (isset($row[8]) && !empty($row[8])) {
+                    // Handle pulling_time (index 9, kolom J)
+                    if (isset($row[9]) && !empty($row[9])) {
                         try {
-                            if ($row[8] instanceof \DateTime) {
-                                $pullingTime = $row[8]->format('H:i:s');
-                            } elseif (is_numeric($row[8])) {
-                                $pullingTime = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[8])->format('H:i:s');
+                            if ($row[9] instanceof \DateTime) {
+                                $pullingTime = $row[9]->format('H:i:s');
+                            } elseif (is_numeric($row[9])) {
+                                $pullingTime = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row[9])->format('H:i:s');
                             } else {
-                                $pullingTime = Carbon::parse($row[8])->format('H:i:s');
+                                $pullingTime = Carbon::parse($row[9])->format('H:i:s');
                             }
                         } catch (\Exception $e) {
-                            Log::warning('Invalid pulling time format for no_dn ' . $noDn . ': ' . $row[8]);
+                            Log::warning('Invalid pulling time format for no_dn ' . $noDn . ': ' . $row[9]);
                             $pullingTime = '00:00:00';
                         }
                     }
@@ -260,6 +264,7 @@ class ImportExcelController extends Controller
                         'delivery_date'     => $deliveryDate,
                         'delivery_time'     => $deliveryTime ?? '00:00:00',
                         'cycle'             => $cycle,
+                        'qty_kbn'           => $qtyKbn,
                         'pulling_date'      => $pullingDate,
                         'pulling_time'      => $pullingTime ?? '00:00:00',
                     ]);

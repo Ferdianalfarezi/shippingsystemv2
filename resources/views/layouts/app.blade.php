@@ -541,6 +541,9 @@
             <!-- Menu below Navbar -->
             <div class="menu-container">
                 <div class="menu-item">
+                    <a href="{{ route('prep-monitoring.index') }}">Dashboard</a>
+                </div>
+                <div class="menu-item">
                     <a href="{{ route('preparations.index') }}">Preparation</a>
                 </div>
                 <div class="menu-item">
@@ -580,6 +583,12 @@
                                 ADM 
                             </a>
                         </li>
+
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanban-ntc-split.index') }}">
+                                NTC 
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
@@ -612,6 +621,10 @@
                                 <i class="fas fa-address-book"></i> ADM Address
                             </a>
 
+                            <a href="{{ route('ntcaddresses.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> NTC Address
+                            </a>
+
                             <a href="{{ route('arsadms.index') }}" class="fs-6">
                                 <i class="fas fa-address-book"></i> ADM ARS
                             </a>
@@ -626,6 +639,9 @@
                             <div class="andon-submenu mt-1 mb-1" style="display: none; padding-left: 40px;">
                                 <a href="{{ route('andon.preparations') }}" target="_blank" style="font-size:15px; opacity:0.7;">
                                     • Preparations
+                                </a>
+                                <a href="{{ route('andon.prep-monitoring') }}" target="_blank" style="font-size:15px; opacity:0.7;">
+                                    • Dashboard
                                 </a>
                                 <a href="{{ route('andon.shippings.group') }}" target="_blank" style="font-size:15px; opacity:0.7;">
                                     • Shippings

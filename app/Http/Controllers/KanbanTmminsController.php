@@ -574,7 +574,84 @@ class KanbanTmminsController extends Controller
     }
 
     /**
-     * Extract times based on dock_code
+     * Cek apakah sebuah value valid sebagai datetime "asli" dari data sumber
+     * (bukan hasil parsing gagal). Batas bawah 1990 dan batas atas +2 tahun
+     * dari sekarang dipakai supaya angka yang kebetulan ke-parse jadi tanggal
+     * ekstrem (misal salah baca part number) ikut ditolak.
+     */
+    private function isValidDateTime($value)
+    {
+        if ($value === null) return false;
+        $clean = trim((string) $value);
+        if ($clean === '') return false;
+        $ts = strtotime($clean);
+        return ($ts !== false && $ts > strtotime('1990-01-01') && $ts < strtotime('+2 years'));
+    }
+
+    /**
+     * Cari kolom yang berisi datetime valid di sekitar posisi yang diharapkan.
+     *
+     * Dipakai karena jumlah/urutan kolom di file TXT sumber tidak selalu
+     * konsisten antar baris (field kosong yang membuat kolom-kolom setelahnya
+     * geser). Daripada langsung fallback ke now() saat posisi yang diharapkan
+     * ternyata bukan tanggal, method ini scan kolom-kolom di sekitarnya
+     * (radius kiri-kanan) untuk menemukan value yang memang berpola datetime,
+     * lalu sebagai upaya terakhir scan seluruh baris.
+     *
+     * $excludeIndexes dipakai supaya kolom yang sudah dipakai untuk field
+     * waktu lain (misal sudah dipakai untuk departure_time) tidak dipakai
+     * ulang untuk arrival_time/out_time pada baris yang sama.
+     *
+     * Return: ['value' => string|null, 'index' => int|null]
+     */
+    private function findNearbyDateTime($d1, $expectedIndex, $radius = 5, $excludeIndexes = [])
+    {
+        $clean = function ($raw) {
+            return trim(preg_replace('/\.\d{1,6}$/', '', (string) $raw));
+        };
+
+        // 1. Cek dulu posisi yang diharapkan
+        if (isset($d1[$expectedIndex]) && !in_array($expectedIndex, $excludeIndexes, true)) {
+            $candidate = $clean($d1[$expectedIndex]);
+            if ($this->isValidDateTime($candidate)) {
+                return ['value' => $candidate, 'index' => $expectedIndex];
+            }
+        }
+
+        // 2. Scan kolom kiri-kanan di sekitar posisi yang diharapkan,
+        //    makin dekat ke posisi yang diharapkan makin diprioritaskan
+        for ($offset = 1; $offset <= $radius; $offset++) {
+            foreach ([$expectedIndex + $offset, $expectedIndex - $offset] as $idx) {
+                if ($idx < 0 || in_array($idx, $excludeIndexes, true)) continue;
+                if (!isset($d1[$idx])) continue;
+
+                $candidate = $clean($d1[$idx]);
+                if ($this->isValidDateTime($candidate)) {
+                    return ['value' => $candidate, 'index' => $idx];
+                }
+            }
+        }
+
+        // 3. Last resort: scan seluruh baris cari value pertama yang berpola datetime
+        foreach ($d1 as $idx => $value) {
+            if (in_array($idx, $excludeIndexes, true)) continue;
+            $candidate = $clean($value);
+            if ($this->isValidDateTime($candidate)) {
+                return ['value' => $candidate, 'index' => $idx];
+            }
+        }
+
+        return ['value' => null, 'index' => null];
+    }
+
+    /**
+     * Extract times based on dock_code.
+     *
+     * Tidak lagi fallback ke now() begitu saja saat kolom yang diharapkan
+     * kosong/tidak valid — kolom di sekitarnya di-scan dulu (findNearbyDateTime)
+     * karena data waktu biasanya tetap ada di baris tersebut, cuma posisinya
+     * geser. now() hanya dipakai kalau benar-benar tidak ada satupun kolom
+     * berpola datetime yang ditemukan di seluruh baris.
      */
     private function extractTimes($d1, $dockCode)
     {
@@ -583,33 +660,45 @@ class KanbanTmminsController extends Controller
         $out_time = now();
 
         if (strtoupper($dockCode) === '4P') {
-            $departure_time = isset($d1[19]) ? date('Y-m-d H:i:s', strtotime($d1[19])) : now();
-            $arrival_time = isset($d1[20]) ? date('Y-m-d H:i:s', strtotime($d1[20])) : date('Y-m-d H:i:s', strtotime($departure_time . ' +4 hours'));
+            $dep = $this->findNearbyDateTime($d1, 19);
+            $departure_time = $dep['value']
+                ? date('Y-m-d H:i:s', strtotime($dep['value']))
+                : now();
+
+            $arr = $this->findNearbyDateTime($d1, 20, 5, array_filter([$dep['index']], fn($v) => $v !== null));
+            $arrival_time = $arr['value']
+                ? date('Y-m-d H:i:s', strtotime($arr['value']))
+                : date('Y-m-d H:i:s', strtotime($departure_time . ' +4 hours'));
+
             $out_time = null;
+
         } elseif (strtoupper($dockCode) === '43') {
-            $departure_time = isset($d1[19]) ? date('Y-m-d H:i:s', strtotime($d1[19])) : now();
-            $arrival_time = isset($d1[30]) ? date('Y-m-d H:i:s', strtotime($d1[30])) : date('Y-m-d H:i:s', strtotime($departure_time . ' +4 hours'));
-            
-            if (isset($d1[20]) && !empty(trim($d1[20]))) {
-                $rawTime = trim($d1[20]);
-                $cleanTime = preg_replace('/\.\d{3}$/', '', $rawTime);
-                $parsedTime = strtotime($cleanTime);
-                if ($parsedTime !== false && $parsedTime > strtotime('1990-01-01')) {
-                    $out_time = date('Y-m-d H:i:s', $parsedTime);
-                }
-            }
+            $dep = $this->findNearbyDateTime($d1, 19);
+            $departure_time = $dep['value']
+                ? date('Y-m-d H:i:s', strtotime($dep['value']))
+                : now();
+
+            $arr = $this->findNearbyDateTime($d1, 30, 5, array_filter([$dep['index']], fn($v) => $v !== null));
+            $arrival_time = $arr['value']
+                ? date('Y-m-d H:i:s', strtotime($arr['value']))
+                : date('Y-m-d H:i:s', strtotime($departure_time . ' +4 hours'));
+
+            $out = $this->findNearbyDateTime($d1, 20, 5, array_filter([$dep['index'], $arr['index']], fn($v) => $v !== null));
+            $out_time = $out['value'] ? date('Y-m-d H:i:s', strtotime($out['value'])) : null;
+
         } else {
-            $departure_time = isset($d1[20]) ? date('Y-m-d H:i:s', strtotime($d1[20])) : now();
-            $arrival_time = isset($d1[31]) ? date('Y-m-d H:i:s', strtotime($d1[31])) : date('Y-m-d H:i:s', strtotime($departure_time . ' +4 hours'));
-            
-            if (isset($d1[21]) && !empty(trim($d1[21]))) {
-                $rawTime = trim($d1[21]);
-                $cleanTime = preg_replace('/\.\d{3}$/', '', $rawTime);
-                $parsedTime = strtotime($cleanTime);
-                if ($parsedTime !== false && $parsedTime > strtotime('1990-01-01')) {
-                    $out_time = date('Y-m-d H:i:s', $parsedTime);
-                }
-            }
+            $dep = $this->findNearbyDateTime($d1, 20);
+            $departure_time = $dep['value']
+                ? date('Y-m-d H:i:s', strtotime($dep['value']))
+                : now();
+
+            $arr = $this->findNearbyDateTime($d1, 31, 5, array_filter([$dep['index']], fn($v) => $v !== null));
+            $arrival_time = $arr['value']
+                ? date('Y-m-d H:i:s', strtotime($arr['value']))
+                : date('Y-m-d H:i:s', strtotime($departure_time . ' +4 hours'));
+
+            $out = $this->findNearbyDateTime($d1, 21, 5, array_filter([$dep['index'], $arr['index']], fn($v) => $v !== null));
+            $out_time = $out['value'] ? date('Y-m-d H:i:s', strtotime($out['value'])) : null;
         }
 
         return [

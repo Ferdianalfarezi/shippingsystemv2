@@ -26,6 +26,9 @@ use App\Http\Controllers\KanbanadmController;
 use App\Http\Controllers\ArsAdmController;
 use App\Http\Controllers\KanbanAdmSplitController;
 use App\Http\Controllers\AdmAddressControllerv2;
+use App\Http\Controllers\ShippingMatrixController;
+use App\Http\Controllers\PrepMonitoringController;
+use App\Http\Controllers\NtcAddressController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -123,6 +126,9 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::resource('lp-configs', LpConfigController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('lp-configs/batch-save', [LpConfigController::class, 'batchSave'])->name('lp-configs.batch-save');
+
+    Route::get('/shipping-matrix', [ShippingMatrixController::class, 'index'])->name('shipping-matrix.index');
+Route::post('/shipping-matrix/batch-save', [ShippingMatrixController::class, 'batchSave'])->name('shipping-matrix.batch-save');
 
     /*
     |----------------------------------------------------------------------
@@ -227,6 +233,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('/delete-all',    [HistoryController::class, 'deleteAll'])   ->name('deleteAll');
         Route::post('/scan-to-history', [HistoryController::class, 'scanToHistory'])->name('scanToHistory');
+        Route::get('/export',           [HistoryController::class, 'export'])      ->name('export'); // <-- BARU: export excel
 
         Route::get('/{history}',       [HistoryController::class, 'show'])   ->name('show');
         Route::delete('/{history}',    [HistoryController::class, 'destroy'])->name('destroy');
@@ -386,7 +393,30 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/admadressesv2/delete-all', [AdmAddressControllerv2::class, 'deleteAll'])->name('admadressesv2.deleteAll');
     Route::post('/admadressesv2/import', [AdmAddressControllerv2::class, 'import'])->name('admadressesv2.import');
 
- 
+    Route::get('/prep-monitoring', [PrepMonitoringController::class, 'index'])->name('prep-monitoring.index');
+    Route::get('/prep-monitoring/check-dn', [PrepMonitoringController::class, 'checkDn'])->name('prep-monitoring.check-dn');
+    Route::post('/prep-monitoring/scan', [PrepMonitoringController::class, 'scan'])->name('prep-monitoring.scan');
+    Route::post('prep-monitoring/scan-direct', [App\Http\Controllers\PrepMonitoringController::class, 'scanDirect'])
+    ->name('prep-monitoring.scan-direct');
+    Route::delete('/prep-monitoring/delete-all', [PrepMonitoringController::class, 'deleteAll'])->name('prep-monitoring.delete-all');
+    Route::get('/andon/prep-monitoring', [PrepMonitoringController::class, 'andon'])
+    ->name('andon.prep-monitoring');
+
+    Route::get('/ntc-addresses', [\App\Http\Controllers\NtcAddressController::class, 'index'])->name('ntcaddresses.index');
+    Route::post('/ntc-addresses', [\App\Http\Controllers\NtcAddressController::class, 'store'])->name('ntcaddresses.store');
+    Route::get('/ntc-addresses/{ntcAddress}/edit', [\App\Http\Controllers\NtcAddressController::class, 'edit'])->name('ntcaddresses.edit');
+    Route::put('/ntc-addresses/{ntcAddress}', [\App\Http\Controllers\NtcAddressController::class, 'update'])->name('ntcaddresses.update');
+    Route::delete('/ntc-addresses/{ntcAddress}', [\App\Http\Controllers\NtcAddressController::class, 'destroy'])->name('ntcaddresses.destroy');
+    Route::delete('/ntc-addresses-delete-all', [\App\Http\Controllers\NtcAddressController::class, 'deleteAll'])->name('ntcaddresses.deleteAll');
+    Route::post('/ntc-addresses/import', [\App\Http\Controllers\NtcAddressController::class, 'import'])->name('ntcaddresses.import');
+
+    Route::prefix('kanban-ntc-split')->name('kanban-ntc-split.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\KanbanNtcSplitController::class, 'index'])->name('index');
+    Route::post('/process', [\App\Http\Controllers\KanbanNtcSplitController::class, 'process'])->name('process');
+    Route::get('/recent', [\App\Http\Controllers\KanbanNtcSplitController::class, 'recent'])->name('recent');
+    Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanNtcSplitController::class, 'labelsMeta'])->name('labels-meta');
+    Route::get('/{token}/download', [\App\Http\Controllers\KanbanNtcSplitController::class, 'download'])->name('download');
+    });
 
 }); // end middleware auth
 

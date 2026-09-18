@@ -21,9 +21,9 @@ class KanbanRackSplitter
      * Regex buat narik "DN NO" (delivery note number) dari teks label,
      * mis. "DN4126060048037A". Beda sama part no (mis. "57036-BZ031-00")
      * - DN No ini dipake orang buat nyari fisik dokumen/kanban-nya,
-     * bukan buat matching ke tabel AdmAddressv2. Sekarang JUGA dipake
-     * buat GROUPING urutan output (lihat split()), selain buat search
-     * di frontend.
+     * bukan buat matching ke tabel AdmAddressv2. Dipake buat search
+     * di frontend & ditampilkan di metadata, DAN sekarang juga dipake
+     * buat GROUPING sebelum sorting rack_no (lihat sortItemsByDnGroup()).
      */
     protected string $dnNoPattern = '/\bDN\d{10,16}[A-Z]?\b/i';
 
@@ -129,40 +129,30 @@ class KanbanRackSplitter
     }
 
     /**
-     * Split PDF + cocokkan part no ke admadresses + overlay rack no +
-     * URUTIN ulang halaman output berdasarkan CYCLE (paling luar), lalu
-     * DN No (grouping di dalam 1 cycle), lalu rack_no (urutan antar &
-     * dalam grup DN No).
+     * Split PDF + cocokkan part no ke admadresses + overlay rack no.
      *
-     * Urutan default:
-     * 0. CYCLE (mis. dari fraction "1/4", "2/4", dst di header label) —
-     *    SORT KEY PALING LUAR. Semua label cycle 1 keluar duluan,
-     *    baru cycle 2, dst. Label yang cycle-nya gak ketemu ditaro
-     *    paling belakang dari semua cycle.
-     * 1. GROUPING BY DN NO (di dalam 1 cycle) — semua label yang punya
-     *    DN No SAMA WAJIB nempel bersebelahan di output (gak boleh
-     *    kepisah walau rack-nya beda), tapi TETEP gak akan nyampur
-     *    sama label dari cycle lain. Label tanpa DN No dianggep grup
-     *    isi 1 (sendiri-sendiri), behave kayak sebelumnya.
-     * 2. Plant 1 (rack_no TIDAK diawali huruf "K") — diurutin DESCENDING
-     *    (Z→A) biar pas dicetak, rack paling "kecil" (mis. A1) keluar
-     *    PALING TERAKHIR dari printer -> jatuh di PALING ATAS tumpukan.
-     * 3. Plant 2 (rack_no diawali huruf "K") — ditaro di PALING BELAKANG
-     *    dari semua, urutannya sendiri juga descending kayak di atas.
-     * 4. Yang gak ketemu rack_no-nya (unmatched) — ditaro paling belakang
-     *    dari semua-semuanya, urutan asli (gak ada rack buat diurutin).
+     * URUTAN OUTPUT: pada dasarnya ngikutin urutan halaman & posisi
+     * label di PDF SUMBER (halaman 1 label 1,2,3,4, lanjut halaman 2
+     * label 1,2,3,4, dst) — TAPI dengan satu pengecualian:
      *
-     * Aturan #2-#4 di atas sekarang dipake DUA KALI: buat nentuin posisi
-     * ANTAR grup DN No (pake rack "representative" tiap grup), dan buat
-     * nentuin urutan item DI DALAM 1 grup DN No (kalau grup-nya isi > 1
-     * label dengan rack beda-beda). Semuanya di-scope di dalam 1 cycle.
+     * Di dalam label-label yang punya DN No SAMA, urutannya di-SORT
+     * berdasarkan rack_no DESCENDING (dari yang "terbesar" ke
+     * "terkecil" secara string, mis. K3-39-A > C3-07-A > C2-39-A >
+     * C2-36-A). Urutan ANTAR grup DN No sendiri tetap ngikutin
+     * kemunculan pertama grup itu di PDF sumber (gak diacak). Label
+     * yang gak punya DN No (null) dianggap grup sendiri-sendiri (gak
+     * ikut campur ke grup lain), dan di dalam satu grup label yang
+     * rack_no-nya null (unmatched) ditaro di akhir grup, urutan asli
+     * dipertahanin. Lihat sortItemsByDnGroup().
      *
-     * DN No (5 digit terakhir, ASCENDING) sekarang jadi ACUAN UTAMA buat
-     * urutan ANTAR grup di dalam groupNum yang sama (lihat uasort di
-     * bawah) — sebelum ini urutan antar grup unmatched cuma ngikutin
-     * urutan asli halaman sumber, jadinya DN No bisa acak (mis. DN...254
-     * keluar duluan sebelum DN...253). Rack tetep dipake sebagai
-     * tie-breaker kalau DN suffix-nya sama/null.
+     * Metadata (shop, rack_no, part_no, dn_no, cycle) TETAP diekstrak &
+     * dikembalikan di $labels buat keperluan search/filter/display di
+     * frontend.
+     *
+     * PDF sumber yang strukturnya pakai cross-reference stream /
+     * object stream terkompresi (gak disupport parser FPDI gratis
+     * maupun Smalot/pdfparser) otomatis di-normalize dulu pakai qpdf
+     * lewat ensureReadable() sebelum diproses. Lihat PdfNormalizer.
      *
      * @return array{
      *     output: string,
@@ -177,6 +167,9 @@ class KanbanRackSplitter
      */
     public function split(string $sourcePath, string $outputPath): array
     {
+        $originalSourcePath = $sourcePath;
+        $sourcePath = $this->ensureReadable($sourcePath);
+
         $pdf = new Fpdi('P', 'pt');
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
@@ -205,8 +198,9 @@ class KanbanRackSplitter
         // Import tiap halaman sumber sekali buat dapetin templateId +
         // faktor scale-nya, terus loop tiap slot label buat extract
         // part no / shop / rack no / cycle. Hasilnya ditampung di
-        // $items, BELUM di-render, karena urutan render ditentuin
-        // belakangan (pass 2) setelah semua rack_no diketahui.
+        // $items, urutannya PERSIS urutan asli sumber (halaman lalu
+        // label_index). Urutan ini kemudian di-adjust dikit lewat
+        // sortItemsByDnGroup() sebelum dipake di PASS 2 (lihat bawah).
         // ============================================================
         $pageMeta = []; // pageNo -> [templateId, scaleX, scaleY, labelHeight, topOffset, fullWidth, fullHeight]
         $items = [];    // list flat semua slot label, urutan asli sumber
@@ -232,23 +226,6 @@ class KanbanRackSplitter
             $pageMeta[$pageNo] = compact('templateId', 'scaleX', 'scaleY', 'labelHeight', 'topOffset', 'fullWidth', 'fullHeight');
 
             $chunks = $labelTextsPerPage[$pageNo - 1] ?? [];
-
-            // DEBUG SEMENTARA: log teks mentah label pertama di halaman 1,
-            // dengan whitespace dibikin keliatan. HAPUS kalau udah gak kepake.
-            if ($pageNo === 1) {
-                foreach ($chunks as $debugIdx => $debugText) {
-                    $visible = str_replace(
-                        ["\r\n", "\n", "\r", "\t", ' '],
-                        ['[NL]', '[NL]', '[NL]', '[TAB]', '·'],
-                        $debugText
-                    );
-                    \Illuminate\Support\Facades\Log::info('KANBAN DEBUG RAW TEXT', [
-                        'page' => $pageNo,
-                        'label_index' => $debugIdx,
-                        'raw_visible' => $visible,
-                    ]);
-                }
-            }
 
             for ($i = 0; $i < $this->labelsPerPage; $i++) {
                 $labelText = $chunks[$i] ?? '';
@@ -301,7 +278,7 @@ class KanbanRackSplitter
                 }
 
                 $items[] = [
-                    'seq' => count($items), // urutan asli, dipake buat tie-break yang unmatched
+                    'seq' => count($items), // urutan asli
                     'pageNo' => $pageNo,
                     'labelIndex' => $i,
                     'shop' => $shop,
@@ -313,8 +290,8 @@ class KanbanRackSplitter
                     // (mis. ada/gak ada suffix) sama teks yang beneran tercetak.
                     'partNoRaw' => $partNo,
                     'dnNo' => $dnNo,
-                    // angka CYCLE (mis. dari "1/4") — SORT KEY PALING LUAR,
-                    // null kalau fraction-nya gak ketemu di teks label.
+                    // angka CYCLE (mis. dari "1/4") — cuma buat metadata/display,
+                    // GAK dipake buat sorting lagi.
                     'cycle' => $cycle,
                     'plant' => $rackNo === null ? null : (stripos($rackNo, 'K') === 0 ? 'Plant 2' : 'Plant 1'),
                 ];
@@ -323,143 +300,15 @@ class KanbanRackSplitter
 
         $totalLabels = count($items);
 
-        // ============================================================
-        // GROUPING BY CYCLE (paling luar) — semua label dengan CYCLE
-        // sama dikelompokin & diurutin duluan (1,2,3,4,...). Item yang
-        // cycle-nya gak ketemu (null) ditaro PALING BELAKANG dari
-        // semua cycle group yang ketemu.
-        // ============================================================
-        $cycleGroups = [];
-        foreach ($items as $item) {
-            $cycleKey = $item['cycle'] !== null ? $item['cycle'] : 'null';
-            $cycleGroups[$cycleKey][] = $item;
-        }
-
-        uksort($cycleGroups, function ($a, $b) {
-            if ($a === 'null' && $b === 'null') {
-                return 0;
-            }
-            if ($a === 'null') {
-                return 1;
-            }
-            if ($b === 'null') {
-                return -1;
-            }
-            return $a <=> $b;
-        });
-
-        $items = [];
-
-        foreach ($cycleGroups as $cycleItems) {
-            // ============================================================
-            // GROUPING BY DN NO — di dalam 1 cycle, label yang DN No-nya
-            // sama WAJIB nempel bersebelahan di output (1 DN No bisa
-            // punya beberapa part/kanban dengan rack beda-beda, tapi
-            // tetep pengen dicetak berurutan biar gak kepisah-pisah pas
-            // ambil dokumennya). Item TANPA DN No diperlakukan
-            // sendiri-sendiri (grup isi 1), sama kayak behavior lama
-            // (gak dipaksa nempel ke apapun). Scope-nya cuma di dalem
-            // cycle ini aja — gak akan nyampur sama item dari cycle lain.
-            // ============================================================
-            $dnGroups = [];
-            foreach ($cycleItems as $item) {
-                $key = ($item['dnNo'] !== null && $item['dnNo'] !== '')
-                    ? 'dn:' . $item['dnNo']
-                    : 'single:' . $item['seq'];
-                $dnGroups[$key][] = $item;
-            }
-
-            foreach ($dnGroups as $key => $groupItems) {
-                // posisi grup (antar-grup) ikut yang PALING matched di antara
-                // member-nya: 0=Plant1, 1=Plant2, 2=unmatched. Jadi grup yang
-                // ada minimal 1 label matched gak ketutup di belakang bareng
-                // grup yang bener-bener semuanya unmatched.
-                $groupNum = min(array_map(fn ($it) => $this->sortGroupFor($it['rackNo']), $groupItems));
-
-                // rack "representative" buat urutin ANTAR grup: rack TERBESAR
-                // (natural sort) di antara member grup yang punya rack.
-                // Kalau nanti ternyata DN No sama selalu 1 rack aja, ini otomatis
-                // sama dengan rack satu-satunya itu.
-                $repRack = null;
-                foreach ($groupItems as $it) {
-                    if ($it['rackNo'] === null || $it['rackNo'] === '') {
-                        continue;
-                    }
-                    if ($repRack === null || strnatcasecmp($it['rackNo'], $repRack) > 0) {
-                        $repRack = $it['rackNo'];
-                    }
-                }
-
-                // 5 digit terakhir DN No grup ini — dipake sebagai ACUAN UTAMA
-                // urutan antar grup (lihat uasort di bawah). Semua member 1
-                // grup punya DN No yang sama (kecuali grup "single:" yang emang
-                // gak punya DN No -> null), jadi cukup ambil dari item pertama.
-                $dnSuffix = $this->extractDnSuffix($groupItems[0]['dnNo'] ?? null);
-
-                $minSeq = min(array_map(fn ($it) => $it['seq'], $groupItems));
-
-                // urutin item DI DALAM grup pake logic rack yang sama kayak
-                // urutan lama (buat kasus 1 DN No isinya beberapa rack beda)
-                usort($groupItems, function (array $a, array $b) {
-                    $ga = $this->sortGroupFor($a['rackNo']);
-                    $gb = $this->sortGroupFor($b['rackNo']);
-                    if ($ga !== $gb) {
-                        return $ga <=> $gb;
-                    }
-                    if ($ga === 2) {
-                        return $a['seq'] <=> $b['seq'];
-                    }
-                    return strnatcasecmp($b['rackNo'], $a['rackNo']);
-                });
-
-                $dnGroups[$key] = compact('groupItems', 'groupNum', 'repRack', 'minSeq', 'dnSuffix');
-            }
-
-            // urutin ANTAR grup DN No.
-            // 1. DN No (5 digit terakhir) ASCENDING — SEKARANG JADI ACUAN
-            //    PALING UTAMA (di atas groupNum/rack), soalnya ini yang
-            //    paling nyerminin urutan fisik di dokumen sumber (yang
-            //    emang udah ke-generate urut per DN No: 253, 254, 255, ...).
-            //    PENTING: ini sengaja ditaro DI ATAS groupNum. Sebelumnya
-            //    groupNum (Plant1/Plant2) dicek duluan, jadi kalau 1 grup
-            //    DN kebetulan punya member match ke Plant1 (groupNum lebih
-            //    kecil) sementara grup DN lain semua match ke Plant2 doang,
-            //    DN suffix-nya gak kepake sama sekali & urutan DN jadi
-            //    keliru (mis. DN254 nyodok duluan drpd DN253 gara2 DN254
-            //    ada 1-2 item yg nyasar ke rack Plant1).
-            // 2. groupNum (Plant1/Plant2/unmatched) & rack (descending)
-            //    cuma dipake sebagai tie-breaker kalau DN suffix-nya
-            //    sama atau null (grup "single:" tanpa DN No).
-            // 3. minSeq (urutan asli) fallback paling akhir.
-            uasort($dnGroups, function (array $a, array $b) {
-                if ($a['dnSuffix'] !== null && $b['dnSuffix'] !== null && $a['dnSuffix'] !== $b['dnSuffix']) {
-                    return $a['dnSuffix'] <=> $b['dnSuffix'];
-                }
-                if ($a['groupNum'] !== $b['groupNum']) {
-                    return $a['groupNum'] <=> $b['groupNum'];
-                }
-                if ($a['groupNum'] === 2) {
-                    return $a['minSeq'] <=> $b['minSeq'];
-                }
-                if ($a['repRack'] === null || $b['repRack'] === null) {
-                    return $a['minSeq'] <=> $b['minSeq'];
-                }
-                return strnatcasecmp($b['repRack'], $a['repRack']);
-            });
-
-            // flatten balik ke $items — DN No sama udah nempel bersebelahan
-            // di dalem cycle ini, urutan antar grup & di dalam grup tetep
-            // ngikutin aturan DN No -> rack_no
-            foreach ($dnGroups as $group) {
-                foreach ($group['groupItems'] as $it) {
-                    $items[] = $it;
-                }
-            }
-        }
+        // Sort: di dalam grup DN No yang sama, urutin rack_no descending.
+        // Urutan antar grup DN No tetap ngikut kemunculan pertama di
+        // sumber. Lihat docblock sortItemsByDnGroup().
+        $items = $this->sortItemsByDnGroup($items);
 
         // ============================================================
-        // PASS 2 — render halaman PDF sesuai urutan $items yang baru,
-        // pake templateId & faktor scale yang udah disiapin di pass 1.
+        // PASS 2 — render halaman PDF sesuai urutan $items (= urutan
+        // hasil sortItemsByDnGroup di atas), pake templateId & faktor
+        // scale dari pass 1.
         // ============================================================
         $labels = []; // metadata final per halaman OUTPUT, sinkron urutan render
 
@@ -492,6 +341,11 @@ class KanbanRackSplitter
         }
 
         $pdf->Output($outputPath, 'F');
+
+        // bersihin file temp hasil normalize qpdf (kalau memang sempat dipakai)
+        if ($sourcePath !== $originalSourcePath) {
+            @unlink($sourcePath);
+        }
 
         $unmatched = $unmatchedNoText + $unmatchedNoExtract + $unmatchedNoMaster + $unmatchedNoRack;
 
@@ -564,18 +418,116 @@ class KanbanRackSplitter
     }
 
     /**
-     * Grup pengurutan buat 1 item berdasarkan rack_no-nya:
-     * 0 = Plant 1 (rack_no ada, gak diawali "K")
-     * 1 = Plant 2 (rack_no ada, diawali "K")
-     * 2 = unmatched (rack_no null/gak ketemu) -> selalu paling belakang
+     * Coba baca PDF sumber langsung pakai FPDI. Kalau gagal karena
+     * struktur/kompresi yang gak disupport parser FPDI gratis (mis.
+     * cross-reference stream, object stream terkompresi), normalize
+     * dulu pakai qpdf (via PdfNormalizer) dan pakai hasil normalize-nya
+     * sebagai source untuk SISA proses split() (baik FPDI maupun
+     * Smalot/pdfparser di extractLabelTexts()).
+     *
+     * Return path file yang aman dipakai (bisa sama dengan $sourcePath
+     * asli kalau memang gak bermasalah, atau path file temp hasil
+     * normalize kalau tadinya bermasalah).
      */
-    protected function sortGroupFor(?string $rackNo): int
+    protected function ensureReadable(string $sourcePath): string
     {
-        if ($rackNo === null || $rackNo === '') {
-            return 2;
+        try {
+            $probe = new Fpdi();
+            $probe->setSourceFile($sourcePath);
+            return $sourcePath; // aman, gak perlu normalize
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('KANBAN PDF PERLU NORMALIZE', [
+                'source' => $sourcePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return app(PdfNormalizer::class)->normalize($sourcePath);
+        }
+    }
+
+    /**
+     * Sort $items (flat, urutan asli PDF sumber) supaya di dalam
+     * label-label yang punya DN No SAMA, urutannya jadi rack_no
+     * DESCENDING. Contoh (dalam 1 grup DN No yang sama):
+     *
+     *   input:  C2-36-A, C3-07-A, C2-39-A, K3-39-A
+     *   output: K3-39-A, C3-07-A, C2-39-A, C2-36-A
+     *
+     * Aturan:
+     * - Grouping berdasarkan 'dnNo'. Item dengan dnNo NULL dianggap
+     *   grup sendiri per-item (gak digabung ke grup lain), jadi
+     *   posisinya gak berubah relatif terhadap item ber-dnNo.
+     * - Urutan ANTAR grup (DN No mana duluan) ngikut posisi
+     *   kemunculan PERTAMA grup itu di $items asli — jadi PDF secara
+     *   garis besar tetep jalan sesuai urutan sumbernya, cuma di
+     *   dalam 1 DN No aja yang di-reorder.
+     * - Di dalam grup, item yang rackNo-nya NULL (unmatched / gak ada
+     *   di master) ditaro di AKHIR grup, urutan asli antar-mereka
+     *   dipertahankan (stable), karena gak ada rackNo buat dibandingin.
+     * - Perbandingan rackNo pakai strcmp() dibalik (descending),
+     *   cukup buat format rack no yang konsisten (mis. "C2-36-A",
+     *   "K3-39-A"). Kalau nanti ketemu format rack yang beda panjang
+     *   digit/format-nya dan hasil sortnya jadi aneh, kasih tau biar
+     *   diganti ke natural-sort (strnatcmp) atau logic parsing custom.
+     *
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    protected function sortItemsByDnGroup(array $items): array
+    {
+        // 1. Kelompokkan item ke grup, sambil catat urutan kemunculan
+        //    pertama tiap grup (biar urutan antar-grup gak berubah).
+        $groups = [];       // groupKey -> array of items
+        $groupOrder = [];   // list groupKey sesuai urutan kemunculan pertama
+
+        foreach ($items as $index => $item) {
+            $dnNo = $item['dnNo'] ?? null;
+
+            // item tanpa DN No = grup sendiri (pakai index unik biar
+            // gak ke-gabung sama item lain yang juga null dnNo-nya)
+            $groupKey = $dnNo !== null && $dnNo !== '' ? ('dn:' . $dnNo) : ('solo:' . $index);
+
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [];
+                $groupOrder[] = $groupKey;
+            }
+
+            $groups[$groupKey][] = $item;
         }
 
-        return stripos($rackNo, 'K') === 0 ? 1 : 0;
+        // 2. Di dalam tiap grup, sort rackNo descending (null di akhir,
+        //    stable buat item yang rackNo-nya sama/null).
+        foreach ($groups as $groupKey => $groupItems) {
+            usort($groupItems, function ($a, $b) {
+                $rackA = $a['rackNo'] ?? null;
+                $rackB = $b['rackNo'] ?? null;
+
+                if ($rackA === null && $rackB === null) {
+                    return 0; // biarin usort jaga stability relatif (PHP 8 usort stable)
+                }
+                if ($rackA === null) {
+                    return 1; // null selalu di belakang
+                }
+                if ($rackB === null) {
+                    return -1;
+                }
+
+                return strcmp($rackB, $rackA); // descending
+            });
+
+            $groups[$groupKey] = $groupItems;
+        }
+
+        // 3. Flatten balik sesuai urutan grup asli, lalu reindex 'seq'.
+        $result = [];
+        foreach ($groupOrder as $groupKey) {
+            foreach ($groups[$groupKey] as $item) {
+                $item['seq'] = count($result);
+                $result[] = $item;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -640,10 +592,9 @@ class KanbanRackSplitter
 
     /**
      * Ambil "DN NO" (delivery note number) dari teks 1 label, mis.
-     * "DN4126060048037A". Dipake buat: (1) keperluan search di frontend,
-     * dan (2) GROUPING urutan output di split() — label dengan DN No
-     * sama dipaksa nempel bersebelahan (di dalem cycle yang sama). Gak
-     * dipake buat matching ke master AdmAddressv2 (beda field sama part no).
+     * "DN4126060048037A". Dipake buat keperluan search/metadata di
+     * frontend, DAN buat grouping di sortItemsByDnGroup(). Gak dipake
+     * buat matching ke master AdmAddressv2 (beda field sama part no).
      */
     protected function extractDnNo(string $labelText): ?string
     {
@@ -655,38 +606,9 @@ class KanbanRackSplitter
     }
 
     /**
-     * Ambil 5 digit TERAKHIR dari bagian numeric DN No, mis.
-     * "DN4126080008253A" -> "4126080008253" -> "08253" -> 8253 (int).
-     * Dipake sebagai SORT KEY UTAMA buat urutan ANTAR grup DN No (lihat
-     * uasort di split()) — biar dokumen fisik keurut dari nomor DN
-     * terkecil ke terbesar, bukan ngikutin urutan halaman sumber PDF
-     * (yang bisa acak/gak berurutan).
-     * Return null kalau DN No-nya kosong atau digit-nya kurang dari 5
-     * (gak cukup buat diambil 5 digit terakhirnya).
-     */
-    protected function extractDnSuffix(?string $dnNo): ?int
-    {
-        if ($dnNo === null || $dnNo === '') {
-            return null;
-        }
-
-        // buang semua yang bukan digit (prefix "DN" & suffix huruf mis. "A")
-        $digits = preg_replace('/\D/', '', $dnNo);
-
-        if ($digits === '' || strlen($digits) < 5) {
-            return null;
-        }
-
-        return (int) substr($digits, -5);
-    }
-
-    /**
      * Ambil nomor CYCLE dari teks 1 label, mis. teks yang ngandung
-     * "1/4" bakal balikin int(1). Dipake buat SORT KEY UTAMA (paling
-     * luar) — semua label dengan cycle sama dikelompokin bareng dan
-     * cycle kecil (1) keluar duluan, sebelum cycle besar (2,3,4,...).
-     * Item tanpa cycle (gak ketemu fraction-nya) ditaro PALING
-     * BELAKANG dari semua cycle group.
+     * "1/4" bakal balikin int(1). Sekarang cuma buat metadata/display
+     * di $labels, GAK dipake buat sorting output lagi.
      */
     protected function extractCycle(string $labelText): ?int
     {

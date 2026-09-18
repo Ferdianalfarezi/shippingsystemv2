@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\History;
 use App\Models\Delivery;
+use App\Exports\HistoriesExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -303,5 +305,28 @@ class HistoryController extends Controller
                 'message' => 'Gagal menghapus data: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function export(Request $request)
+    {
+        $search   = $request->get('search');
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+
+        $filenameParts = ['History'];
+        if ($dateFrom && $dateTo && $dateFrom === $dateTo) {
+            $filenameParts[] = $dateFrom;
+        } elseif ($dateFrom || $dateTo) {
+            $filenameParts[] = ($dateFrom ?: 'awal') . '_sd_' . ($dateTo ?: 'sekarang');
+        } else {
+            $filenameParts[] = now()->format('Y-m-d_His');
+        }
+
+        $filename = implode('_', $filenameParts) . '.xlsx';
+
+        return Excel::download(
+            new HistoriesExport($search, $dateFrom, $dateTo),
+            $filename
+        );
     }
 }
