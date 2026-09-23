@@ -29,6 +29,9 @@ use App\Http\Controllers\AdmAddressControllerv2;
 use App\Http\Controllers\ShippingMatrixController;
 use App\Http\Controllers\PrepMonitoringController;
 use App\Http\Controllers\NtcAddressController;
+use App\Http\Controllers\AddressFjiController;
+use App\Http\Controllers\AddressFutabaController;
+use App\Http\Controllers\KanbanFutabaSplitController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -411,13 +414,44 @@ Route::post('/shipping-matrix/batch-save', [ShippingMatrixController::class, 'ba
     Route::post('/ntc-addresses/import', [\App\Http\Controllers\NtcAddressController::class, 'import'])->name('ntcaddresses.import');
 
     Route::prefix('kanban-ntc-split')->name('kanban-ntc-split.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\KanbanNtcSplitController::class, 'index'])->name('index');
-    Route::post('/process', [\App\Http\Controllers\KanbanNtcSplitController::class, 'process'])->name('process');
-    Route::get('/recent', [\App\Http\Controllers\KanbanNtcSplitController::class, 'recent'])->name('recent');
-    Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanNtcSplitController::class, 'labelsMeta'])->name('labels-meta');
-    Route::get('/{token}/download', [\App\Http\Controllers\KanbanNtcSplitController::class, 'download'])->name('download');
+        Route::get('/', [\App\Http\Controllers\KanbanNtcSplitController::class, 'index'])->name('index');
+        Route::post('/process', [\App\Http\Controllers\KanbanNtcSplitController::class, 'process'])->name('process');
+        Route::get('/recent', [\App\Http\Controllers\KanbanNtcSplitController::class, 'recent'])->name('recent');
+        Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanNtcSplitController::class, 'labelsMeta'])->name('labels-meta');
+        Route::get('/{token}/download', [\App\Http\Controllers\KanbanNtcSplitController::class, 'download'])->name('download');
     });
 
+    Route::get('/address-fji', [\App\Http\Controllers\AddressFjiController::class, 'index'])->name('addressfji.index');
+    Route::post('/address-fji', [\App\Http\Controllers\AddressFjiController::class, 'store'])->name('addressfji.store');
+    Route::get('/address-fji/{addressFji}/edit', [\App\Http\Controllers\AddressFjiController::class, 'edit'])->name('addressfji.edit');
+    Route::put('/address-fji/{addressFji}', [\App\Http\Controllers\AddressFjiController::class, 'update'])->name('addressfji.update');
+    Route::delete('/address-fji/{addressFji}', [\App\Http\Controllers\AddressFjiController::class, 'destroy'])->name('addressfji.destroy');
+    Route::delete('/address-fji-delete-all', [\App\Http\Controllers\AddressFjiController::class, 'deleteAll'])->name('addressfji.deleteAll');
+    Route::post('/address-fji/import', [\App\Http\Controllers\AddressFjiController::class, 'import'])->name('addressfji.import');
+
+    Route::prefix('kanban-fji-split')->name('kanban-fji-split.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\KanbanFjiSplitController::class, 'index'])->name('index');
+        Route::post('/process', [\App\Http\Controllers\KanbanFjiSplitController::class, 'process'])->name('process');
+        Route::get('/recent', [\App\Http\Controllers\KanbanFjiSplitController::class, 'recent'])->name('recent');
+        Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanFjiSplitController::class, 'labelsMeta'])->name('labels-meta');
+        Route::get('/{token}/download', [\App\Http\Controllers\KanbanFjiSplitController::class, 'download'])->name('download');
+    });
+
+    Route::get('/address-futaba', [\App\Http\Controllers\AddressFutabaController::class, 'index'])->name('addressfutaba.index');
+    Route::post('/address-futaba', [\App\Http\Controllers\AddressFutabaController::class, 'store'])->name('addressfutaba.store');
+    Route::get('/address-futaba/{addressFutaba}/edit', [\App\Http\Controllers\AddressFutabaController::class, 'edit'])->name('addressfutaba.edit');
+    Route::put('/address-futaba/{addressFutaba}', [\App\Http\Controllers\AddressFutabaController::class, 'update'])->name('addressfutaba.update');
+    Route::delete('/address-futaba/{addressFutaba}', [\App\Http\Controllers\AddressFutabaController::class, 'destroy'])->name('addressfutaba.destroy');
+    Route::delete('/address-futaba-delete-all', [\App\Http\Controllers\AddressFutabaController::class, 'deleteAll'])->name('addressfutaba.deleteAll');
+    Route::post('/address-futaba/import', [\App\Http\Controllers\AddressFutabaController::class, 'import'])->name('addressfutaba.import');
+
+    Route::prefix('kanban-futaba-split')->name('kanban-futaba-split.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'index'])->name('index');
+        Route::post('/process', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'process'])->name('process');
+        Route::get('/recent', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'recent'])->name('recent');
+        Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'labelsMeta'])->name('labels-meta');
+        Route::get('/{token}/download', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'download'])->name('download');
+    });
 }); // end middleware auth
 
 require __DIR__.'/auth.php';

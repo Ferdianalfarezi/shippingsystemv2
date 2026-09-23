@@ -589,6 +589,18 @@
                                 NTC 
                             </a>
                         </li>
+                        
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanban-fji-split.index') }}">
+                                FJI 
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanban-futaba-split.index') }}">
+                                FUTABA
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
@@ -623,6 +635,14 @@
 
                             <a href="{{ route('ntcaddresses.index') }}" class="fs-6">
                                 <i class="fas fa-address-book"></i> NTC Address
+                            </a>
+                            
+                            <a href="{{ route('addressfji.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> FJI Address
+                            </a>
+
+                            <a href="{{ route('addressfutaba.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> Futaba Address
                             </a>
 
                             <a href="{{ route('arsadms.index') }}" class="fs-6">
