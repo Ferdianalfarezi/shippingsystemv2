@@ -601,6 +601,12 @@
                                 FUTABA
                             </a>
                         </li>
+
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanban-hino-split.index') }}">
+                                HINO
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
@@ -643,6 +649,10 @@
 
                             <a href="{{ route('addressfutaba.index') }}" class="fs-6">
                                 <i class="fas fa-address-book"></i> Futaba Address
+                            </a>
+
+                            <a href="{{ route('addresshino.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> Hino Address
                             </a>
 
                             <a href="{{ route('arsadms.index') }}" class="fs-6">

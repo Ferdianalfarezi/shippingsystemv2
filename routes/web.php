@@ -32,6 +32,8 @@ use App\Http\Controllers\NtcAddressController;
 use App\Http\Controllers\AddressFjiController;
 use App\Http\Controllers\AddressFutabaController;
 use App\Http\Controllers\KanbanFutabaSplitController;
+use App\Http\Controllers\AddressHinoController;
+use App\Http\Controllers\KanbanHinoSplitController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -452,6 +454,24 @@ Route::post('/shipping-matrix/batch-save', [ShippingMatrixController::class, 'ba
         Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'labelsMeta'])->name('labels-meta');
         Route::get('/{token}/download', [\App\Http\Controllers\KanbanFutabaSplitController::class, 'download'])->name('download');
     });
+
+    Route::get('/address-hino', [\App\Http\Controllers\AddressHinoController::class, 'index'])->name('addresshino.index');
+    Route::post('/address-hino', [\App\Http\Controllers\AddressHinoController::class, 'store'])->name('addresshino.store');
+    Route::get('/address-hino/{addressHino}/edit', [\App\Http\Controllers\AddressHinoController::class, 'edit'])->name('addresshino.edit');
+    Route::put('/address-hino/{addressHino}', [\App\Http\Controllers\AddressHinoController::class, 'update'])->name('addresshino.update');
+    Route::delete('/address-hino/{addressHino}', [\App\Http\Controllers\AddressHinoController::class, 'destroy'])->name('addresshino.destroy');
+    Route::delete('/address-hino-delete-all', [\App\Http\Controllers\AddressHinoController::class, 'deleteAll'])->name('addresshino.deleteAll');
+    Route::post('/address-hino/import', [\App\Http\Controllers\AddressHinoController::class, 'import'])->name('addresshino.import');
+
+    Route::prefix('kanban-hino-split')->name('kanban-hino-split.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\KanbanHinoSplitController::class, 'index'])->name('index');
+        Route::post('/process', [\App\Http\Controllers\KanbanHinoSplitController::class, 'process'])->name('process');
+        Route::get('/recent', [\App\Http\Controllers\KanbanHinoSplitController::class, 'recent'])->name('recent');
+        Route::get('/{token}/labels-meta', [\App\Http\Controllers\KanbanHinoSplitController::class, 'labelsMeta'])->name('labels-meta');
+        Route::get('/{token}/download', [\App\Http\Controllers\KanbanHinoSplitController::class, 'download'])->name('download');
+    });
+
+
 }); // end middleware auth
 
 require __DIR__.'/auth.php';
