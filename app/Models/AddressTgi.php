@@ -4,16 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AddressFji extends Model
+class AddressTgi extends Model
 {
-    // nama tabel literal 'addressfji' (bukan default konvensi plural)
-    protected $table = 'addressfji';
+    protected $table = 'addresstgi';
 
     protected $fillable = [
         'part_no',
         'customer_code',
         'part_name',
         'rack_no',
-        'kategori',
     ];
 }

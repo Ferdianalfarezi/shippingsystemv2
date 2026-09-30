@@ -2,116 +2,156 @@
 
 namespace App\Services;
 
-use App\Models\AddressFutaba;
+use App\Models\AddressFji;
 use setasign\Fpdi\Tcpdf\Fpdi;
 use Smalot\PdfParser\Parser as PdfTextParser;
 
-class KanbanFutabaRackSplitter
+class KanbanFjiRackSplitter
 {
-    /**
-     * Jumlah kanban per halaman sumber. Customer Futaba -> 3 per
-     * halaman (beda dari ADM/NTC/FJI yang defaultnya 4).
-     */
+    /** Jumlah kanban per halaman sumber (tersusun vertikal) */
     protected int $labelsPerPage;
 
     /**
-     * Teks penanda awal tiap label kanban Futaba. "SUPPLIER" muncul
-     * sekali persis di awal tiap label.
+     * Teks penanda awal tiap label di kanban FJI. Tiap label punya
+     * blok jelas yang selalu diawali (dalam urutan hasil extract)
+     * sama teks "No. Surat Jalan".
      */
-    protected string $labelAnchorText = 'SUPPLIER';
-
-    /** Part No langsung nempel abis "PART No." */
-    protected string $partNoPattern = '/PART No\.\s*\r?\n?\s*(\S+)/i';
+    protected string $labelAnchorText = 'No. Surat Jalan';
 
     /**
-     * "STORE ADDRESS" = kode lokasi/gudang customer Futaba sendiri —
-     * BUKAN rack_no milik STEP, cuma metadata buat search/filter.
+     * Regex buat narik Part Number. BUKAN pakai PartNoExtractor generik
+     * — part no FJI variatif bentuknya, jadi diambil langsung dari
+     * pola tercetak "Part Number ... : <value>".
      */
-    protected string $storeAddressPattern = '/STORE ADDRESS\s*\r?\n?\s*([^\r\n]+)/i';
+    protected string $partNoPattern = '/Part\s*Number.*?:\s*(\S+)/is';
 
     /**
-     * "DOCK CODE" (mis. "D04"). Dipake buat GROUPING (1 PDF biasanya
-     * = 1 dock code, jadi kalau upload banyak file sekaligus, tiap
-     * file otomatis jadi 1 grup). Beda dari No. Surat Jalan-nya FJI,
-     * field ini nempel LANGSUNG setelah header-nya (gak kepotong ke
-     * chunk sebelumnya), jadi aman diambil PER LABEL.
+     * Regex buat narik "No. Surat Jalan". Diambil SEKALI per file
+     * (nilainya konstan buat 1 file/surat jalan), bukan per label.
      */
-    protected string $dockCodePattern = '/DOCK CODE\s*\r?\n?\s*(\S+)/i';
+    protected string $suratJalanNoPattern = '/(\d{10,20})\s*\r?\n?\s*No\.\s*Surat\s*Jalan/i';
 
     // ============================================================
-    // OVERLAY RACK NO — kotak "Supplier Free Area 1" (kiri bawah, di
-    // bawah PDS No./SERIAL). Koordinat fraksi, PER INDEX posisi FISIK
-    // label di halaman sumber (0-2).
+    // URUTAN OUTPUT
+    // 1) Surat jalan  -> ASC
+    // 2) Rack no      -> DESC (abjad terbesar muncul duluan)
+    // Label tanpa rack / tanpa surat jalan ditaruh paling bawah.
+    // ============================================================
+    protected bool $sortSuratJalanAsc = true;
+    protected bool $sortRackDesc = true;
+
+    // ============================================================
+    // OVERLAY RACK NO — PER INDEX label dalam 1 halaman (0 = kanban
+    // paling atas, 3 = paling bawah). Semua nilai fraksi (0-1)
+    // relatif ke lebar/tinggi label. Defaultnya sama semua (posisi
+    // kotak kosong di baris footer, sebelah kiri sebelum teks "WH RM
+    // WELDING KIIC"), tuning manual per index kalau ternyata posisi
+    // fisiknya beda-beda antar kanban di halaman.
     // ============================================================
     protected array $overlayXFractionByIndex = [
-        0 => 0.02,
-        1 => 0.02,
-        2 => 0.02,
+        0 => 0.13,
+        1 => 0.13,
+        2 => 0.13,
+        3 => 0.13,
     ];
     protected array $overlayYFractionByIndex = [
-        0 => 0.60,
-        1 => 0.60,
-        2 => 0.60,
+        0 => 0.83,
+        1 => 0.80,
+        2 => 0.81,
+        3 => 0.81,
     ];
     protected array $overlayWidthFractionByIndex = [
+        0 => 0.14,
+        1 => 0.14,
+        2 => 0.14,
+        3 => 0.14,
+    ];
+    protected array $overlayHeightFractionByIndex = [
+        0 => 0.14,
+        1 => 0.14,
+        2 => 0.14,
+        3 => 0.14,
+    ];
+    protected float $overlayFontSize = 11;
+    protected string $overlayFont = 'helvetica';
+    protected string $overlayAlign = 'C';
+
+    // ============================================================
+    // OVERLAY KATEGORI — area kosong di kanan "Part Number" s/d
+    // "QTY" (di dalam kotak utama, sebelum kolom QR surat jalan).
+    // Sama kayak overlay rack: fraksi (0-1) PER INDEX label.
+    // Y index 1-3 diturunin dikit ngikutin pola drift overlay rack.
+    // ============================================================
+    protected array $kategoriXFractionByIndex = [
+        0 => 0.47,
+        1 => 0.47,
+        2 => 0.47,
+        3 => 0.47,
+    ];
+    protected array $kategoriYFractionByIndex = [
+        0 => 0.40,
+        1 => 0.37,
+        2 => 0.38,
+        3 => 0.38,
+    ];
+    protected array $kategoriWidthFractionByIndex = [
         0 => 0.22,
         1 => 0.22,
         2 => 0.22,
+        3 => 0.22,
     ];
-    protected array $overlayHeightFractionByIndex = [
-        0 => 0.15,
-        1 => 0.15,
-        2 => 0.15,
+    protected array $kategoriHeightFractionByIndex = [
+        0 => 0.26,
+        1 => 0.26,
+        2 => 0.26,
+        3 => 0.26,
     ];
-    protected float $overlayFontSize = 16;
-    protected string $overlayFont = 'helvetica';
-    protected string $overlayAlign = 'C';
+    protected float $kategoriFontSize = 28;
+    protected string $kategoriFont = 'helvetica';
+    protected string $kategoriAlign = 'C';
 
     protected float $sourceMarginTopMm = 5;
     protected float $sourceMarginBottomMm = 5;
 
     /**
-     * Margin tambahan (mm) di ATAS tiap crop, PER INDEX posisi FISIK
-     * label di halaman sumber (0-2) — BUKAN urutan render setelah
-     * di-sort, biar tuning-nya tetep valid meskipun labelnya kepencar
-     * urutan render-nya gara-gara grouping/sorting.
+     * Margin tambahan (mm) di ATAS tiap crop, PER INDEX label dalam
+     * 1 halaman (0 = kanban paling atas, 3 = paling bawah). Index 2
+     * & 3 dinaikin lagi karena drift-nya lebih kerasa di posisi bawah.
      */
     protected array $topExtraMarginMmByIndex = [
-        0 => 2,
-        1 => 0,
-        2 => -3,
+        0 => 6,
+        1 => 6,
+        2 => 8,
+        3 => 10,
     ];
 
-    protected float $labelHeightTrimMm = 0;
+    /**
+     * TRIM tinggi tiap slice label (mm), dipake buat STEPPING antar
+     * crop DAN tinggi output. Biar gak ada drift/sisa ruang kosong.
+     */
+    protected float $labelHeightTrimMm = 3;
 
     protected ?float $customLabelHeight = null;
     protected ?float $customTopOffset = null;
 
+    /**
+     * TODO FJI: belum dikonfirmasi mau di-resize ke ukuran fix
+     * tertentu (kayak NTC 200x75mm) atau enggak. Default sekarang:
+     * GAK di-resize, output per label ngikutin ukuran asli PDF sumber
+     * (udah dikurangin $labelHeightTrimMm).
+     */
     protected bool $forceOutputSize = false;
     protected float $outputPageWidthMm = 100;
-    protected float $outputPageHeightMm = 60;
+    protected float $outputPageHeightMm = 40;
 
     protected const MM_TO_PT = 72 / 25.4;
 
-    public function __construct(int $labelsPerPage = 3)
+    public function __construct(int $labelsPerPage = 4)
     {
         $this->labelsPerPage = $labelsPerPage;
     }
 
     /**
-     * Split BANYAK file PDF jadi SATU output, DI-GROUPING per Dock
-     * Code lalu DI-SORT rack_no descending (natural sort) di dalam
-     * tiap grup — pola sama kayak sortItemsByManifestGroup() punya
-     * NTC, cuma key grouping-nya Dock Code dan perbandingannya pakai
-     * strnatcasecmp (bandingin huruf dulu, angka dibandingin sebagai
-     * nilai, bukan per-karakter).
-     *
-     * PASS 1 — kumpulin semua label dari semua file dulu (import
-     * semua halaman ke $pdf, simpen templateId + geometri + hasil
-     * extract/matching per label).
-     * PASS 2 — $items di-grouping+sort, baru DI-RENDER ke halaman
-     * output pake templateId yang udah disimpen di PASS 1.
-     *
      * @param array<int, array{path: string, original_filename: string}> $sources
      * @return array{
      *     output: string,
@@ -128,12 +168,6 @@ class KanbanFutabaRackSplitter
      */
     public function splitMultiple(array $sources, string $outputPath): array
     {
-        $pdf = new Fpdi('P', 'pt');
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
-        $pdf->SetMargins(0, 0, 0);
-        $pdf->SetAutoPageBreak(false, 0);
-
         $matched = 0;
         $unmatchedNoText = 0;
         $unmatchedNoExtract = 0;
@@ -141,49 +175,37 @@ class KanbanFutabaRackSplitter
         $unmatchedNoRack = 0;
         $unmatchedDetails = [];
 
-        // ========================================================
-        // PASS 1 — analisa semua label dari semua file, belum render.
-        // ========================================================
-        $items = [];
+        /** @var array<int, array<string, mixed>> $records */
+        $records = [];
+        $seq = 0;
 
-        foreach ($sources as $source) {
+        /** @var array<int, array{resolved: string, original: string}> $sourceFiles */
+        $sourceFiles = [];
+
+        // ============================================================
+        // FASE 1 — SCAN: kumpulin semua label dari semua file dulu,
+        // belum render apa-apa.
+        // ============================================================
+        foreach ($sources as $sourceIdx => $source) {
             $originalSourcePath = $source['path'];
             $originalFilename = $source['original_filename'] ?? basename($originalSourcePath);
 
             $resolvedSourcePath = $this->ensureReadable($originalSourcePath);
+            $sourceFiles[$sourceIdx] = [
+                'resolved' => $resolvedSourcePath,
+                'original' => $originalSourcePath,
+            ];
 
-            $sourcePageCount = $pdf->setSourceFile($resolvedSourcePath);
+            // Fpdi dipake cuma buat ngitung jumlah halaman sumber.
+            $counter = new Fpdi();
+            $sourcePageCount = $counter->setSourceFile($resolvedSourcePath);
+
             $labelTextsPerPage = $this->extractLabelTexts($resolvedSourcePath, $sourcePageCount);
 
+            $fullFileText = $this->extractFullText($resolvedSourcePath);
+            $suratJalanNo = $this->extractSuratJalanNo($fullFileText);
+
             for ($pageNo = 1; $pageNo <= $sourcePageCount; $pageNo++) {
-                $templateId = $pdf->importPage($pageNo);
-                $size = $pdf->getTemplateSize($templateId);
-
-                $fullWidth  = $size['width'];
-                $fullHeight = $size['height'];
-
-                $marginTopPt    = $this->sourceMarginTopMm * self::MM_TO_PT;
-                $marginBottomPt = $this->sourceMarginBottomMm * self::MM_TO_PT;
-                $trimPt         = $this->labelHeightTrimMm * self::MM_TO_PT;
-
-                $rawLabelHeight = $this->customLabelHeight
-                    ?? (($fullHeight - $marginTopPt - $marginBottomPt) / $this->labelsPerPage);
-                $labelHeight = $rawLabelHeight - $trimPt;
-
-                $topOffset = $this->customTopOffset ?? $marginTopPt;
-
-                if ($this->forceOutputSize) {
-                    $outputWidthPt  = $this->outputPageWidthMm * self::MM_TO_PT;
-                    $outputHeightPt = $this->outputPageHeightMm * self::MM_TO_PT;
-                    $scaleX = $outputWidthPt / $fullWidth;
-                    $scaleY = $outputHeightPt / $labelHeight;
-                } else {
-                    $outputWidthPt  = $fullWidth;
-                    $outputHeightPt = $labelHeight;
-                    $scaleX = 1.0;
-                    $scaleY = 1.0;
-                }
-
                 $chunks = $labelTextsPerPage[$pageNo - 1] ?? [];
 
                 for ($i = 0; $i < $this->labelsPerPage; $i++) {
@@ -191,8 +213,7 @@ class KanbanFutabaRackSplitter
                     $rackNo = null;
                     $partNo = null;
                     $partNoMatched = null;
-                    $storeAddress = null;
-                    $dockCode = null;
+                    $kategori = null;
 
                     if (trim($labelText) === '') {
                         $unmatchedNoText++;
@@ -201,14 +222,6 @@ class KanbanFutabaRackSplitter
                             'part_no' => null, 'reason' => 'no_text',
                         ];
                     } else {
-                        if (preg_match($this->storeAddressPattern, $labelText, $sa)) {
-                            $storeAddress = trim($sa[1]);
-                        }
-
-                        if (preg_match($this->dockCodePattern, $labelText, $dc)) {
-                            $dockCode = trim($dc[1]);
-                        }
-
                         if (preg_match($this->partNoPattern, $labelText, $m)) {
                             $partNo = trim($m[1]);
                         }
@@ -221,104 +234,188 @@ class KanbanFutabaRackSplitter
                                 'text_preview' => mb_substr(trim(preg_replace('/\s+/', ' ', $labelText)), 0, 200),
                             ];
                         } else {
-                            $addressFutaba = $this->matchAddress($partNo);
+                            $addressFji = AddressFji::where('part_no', $partNo)->first();
 
-                            if (!$addressFutaba) {
+                            if (!$addressFji) {
                                 $unmatchedNoMaster++;
                                 $unmatchedDetails[] = [
                                     'source' => $originalFilename, 'page' => $pageNo, 'label_index' => $i,
                                     'part_no' => $partNo, 'reason' => 'no_master',
                                 ];
-                            } elseif (!$addressFutaba->rack_no) {
-                                $unmatchedNoRack++;
-                                $unmatchedDetails[] = [
-                                    'source' => $originalFilename, 'page' => $pageNo, 'label_index' => $i,
-                                    'part_no' => $partNo, 'reason' => 'no_rack',
-                                ];
                             } else {
-                                $rackNo = $addressFutaba->rack_no;
-                                $partNoMatched = $addressFutaba->part_no;
-                                $matched++;
+                                // kategori diambil selama part ada di master,
+                                // meskipun rack-nya kosong
+                                $kategori = $addressFji->kategori ?: null;
+
+                                if (!$addressFji->rack_no) {
+                                    $unmatchedNoRack++;
+                                    $unmatchedDetails[] = [
+                                        'source' => $originalFilename, 'page' => $pageNo, 'label_index' => $i,
+                                        'part_no' => $partNo, 'reason' => 'no_rack',
+                                    ];
+                                } else {
+                                    $rackNo = $addressFji->rack_no;
+                                    $partNoMatched = $addressFji->part_no;
+                                    $matched++;
+                                }
                             }
                         }
                     }
 
-                    $items[] = [
-                        'seq' => count($items),
-                        'sourceFilename' => $originalFilename,
-                        'labelIndex' => $i,
-                        'dockCode' => $dockCode,
-                        'storeAddress' => $storeAddress,
-                        'rackNo' => $rackNo,
-                        'partNo' => $partNoMatched,
-                        'partNoRaw' => $partNo,
-                        'plant' => $rackNo === null ? null : (stripos($rackNo, 'K') === 0 ? 'Plant 2' : 'Plant 1'),
-                        // geometri buat render di PASS 2
-                        'templateId' => $templateId,
-                        'scaleX' => $scaleX,
-                        'scaleY' => $scaleY,
-                        'fullWidth' => $fullWidth,
-                        'fullHeight' => $fullHeight,
-                        'rawLabelHeight' => $rawLabelHeight,
-                        'topOffset' => $topOffset,
+                    $records[] = [
+                        'seq'             => $seq++, // urutan asli, buat tie-breaker
+                        'source_idx'      => $sourceIdx,
+                        'source_filename' => $originalFilename,
+                        'page'            => $pageNo,
+                        'index'           => $i,
+                        'surat_jalan_no'  => $suratJalanNo,
+                        'rack_no'         => $rackNo,
+                        'kategori'        => $kategori,
+                        'part_no'         => $partNoMatched,
+                        'part_no_raw'     => $partNo,
                     ];
                 }
             }
-
-            if ($resolvedSourcePath !== $originalSourcePath) {
-                @unlink($resolvedSourcePath);
-            }
         }
 
-        $totalLabels = count($items);
+        // ============================================================
+        // SORT — surat jalan ASC, lalu rack no DESC.
+        // Null (tanpa surat jalan / tanpa rack) selalu di paling bawah.
+        // ============================================================
+        usort($records, function (array $a, array $b) {
+            // 1) surat jalan
+            $sa = $a['surat_jalan_no'];
+            $sb = $b['surat_jalan_no'];
 
-        // Grouping per Dock Code + sort rack_no descending (natural
-        // sort) di dalam grup. Lihat sortItemsByDockCodeGroup().
-        $items = $this->sortItemsByDockCodeGroup($items);
+            if ($sa !== $sb) {
+                if ($sa === null) return 1;
+                if ($sb === null) return -1;
 
-        // ========================================================
-        // PASS 2 — render ke halaman output sesuai urutan hasil sort.
-        // ========================================================
+                $c = $this->sortSuratJalanAsc ? strnatcmp($sa, $sb) : strnatcmp($sb, $sa);
+                if ($c !== 0) return $c;
+            }
+
+            // 2) rack no (abjad alamat rak, natural: F2 < F10)
+            $ra = $a['rack_no'];
+            $rb = $b['rack_no'];
+
+            if ($ra !== $rb) {
+                if ($ra === null) return 1;
+                if ($rb === null) return -1;
+
+                $c = $this->sortRackDesc ? strnatcasecmp($rb, $ra) : strnatcasecmp($ra, $rb);
+                if ($c !== 0) return $c;
+            }
+
+            // 3) sama persis -> ikut urutan asli
+            return $a['seq'] <=> $b['seq'];
+        });
+
+        // ============================================================
+        // FASE 2 — RENDER sesuai urutan yang udah di-sort.
+        // ============================================================
+        $pdf = new Fpdi('P', 'pt');
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+        $pdf->SetMargins(0, 0, 0);
+        $pdf->SetAutoPageBreak(false, 0);
+
         $labels = [];
+        $outputIndex = 0;
 
-        foreach ($items as $outputIndex => $item) {
-            $outputWidthPt  = $item['fullWidth'] * $item['scaleX'];
-            $outputHeightPt = $item['rawLabelHeight'] * $item['scaleY'];
-            // (kalau forceOutputSize false, scaleX/scaleY = 1, jadi
-            // outputWidthPt/outputHeightPt = fullWidth/rawLabelHeight
-            // persis kayak sebelumnya)
+        /** cache template per (file, halaman) biar gak import berulang */
+        $templates = [];
+
+        $marginTopPt    = $this->sourceMarginTopMm * self::MM_TO_PT;
+        $marginBottomPt = $this->sourceMarginBottomMm * self::MM_TO_PT;
+        $trimPt         = $this->labelHeightTrimMm * self::MM_TO_PT;
+
+        foreach ($records as $r) {
+            $key = $r['source_idx'] . ':' . $r['page'];
+
+            if (!isset($templates[$key])) {
+                $pdf->setSourceFile($sourceFiles[$r['source_idx']]['resolved']);
+                $tid = $pdf->importPage($r['page']);
+                $templates[$key] = [
+                    'id'   => $tid,
+                    'size' => $pdf->getTemplateSize($tid),
+                ];
+            }
+
+            $templateId = $templates[$key]['id'];
+            $fullWidth  = $templates[$key]['size']['width'];
+            $fullHeight = $templates[$key]['size']['height'];
+            $i          = $r['index'];
+
+            // labelHeight udah dikurangin trim -> dipake buat
+            // stepping antar crop DAN tinggi output, biar gak ada
+            // drift/sisa ruang kosong yang numpuk.
+            $rawLabelHeight = $this->customLabelHeight
+                ?? (($fullHeight - $marginTopPt - $marginBottomPt) / $this->labelsPerPage);
+            $labelHeight = $rawLabelHeight - $trimPt;
+
+            $topOffset = $this->customTopOffset ?? $marginTopPt;
+
+            if ($this->forceOutputSize) {
+                $outputWidthPt  = $this->outputPageWidthMm * self::MM_TO_PT;
+                $outputHeightPt = $this->outputPageHeightMm * self::MM_TO_PT;
+                $scaleX = $outputWidthPt / $fullWidth;
+                $scaleY = $outputHeightPt / $labelHeight;
+            } else {
+                $outputWidthPt  = $fullWidth;
+                $outputHeightPt = $labelHeight;
+                $scaleX = 1.0;
+                $scaleY = 1.0;
+            }
+
             $orientation = $outputWidthPt >= $outputHeightPt ? 'L' : 'P';
 
             $pdf->AddPage($orientation, [$outputWidthPt, $outputHeightPt]);
 
-            $scaledTemplateWidth  = $item['fullWidth'] * $item['scaleX'];
-            $scaledTemplateHeight = $item['fullHeight'] * $item['scaleY'];
+            $scaledTemplateWidth  = $fullWidth * $scaleX;
+            $scaledTemplateHeight = $fullHeight * $scaleY;
 
-            $yOffset = -(($item['topOffset'] + $item['labelIndex'] * $item['rawLabelHeight']) * $item['scaleY']);
+            // pake $rawLabelHeight (BUKAN yang udah di-trim) buat
+            // stepping posisi label ke-i di SUMBER; yang di-trim
+            // cuma "jendela" tinggi output-nya aja.
+            $yOffset = -(($topOffset + $i * $rawLabelHeight) * $scaleY);
 
-            $topExtraMm = $this->topExtraMarginMmByIndex[$item['labelIndex']] ?? 0;
+            $topExtraMm = $this->topExtraMarginMmByIndex[$i] ?? 0;
             $yOffset += $topExtraMm * self::MM_TO_PT;
 
-            $pdf->useTemplate($item['templateId'], 0, $yOffset, $scaledTemplateWidth, $scaledTemplateHeight);
+            $pdf->useTemplate($templateId, 0, $yOffset, $scaledTemplateWidth, $scaledTemplateHeight);
 
-            if ($item['rackNo']) {
-                $this->drawOverlay($pdf, $item['rackNo'], $outputWidthPt, $outputHeightPt, $item['labelIndex']);
+            if ($r['rack_no']) {
+                $this->drawOverlay($pdf, $r['rack_no'], $outputWidthPt, $outputHeightPt, $i);
             }
 
+            if ($r['kategori']) {
+                $this->drawKategoriOverlay($pdf, $r['kategori'], $outputWidthPt, $outputHeightPt, $i);
+            }
+
+            $outputIndex++;
+
             $labels[] = [
-                'output_page' => $outputIndex + 1,
-                'source_filename' => $item['sourceFilename'],
-                'dock_code' => $item['dockCode'],
-                'store_address' => $item['storeAddress'],
-                'rack_no' => $item['rackNo'],
-                'part_no' => $item['partNo'],
-                'part_no_raw' => $item['partNoRaw'],
-                'plant' => $item['plant'],
-                'matched' => (bool) $item['rackNo'],
+                'output_page'     => $outputIndex,
+                'source_filename' => $r['source_filename'],
+                'surat_jalan_no'  => $r['surat_jalan_no'],
+                'rack_no'         => $r['rack_no'],
+                'kategori'        => $r['kategori'],
+                'part_no'         => $r['part_no'],
+                'part_no_raw'     => $r['part_no_raw'],
+                'plant'           => $r['rack_no'] === null ? null : (stripos($r['rack_no'], 'K') === 0 ? 'Plant 2' : 'Plant 1'),
+                'matched'         => (bool) $r['rack_no'],
             ];
         }
 
         $pdf->Output($outputPath, 'F');
+
+        // Bersihin file hasil normalize (setelah semua selesai dirender)
+        foreach ($sourceFiles as $sf) {
+            if ($sf['resolved'] !== $sf['original']) {
+                @unlink($sf['resolved']);
+            }
+        }
 
         $unmatched = $unmatchedNoText + $unmatchedNoExtract + $unmatchedNoMaster + $unmatchedNoRack;
 
@@ -335,10 +432,10 @@ class KanbanFutabaRackSplitter
             array_filter($unmatchedDetails, fn ($d) => $d['reason'] === 'no_extract')
         ));
 
-        \Illuminate\Support\Facades\Log::info('KANBAN FUTABA SPLIT DONE', [
+        \Illuminate\Support\Facades\Log::info('KANBAN FJI SPLIT DONE', [
             'output' => $outputPath,
             'file_count' => count($sources),
-            'total_labels' => $totalLabels,
+            'total_labels' => $outputIndex,
             'matched' => $matched,
             'unmatched' => $unmatched,
             'unmatched_no_text' => $unmatchedNoText,
@@ -348,21 +445,21 @@ class KanbanFutabaRackSplitter
         ]);
 
         if (!empty($noExtractPreviews)) {
-            \Illuminate\Support\Facades\Log::info('KANBAN FUTABA UNMATCHED - PART NO GAGAL DI-EXTRACT DARI TEKS', [
+            \Illuminate\Support\Facades\Log::info('KANBAN FJI UNMATCHED - PART NO GAGAL DI-EXTRACT DARI TEKS', [
                 'count' => count($noExtractPreviews),
                 'previews' => $noExtractPreviews,
             ]);
         }
 
         if (!empty($noMasterPartNos)) {
-            \Illuminate\Support\Facades\Log::info('KANBAN FUTABA UNMATCHED - PART NO GAK ADA DI MASTER', [
+            \Illuminate\Support\Facades\Log::info('KANBAN FJI UNMATCHED - PART NO GAK ADA DI MASTER', [
                 'count' => count($noMasterPartNos),
                 'part_no_list' => $noMasterPartNos,
             ]);
         }
 
         if (!empty($noRackPartNos)) {
-            \Illuminate\Support\Facades\Log::info('KANBAN FUTABA UNMATCHED - RACK NO KOSONG DI MASTER', [
+            \Illuminate\Support\Facades\Log::info('KANBAN FJI UNMATCHED - RACK NO KOSONG DI MASTER', [
                 'count' => count($noRackPartNos),
                 'part_no_list' => $noRackPartNos,
             ]);
@@ -370,7 +467,7 @@ class KanbanFutabaRackSplitter
 
         return [
             'output' => $outputPath,
-            'total_labels' => $totalLabels,
+            'total_labels' => $outputIndex,
             'matched' => $matched,
             'unmatched' => $unmatched,
             'unmatched_no_text' => $unmatchedNoText,
@@ -382,93 +479,6 @@ class KanbanFutabaRackSplitter
         ];
     }
 
-    /**
-     * Sort $items (flat, urutan asli lintas semua file) supaya di
-     * dalam label-label yang punya Dock Code SAMA, urutannya jadi
-     * rack_no DESCENDING pakai NATURAL SORT (strnatcasecmp) — bagian
-     * huruf dibandingin dulu, bagian angka dibandingin sebagai NILAI
-     * (bukan per-karakter), jadi "H3-9-A" < "H3-27-A" dengan bener
-     * (beda dari strcmp biasa yang bisa salah baca '9' > '2').
-     *
-     * Aturan grouping/null-handling sama persis kayak sortItemsByManifestGroup()
-     * punya NTC — cuma key-nya 'dockCode' dan komparatornya natural sort.
-     *
-     * @param array<int, array<string, mixed>> $items
-     * @return array<int, array<string, mixed>>
-     */
-    protected function sortItemsByDockCodeGroup(array $items): array
-    {
-        $groups = [];
-        $groupOrder = [];
-
-        foreach ($items as $index => $item) {
-            $dockCode = $item['dockCode'] ?? null;
-
-            $groupKey = $dockCode !== null && $dockCode !== ''
-                ? ('dock:' . $dockCode)
-                : ('solo:' . $index);
-
-            if (!isset($groups[$groupKey])) {
-                $groups[$groupKey] = [];
-                $groupOrder[] = $groupKey;
-            }
-
-            $groups[$groupKey][] = $item;
-        }
-
-        foreach ($groups as $groupKey => $groupItems) {
-            usort($groupItems, function ($a, $b) {
-                $rackA = $a['rackNo'] ?? null;
-                $rackB = $b['rackNo'] ?? null;
-
-                if ($rackA === null && $rackB === null) {
-                    return 0;
-                }
-                if ($rackA === null) {
-                    return 1; // null selalu di belakang
-                }
-                if ($rackB === null) {
-                    return -1;
-                }
-
-                // descending natural sort: huruf dulu, angka sebagai nilai
-                return strnatcasecmp($rackB, $rackA);
-            });
-
-            $groups[$groupKey] = $groupItems;
-        }
-
-        $result = [];
-        foreach ($groupOrder as $groupKey) {
-            foreach ($groups[$groupKey] as $item) {
-                $item['seq'] = count($result);
-                $result[] = $item;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Cocokin part no ke master. Beberapa part no di PDF Futaba
-     * muncul dengan suffix tambahan yang gak ada di master (mis.
-     * "61235-KK010-W" di PDF vs "61235-KK010" di master) — kalau
-     * exact match gagal, coba strip SATU segmen terakhir dan cari lagi.
-     */
-    protected function matchAddress(string $partNo): ?AddressFutaba
-    {
-        $address = AddressFutaba::where('part_no', $partNo)->first();
-        if ($address) {
-            return $address;
-        }
-
-        if (preg_match('/^(.*)-[A-Za-z0-9]+$/', $partNo, $m)) {
-            return AddressFutaba::where('part_no', $m[1])->first();
-        }
-
-        return null;
-    }
-
     protected function ensureReadable(string $sourcePath): string
     {
         try {
@@ -476,7 +486,7 @@ class KanbanFutabaRackSplitter
             $probe->setSourceFile($sourcePath);
             return $sourcePath;
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('KANBAN FUTABA PDF PERLU NORMALIZE', [
+            \Illuminate\Support\Facades\Log::warning('KANBAN FJI PDF PERLU NORMALIZE', [
                 'source' => $sourcePath,
                 'error' => $e->getMessage(),
             ]);
@@ -485,12 +495,17 @@ class KanbanFutabaRackSplitter
         }
     }
 
+    /**
+     * Tulis rack_no di posisi overlay PER INDEX label ($labelIndex,
+     * 0-3). Koordinat pakai fraksi (0-1) dari lebar/tinggi label
+     * output aktif.
+     */
     protected function drawOverlay(Fpdi $pdf, string $rackNo, float $labelWidthPt, float $labelHeightPt, int $labelIndex): void
     {
-        $xFraction = $this->overlayXFractionByIndex[$labelIndex] ?? 0.02;
-        $yFraction = $this->overlayYFractionByIndex[$labelIndex] ?? 0.60;
-        $wFraction = $this->overlayWidthFractionByIndex[$labelIndex] ?? 0.22;
-        $hFraction = $this->overlayHeightFractionByIndex[$labelIndex] ?? 0.15;
+        $xFraction = $this->overlayXFractionByIndex[$labelIndex] ?? 0.13;
+        $yFraction = $this->overlayYFractionByIndex[$labelIndex] ?? 0.83;
+        $wFraction = $this->overlayWidthFractionByIndex[$labelIndex] ?? 0.14;
+        $hFraction = $this->overlayHeightFractionByIndex[$labelIndex] ?? 0.14;
 
         $x = $xFraction * $labelWidthPt;
         $y = $yFraction * $labelHeightPt;
@@ -501,6 +516,30 @@ class KanbanFutabaRackSplitter
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetXY($x, $y);
         $pdf->Cell($w, $h, $rackNo, 0, 0, $this->overlayAlign);
+    }
+
+    /**
+     * Tulis kategori (mis. "D-40") di area kosong kanan Part Number
+     * s/d QTY, PER INDEX label ($labelIndex, 0-3). Koordinat fraksi
+     * (0-1) dari lebar/tinggi label output aktif.
+     */
+    protected function drawKategoriOverlay(Fpdi $pdf, string $kategori, float $labelWidthPt, float $labelHeightPt, int $labelIndex): void
+    {
+        $xFraction = $this->kategoriXFractionByIndex[$labelIndex] ?? 0.47;
+        $yFraction = $this->kategoriYFractionByIndex[$labelIndex] ?? 0.40;
+        $wFraction = $this->kategoriWidthFractionByIndex[$labelIndex] ?? 0.22;
+        $hFraction = $this->kategoriHeightFractionByIndex[$labelIndex] ?? 0.26;
+
+        $x = $xFraction * $labelWidthPt;
+        $y = $yFraction * $labelHeightPt;
+        $w = $wFraction * $labelWidthPt;
+        $h = $hFraction * $labelHeightPt;
+
+        $pdf->SetFont($this->kategoriFont, 'B', $this->kategoriFontSize);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetXY($x, $y);
+        // valign 'M' biar teks di tengah kotak secara vertikal
+        $pdf->Cell($w, $h, $kategori, 0, 0, $this->kategoriAlign, false, '', 0, false, 'T', 'M');
     }
 
     protected function extractLabelTexts(string $sourcePath, int $pageCount): array
@@ -524,5 +563,27 @@ class KanbanFutabaRackSplitter
         }
 
         return $result;
+    }
+
+    protected function extractFullText(string $sourcePath): string
+    {
+        $textParser = new PdfTextParser();
+        $document = $textParser->parseFile($sourcePath);
+
+        $fullText = '';
+        foreach ($document->getPages() as $page) {
+            $fullText .= "\n" . $page->getText();
+        }
+
+        return $fullText;
+    }
+
+    protected function extractSuratJalanNo(string $fullFileText): ?string
+    {
+        if (preg_match($this->suratJalanNoPattern, $fullFileText, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 }

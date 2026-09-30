@@ -1,15 +1,16 @@
-<div class="modal fade" id="createAddressFjiModal" tabindex="-1" aria-hidden="true">
+{{-- create.blade.php --}}
+<div class="modal fade" id="createAddressTgiModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="createAddressFjiForm">
+            <form id="createAddressTgiForm">
                 @csrf
                 <div class="modal-header">
-                    <h6 class="modal-title fw-bold">Tambah Data FJI Address</h6>
+                    <h6 class="modal-title fw-bold">Tambah Data TGI Address</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label small text-secondary">Part No</label>
+                        <label class="form-label small text-secondary">Part No (format stripped, mis. GA440-02850)</label>
                         <input type="text" name="part_no" class="form-control" required>
                     </div>
                     <div class="mb-3">
@@ -23,10 +24,6 @@
                     <div class="mb-3">
                         <label class="form-label small text-secondary">Rack No</label>
                         <input type="text" name="rack_no" class="form-control">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary">Kategori</label>
-                        <input type="text" name="kategori" class="form-control">
                     </div>
                 </div>
                 <div class="modal-footer">

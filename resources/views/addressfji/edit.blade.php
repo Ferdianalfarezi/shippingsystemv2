@@ -25,6 +25,10 @@
                         <label class="form-label small text-secondary">Rack No</label>
                         <input type="text" name="rack_no" id="edit_rack_no_fji" class="form-control">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary">Kategori</label>
+                        <input type="text" name="kategori" id="edit_kategori_fji" class="form-control">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>

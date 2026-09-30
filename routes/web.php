@@ -34,6 +34,9 @@ use App\Http\Controllers\AddressFutabaController;
 use App\Http\Controllers\KanbanFutabaSplitController;
 use App\Http\Controllers\AddressHinoController;
 use App\Http\Controllers\KanbanHinoSplitController;
+use App\Http\Controllers\KanbanBankTgiController;
+use App\Http\Controllers\KanbanTgiSplitController;
+use App\Http\Controllers\AddressTgiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -471,6 +474,26 @@ Route::post('/shipping-matrix/batch-save', [ShippingMatrixController::class, 'ba
         Route::get('/{token}/download', [\App\Http\Controllers\KanbanHinoSplitController::class, 'download'])->name('download');
     });
 
+    Route::get('/kanban-bank-tgi', [\App\Http\Controllers\KanbanBankTgiController::class, 'index'])->name('kanbanbanktgi.index');
+    Route::post('/kanban-bank-tgi/upload', [\App\Http\Controllers\KanbanBankTgiController::class, 'upload'])->name('kanbanbanktgi.upload');
+    Route::delete('/kanban-bank-tgi/{kanbanBankTgi}', [\App\Http\Controllers\KanbanBankTgiController::class, 'destroy'])->name('kanbanbanktgi.destroy');
+
+    Route::prefix('kanban-tgi-split')->name('kanban-tgi-split.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\KanbanTgiSplitController::class, 'index'])->name('index');
+        Route::post('/process', [\App\Http\Controllers\KanbanTgiSplitController::class, 'process'])->name('process');
+        Route::post('/print-filtered', [\App\Http\Controllers\KanbanTgiSplitController::class, 'printFiltered'])->name('print-filtered');
+        Route::get('/recent', [\App\Http\Controllers\KanbanTgiSplitController::class, 'recent'])->name('recent');
+        Route::get('/{token}/items-meta', [\App\Http\Controllers\KanbanTgiSplitController::class, 'itemsMeta'])->name('items-meta');
+        Route::get('/{token}/download', [\App\Http\Controllers\KanbanTgiSplitController::class, 'download'])->name('download');
+    });
+
+    Route::get('/address-tgi', [\App\Http\Controllers\AddressTgiController::class, 'index'])->name('addresstgi.index');
+    Route::post('/address-tgi', [\App\Http\Controllers\AddressTgiController::class, 'store'])->name('addresstgi.store');
+    Route::get('/address-tgi/{addressTgi}/edit', [\App\Http\Controllers\AddressTgiController::class, 'edit'])->name('addresstgi.edit');
+    Route::put('/address-tgi/{addressTgi}', [\App\Http\Controllers\AddressTgiController::class, 'update'])->name('addresstgi.update');
+    Route::delete('/address-tgi/{addressTgi}', [\App\Http\Controllers\AddressTgiController::class, 'destroy'])->name('addresstgi.destroy');
+    Route::delete('/address-tgi-delete-all', [\App\Http\Controllers\AddressTgiController::class, 'deleteAll'])->name('addresstgi.deleteAll');
+    Route::post('/address-tgi/import', [\App\Http\Controllers\AddressTgiController::class, 'import'])->name('addresstgi.import');
 
 }); // end middleware auth
 

@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
-@section('title', 'FJI Address')
-@section('page-title', 'FJI ADDRESS')
-@section('body-class', 'addressfji-page')
+@section('title', 'TGI Address')
+@section('page-title', 'TGI ADDRESS')
+@section('body-class', 'addresstgi-page')
 
 @section('content')
 
@@ -21,7 +21,7 @@
 
         <div class="input-group" style="width: 300px;">
             <input type="text" class="form-control" id="searchInput"
-                   placeholder="Cari Part No, Customer, Part Name, Kategori..."
+                   placeholder="Cari Part No, Customer, Part Name..."
                    value="{{ request('search') }}">
             <button class="btn btn-secondary" type="button" id="searchButton">
                 <i class="bi bi-search"></i>
@@ -39,20 +39,20 @@
                         <ul class="dropdown-menu dropdown-menu-end shadow">
                             <li>
                                 <a class="dropdown-item" href="#"
-                                   data-bs-toggle="modal" data-bs-target="#createAddressFjiModal">
+                                   data-bs-toggle="modal" data-bs-target="#createAddressTgiModal">
                                     <i class="bi bi-plus-circle me-2"></i> Tambah Data
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item text-success" href="#"
-                                   data-bs-toggle="modal" data-bs-target="#importFjiModal">
+                                   data-bs-toggle="modal" data-bs-target="#importTgiModal">
                                     <i class="bi bi-file-earmark-excel text-success me-2"></i> Import Excel
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item text-danger" href="#" id="deleteAllFjiBtn">
+                                <a class="dropdown-item text-danger" href="#" id="deleteAllTgiBtn">
                                     <i class="bi bi-trash3 text-danger me-2"></i> Hapus Semua Data
                                 </a>
                             </li>
@@ -69,7 +69,7 @@
                         </div>
                         <div>
                             <small class="text-white d-block fw-bold me-3" style="font-size: 0.7rem;">Total</small>
-                            <h5 class="mb-0 fw-bold text-white">{{ $addressFjis->total() }}</h5>
+                            <h5 class="mb-0 fw-bold text-white">{{ $addressTgis->total() }}</h5>
                         </div>
                     </div>
                 </div>
@@ -77,6 +77,8 @@
         </div>
 
     </div>
+
+    <p class="text-muted small">Format Part No di sini pake versi "stripped" (mis. <code>GA440-02850</code>), BUKAN part no lengkap dari Delivery Note (<code>KSCGA440-02850-00</code>) — sistem otomatis nransformasi pas nyocokin.</p>
 
     <div class="table-responsive p-0 mt-0">
         <table class="table table-compact w-100 mt-1">
@@ -86,27 +88,25 @@
                     <th>Customer Code</th>
                     <th>Part Name</th>
                     <th>Rack No</th>
-                    <th>Kategori</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($addressFjis as $item)
+                @forelse($addressTgis as $item)
                     <tr class="fs-5">
                         <td><strong>{{ $item->part_no }}</strong></td>
                         <td>{{ $item->customer_code }}</td>
                         <td>{{ $item->part_name }}</td>
                         <td><strong>{{ $item->rack_no }}</strong></td>
-                        <td>{{ $item->kategori }}</td>
                         <td>
                             <div class="d-flex justify-content-center p-1" style="gap: 0;">
-                                <button onclick="openEditFjiModal({{ $item->id }})"
+                                <button onclick="openEditTgiModal({{ $item->id }})"
                                         class="btn btn-warning btn-sm btn-action-square"
                                         style="border-radius: 6px 0 0 6px; margin: 0;" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
-                                <form action="{{ route('addressfji.destroy', $item->id) }}"
-                                      method="POST" class="d-inline delete-form-fji" style="margin: 0;">
+                                <form action="{{ route('addresstgi.destroy', $item->id) }}"
+                                      method="POST" class="d-inline delete-form-tgi" style="margin: 0;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm btn-action-square"
@@ -119,10 +119,10 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center py-4">
+                        <td colspan="5" class="text-center py-4">
                             <div class="text-muted">
                                 <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                                <p class="mt-2">Belum ada data FJI Address</p>
+                                <p class="mt-2">Belum ada data TGI Address</p>
                             </div>
                         </td>
                     </tr>
@@ -132,12 +132,12 @@
     </div>
 
     <div class="pagination-wrapper">
-        {{ $addressFjis->links() }}
+        {{ $addressTgis->links() }}
     </div>
 
-    @include('addressfji.create')
-    @include('addressfji.edit')
-    @include('addressfji.import')
+    @include('addresstgi.create')
+    @include('addresstgi.edit')
+    @include('addresstgi.import')
 
 @endsection
 
@@ -147,8 +147,7 @@
 <script>
 $(document).ready(function () {
 
-    // Delete single
-    $('.delete-form-fji').on('submit', function (e) {
+    $('.delete-form-tgi').on('submit', function (e) {
         e.preventDefault();
         const form = $(this);
         const url  = form.attr('action');
@@ -181,12 +180,11 @@ $(document).ready(function () {
         });
     });
 
-    // Delete All
-    $('#deleteAllFjiBtn').on('click', function (e) {
+    $('#deleteAllTgiBtn').on('click', function (e) {
         e.preventDefault();
         Swal.fire({
             title: 'Hapus Semua Data?',
-            text: 'Seluruh data FJI Address akan dihapus permanen!',
+            text: 'Seluruh data TGI Address akan dihapus permanen!',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc2626',
@@ -198,7 +196,7 @@ $(document).ready(function () {
             if (result.isConfirmed) {
                 Swal.fire({ title: 'Menghapus...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 $.ajax({
-                    url: '{{ route("addressfji.deleteAll") }}',
+                    url: '{{ route("addresstgi.deleteAll") }}',
                     type: 'DELETE',
                     data: { _token: '{{ csrf_token() }}' },
                     success: function (res) {
@@ -213,16 +211,15 @@ $(document).ready(function () {
         });
     });
 
-    // Create form submit
-    $('#createAddressFjiForm').on('submit', function (e) {
+    $('#createAddressTgiForm').on('submit', function (e) {
         e.preventDefault();
         $.ajax({
-            url: '{{ route("addressfji.store") }}',
+            url: '{{ route("addresstgi.store") }}',
             type: 'POST',
             data: $(this).serialize(),
             success: function (res) {
                 Swal.fire({ title: 'Berhasil!', text: res.message, icon: 'success', confirmButtonColor: '#059669' })
-                    .then(() => { $('#createAddressFjiModal').modal('hide'); window.location.reload(); });
+                    .then(() => { $('#createAddressTgiModal').modal('hide'); window.location.reload(); });
             },
             error: function (xhr) {
                 const msg = xhr.responseJSON?.errors
@@ -233,21 +230,20 @@ $(document).ready(function () {
         });
     });
 
-    $('#createAddressFjiModal').on('hidden.bs.modal', function () {
-        $('#createAddressFjiForm')[0].reset();
+    $('#createAddressTgiModal').on('hidden.bs.modal', function () {
+        $('#createAddressTgiForm')[0].reset();
     });
 
-    // Edit form submit
-    $('#editAddressFjiForm').on('submit', function (e) {
+    $('#editAddressTgiForm').on('submit', function (e) {
         e.preventDefault();
-        const id = $('#edit_id_fji').val();
+        const id = $('#edit_id_tgi').val();
         $.ajax({
-            url: `/address-fji/${id}`,
+            url: `/address-tgi/${id}`,
             type: 'POST',
             data: $(this).serialize() + '&_method=PUT',
             success: function (res) {
                 Swal.fire({ title: 'Berhasil!', text: res.message, icon: 'success', confirmButtonColor: '#059669' })
-                    .then(() => { $('#editAddressFjiModal').modal('hide'); window.location.reload(); });
+                    .then(() => { $('#editAddressTgiModal').modal('hide'); window.location.reload(); });
             },
             error: function (xhr) {
                 const msg = xhr.responseJSON?.errors
@@ -258,43 +254,41 @@ $(document).ready(function () {
         });
     });
 
-    // Import Excel
-    $('#importFjiForm').on('submit', function (e) {
+    $('#importTgiForm').on('submit', function (e) {
         e.preventDefault();
-        if (!$('#excelFjiFile')[0].files.length) {
+        if (!$('#excelTgiFile')[0].files.length) {
             Swal.fire({ title: 'Error!', text: 'Pilih file Excel terlebih dahulu', icon: 'error', confirmButtonColor: '#dc2626' });
             return;
         }
-        $('#importFjiProgress').removeClass('d-none');
-        $('#importFjiButton').prop('disabled', true);
+        $('#importTgiProgress').removeClass('d-none');
+        $('#importTgiButton').prop('disabled', true);
 
         $.ajax({
-            url: '{{ route("addressfji.import") }}',
+            url: '{{ route("addresstgi.import") }}',
             type: 'POST',
             data: new FormData(this),
             processData: false,
             contentType: false,
             success: function (res) {
-                $('#importFjiProgress').addClass('d-none');
-                $('#importFjiButton').prop('disabled', false);
+                $('#importTgiProgress').addClass('d-none');
+                $('#importTgiButton').prop('disabled', false);
                 Swal.fire({ title: 'Berhasil!', text: res.message, icon: 'success', confirmButtonColor: '#059669' })
-                    .then(() => { $('#importFjiModal').modal('hide'); window.location.reload(); });
+                    .then(() => { $('#importTgiModal').modal('hide'); window.location.reload(); });
             },
             error: function (xhr) {
-                $('#importFjiProgress').addClass('d-none');
-                $('#importFjiButton').prop('disabled', false);
+                $('#importTgiProgress').addClass('d-none');
+                $('#importTgiButton').prop('disabled', false);
                 Swal.fire({ title: 'Gagal!', text: xhr.responseJSON?.message || 'Terjadi kesalahan', icon: 'error', confirmButtonColor: '#dc2626' });
             }
         });
     });
 
-    $('#importFjiModal').on('hidden.bs.modal', function () {
-        $('#importFjiForm')[0].reset();
-        $('#importFjiProgress').addClass('d-none');
-        $('#importFjiButton').prop('disabled', false);
+    $('#importTgiModal').on('hidden.bs.modal', function () {
+        $('#importTgiForm')[0].reset();
+        $('#importTgiProgress').addClass('d-none');
+        $('#importTgiButton').prop('disabled', false);
     });
 
-    // Search
     $('#searchButton').on('click', performSearch);
     $('#searchInput').on('keypress', function (e) { if (e.which === 13) performSearch(); });
     $('#perPageSelect').on('change', function () { updateUrl($(this).val(), $('#searchInput').val()); });
@@ -309,18 +303,17 @@ $(document).ready(function () {
     }
 });
 
-function openEditFjiModal(id) {
+function openEditTgiModal(id) {
     $.ajax({
-        url: `/address-fji/${id}/edit`,
+        url: `/address-tgi/${id}/edit`,
         type: 'GET',
         success: function (data) {
-            $('#edit_id_fji').val(data.id);
-            $('#edit_part_no_fji').val(data.part_no);
-            $('#edit_customer_code_fji').val(data.customer_code);
-            $('#edit_part_name_fji').val(data.part_name);
-            $('#edit_rack_no_fji').val(data.rack_no);
-            $('#edit_kategori_fji').val(data.kategori);
-            $('#editAddressFjiModal').modal('show');
+            $('#edit_id_tgi').val(data.id);
+            $('#edit_part_no_tgi').val(data.part_no);
+            $('#edit_customer_code_tgi').val(data.customer_code);
+            $('#edit_part_name_tgi').val(data.part_name);
+            $('#edit_rack_no_tgi').val(data.rack_no);
+            $('#editAddressTgiModal').modal('show');
         },
         error: function () {
             Swal.fire({ title: 'Error!', text: 'Gagal mengambil data', icon: 'error', confirmButtonColor: '#dc2626' });

@@ -17,7 +17,8 @@ class AddressFjiController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('part_no', 'like', "%{$search}%")
                     ->orWhere('customer_code', 'like', "%{$search}%")
-                    ->orWhere('part_name', 'like', "%{$search}%");
+                    ->orWhere('part_name', 'like', "%{$search}%")
+                    ->orWhere('kategori', 'like', "%{$search}%");
             });
         }
 
@@ -36,6 +37,7 @@ class AddressFjiController extends Controller
             'customer_code' => 'nullable|string|max:255',
             'part_name' => 'nullable|string|max:255',
             'rack_no' => 'nullable|string|max:255',
+            'kategori' => 'nullable|string|max:255',
         ]);
 
         AddressFji::create($validated);
@@ -55,6 +57,7 @@ class AddressFjiController extends Controller
             'customer_code' => 'nullable|string|max:255',
             'part_name' => 'nullable|string|max:255',
             'rack_no' => 'nullable|string|max:255',
+            'kategori' => 'nullable|string|max:255',
         ]);
 
         $addressFji->update($validated);

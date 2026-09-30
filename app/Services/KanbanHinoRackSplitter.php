@@ -11,26 +11,29 @@ class KanbanHinoRackSplitter
     /** Jumlah kanban per halaman sumber. Customer Hino -> 4 per halaman (kayak NTC). */
     protected int $labelsPerPage;
 
-    /** Teks penanda awal tiap label kanban Hino. Muncul sekali persis di awal tiap label. */
-    protected string $labelAnchorText = 'FORM:PAD/FR-LAS-00/011';
-
     /**
-     * Part No DIAMBIL DARI BENTUK/SHAPE-nya langsung (5digit-5alnum-2alnum,
-     * mis. "16592-0W010-F0"), BUKAN dari pola "header: value" — soalnya
-     * di PDF Hino urutan kolomnya suka ke-interleave/kacau pas di-extract.
+     * Part No diambil dari SHAPE-nya.
+     * Segmen 1: 5 karakter huruf/angka, WAJIB ada minimal 1 angka
+     *           (mis. "17872" atau "S6911").
+     * Group 1 = BASE part no (2 segmen, mis. "S6911-E0020") -> dipake matching.
+     * Suffix "-XX" (mis. "-00") opsional & dihiraukan.
      */
-    protected string $partNoPattern = '/\b(\d{5}-[A-Z0-9]{4,6}-[A-Z0-9]{2})\b/i';
+    protected string $partNoPattern = '/\b((?=[A-Z0-9]{0,4}\d)[A-Z0-9]{5}\s*-\s*[A-Z0-9]{4,6})(?:\s*-\s*[A-Z0-9]{2})?/i';
 
-    /**
-     * "DELIVERY NOTE" — konstan per file. Cuma metadata buat
-     * search/filter dulu, belum dipake grouping/sort.
-     */
+    /** "DELIVERY NOTE" — konstan per file. Cuma metadata. */
     protected string $deliveryNotePattern = '/DELIVERY NOTE.*?(\d{8,12})/is';
 
+    /** Set true buat log koordinat Y teks halaman 1 (buat nyetel pembagian label). */
+    protected bool $debugCoordinates = false;
+
+    /**
+     * Urutkan output berdasarkan rack_no, abjad terbesar dulu (F3 > F2 > E3).
+     * Sorting-nya PER PDF — urutan antar file tetap sesuai urutan upload.
+     */
+    protected bool $sortByRackDesc = true;
+
     // ============================================================
-    // OVERLAY RACK NO — ditaro di kotak "STP002" (kolom part
-    // no/description, sejajar CYCLE). Gak pake background putih —
-    // teks ditulis langsung di atas konten asli.
+    // OVERLAY RACK NO
     // ============================================================
     protected array $overlayXFractionByIndex = [
         0 => 0.52,
@@ -59,17 +62,14 @@ class KanbanHinoRackSplitter
     protected float $overlayFontSize = 11;
     protected string $overlayFont = 'helvetica';
     protected string $overlayAlign = 'L';
-    protected string $overlayLabel = 'STP RACK : '; // prefix di depan rack_no
-    protected bool $overlayDrawBackground = false; // gak nutupin, langsung tulis aja
+    protected string $overlayLabel = 'STP RACK : ';
+    protected bool $overlayDrawBackground = false;
     protected string $overlayBgColor = 'FFFFFF';
 
     protected float $sourceMarginTopMm = 5;
     protected float $sourceMarginBottomMm = 5;
 
-    /**
-     * Margin tambahan (mm) di ATAS tiap crop, PER INDEX label dalam
-     * 1 halaman (0 = kanban paling atas, 3 = paling bawah).
-     */
+    /** Margin tambahan (mm) di ATAS tiap crop, PER INDEX label dalam 1 halaman. */
     protected array $topExtraMarginMmByIndex = [
         0 => 3,
         1 => 2,
@@ -95,18 +95,6 @@ class KanbanHinoRackSplitter
 
     /**
      * @param array<int, array{path: string, original_filename: string}> $sources
-     * @return array{
-     *     output: string,
-     *     total_labels: int,
-     *     matched: int,
-     *     unmatched: int,
-     *     unmatched_no_text: int,
-     *     unmatched_no_extract: int,
-     *     unmatched_no_master: int,
-     *     unmatched_no_rack: int,
-     *     unmatched_details: array<int, array<string, mixed>>,
-     *     labels: array<int, array<string, mixed>>
-     * }
      */
     public function splitMultiple(array $sources, string $outputPath): array
     {
@@ -122,17 +110,25 @@ class KanbanHinoRackSplitter
         $unmatchedNoMaster = 0;
         $unmatchedNoRack = 0;
         $unmatchedDetails = [];
-        $labels = [];
-        $outputIndex = 0;
+        $entries = [];           // semua label, dikumpulin dulu sebelum dicetak
+        $tempFilesToDelete = []; // file hasil normalize, dihapus SETELAH Output()
+        $sequence = 0;           // urutan asli, buat tie-breaker sorting
+        $sourceIndex = 0;        // file ke berapa (urutan upload)
 
+        // ============================================================
+        // TAHAP 1: KUMPULIN SEMUA LABEL (belum dicetak)
+        // ============================================================
         foreach ($sources as $source) {
             $originalSourcePath = $source['path'];
             $originalFilename = $source['original_filename'] ?? basename($originalSourcePath);
 
             $resolvedSourcePath = $this->ensureReadable($originalSourcePath);
+            if ($resolvedSourcePath !== $originalSourcePath) {
+                $tempFilesToDelete[] = $resolvedSourcePath;
+            }
 
             $sourcePageCount = $pdf->setSourceFile($resolvedSourcePath);
-            $labelTextsPerPage = $this->extractLabelTexts($resolvedSourcePath, $sourcePageCount);
+            $parsedPages = $this->parsePages($resolvedSourcePath);
 
             for ($pageNo = 1; $pageNo <= $sourcePageCount; $pageNo++) {
                 $templateId = $pdf->importPage($pageNo);
@@ -163,14 +159,21 @@ class KanbanHinoRackSplitter
                     $scaleY = 1.0;
                 }
 
-                $orientation = $outputWidthPt >= $outputHeightPt ? 'L' : 'P';
-
-                $chunks = $labelTextsPerPage[$pageNo - 1] ?? [];
+                $chunks = isset($parsedPages[$pageNo - 1])
+                    ? $this->extractLabelTextsByPosition(
+                        $parsedPages[$pageNo - 1],
+                        $fullHeight,
+                        $topOffset,
+                        $rawLabelHeight,
+                        $pageNo
+                    )
+                    : [];
 
                 for ($i = 0; $i < $this->labelsPerPage; $i++) {
                     $labelText = $chunks[$i] ?? '';
                     $rackNo = null;
                     $partNo = null;
+                    $partNoRaw = null;
                     $partNoMatched = null;
                     $deliveryNote = null;
 
@@ -186,7 +189,8 @@ class KanbanHinoRackSplitter
                         }
 
                         if (preg_match($this->partNoPattern, $labelText, $m)) {
-                            $partNo = strtoupper(trim($m[1]));
+                            $partNoRaw = strtoupper(preg_replace('/\s+/', '', $m[0]));
+                            $partNo = strtoupper(preg_replace('/\s+/', '', $m[1]));
                         }
 
                         if (!$partNo) {
@@ -194,7 +198,7 @@ class KanbanHinoRackSplitter
                             $unmatchedDetails[] = [
                                 'source' => $originalFilename, 'page' => $pageNo, 'label_index' => $i,
                                 'part_no' => null, 'reason' => 'no_extract',
-                                'text_preview' => mb_substr(trim(preg_replace('/\s+/', ' ', $labelText)), 0, 200),
+                                'text_preview' => mb_substr(trim(preg_replace('/\s+/', ' ', $labelText)), 0, 500),
                             ];
                         } else {
                             $addressHino = $this->matchAddress($partNo);
@@ -203,58 +207,124 @@ class KanbanHinoRackSplitter
                                 $unmatchedNoMaster++;
                                 $unmatchedDetails[] = [
                                     'source' => $originalFilename, 'page' => $pageNo, 'label_index' => $i,
-                                    'part_no' => $partNo, 'reason' => 'no_master',
+                                    'part_no' => $partNo, 'part_no_raw' => $partNoRaw, 'reason' => 'no_master',
                                 ];
                             } elseif (!$addressHino->rack_no) {
                                 $unmatchedNoRack++;
                                 $unmatchedDetails[] = [
                                     'source' => $originalFilename, 'page' => $pageNo, 'label_index' => $i,
-                                    'part_no' => $partNo, 'reason' => 'no_rack',
+                                    'part_no' => $partNo, 'part_no_raw' => $partNoRaw, 'reason' => 'no_rack',
                                 ];
                             } else {
-                                $rackNo = $addressHino->rack_no;
+                                $rackNo = trim($addressHino->rack_no);
                                 $partNoMatched = $addressHino->part_no;
                                 $matched++;
                             }
                         }
                     }
 
-                    $pdf->AddPage($orientation, [$outputWidthPt, $outputHeightPt]);
-
-                    $scaledTemplateWidth  = $fullWidth * $scaleX;
-                    $scaledTemplateHeight = $fullHeight * $scaleY;
                     $yOffset = -(($topOffset + $i * $rawLabelHeight) * $scaleY);
+                    $yOffset += ($this->topExtraMarginMmByIndex[$i] ?? 0) * self::MM_TO_PT;
 
-                    $topExtraMm = $this->topExtraMarginMmByIndex[$i] ?? 0;
-                    $yOffset += $topExtraMm * self::MM_TO_PT;
-
-                    $pdf->useTemplate($templateId, 0, $yOffset, $scaledTemplateWidth, $scaledTemplateHeight);
-
-                    if ($rackNo) {
-                        $this->drawOverlay($pdf, $rackNo, $outputWidthPt, $outputHeightPt, $i);
-                    }
-
-                    $outputIndex++;
-
-                    $labels[] = [
-                        'output_page' => $outputIndex,
+                    $entries[] = [
+                        'source_index' => $sourceIndex,
+                        'sequence' => $sequence++,
+                        'template_id' => $templateId,
+                        'label_index' => $i,
+                        'output_width' => $outputWidthPt,
+                        'output_height' => $outputHeightPt,
+                        'template_width' => $fullWidth * $scaleX,
+                        'template_height' => $fullHeight * $scaleY,
+                        'y_offset' => $yOffset,
                         'source_filename' => $originalFilename,
+                        'source_page' => $pageNo,
                         'delivery_note' => $deliveryNote,
                         'rack_no' => $rackNo,
                         'part_no' => $partNoMatched,
-                        'part_no_raw' => $partNo,
-                        'plant' => $rackNo === null ? null : (stripos($rackNo, 'K') === 0 ? 'Plant 2' : 'Plant 1'),
-                        'matched' => (bool) $rackNo,
+                        'part_no_raw' => $partNoRaw,
                     ];
                 }
             }
 
-            if ($resolvedSourcePath !== $originalSourcePath) {
-                @unlink($resolvedSourcePath);
+            $sourceIndex++;
+        }
+
+        // ============================================================
+        // TAHAP 2: URUTKAN PER PDF
+        // 1. Urutan file tetap sesuai upload (source_index)
+        // 2. Di dalam 1 file: rack_no abjad terbesar dulu (F3 > F2 > E3)
+        // 3. Label tanpa rack ditaro di akhir file itu (urutan asli)
+        // ============================================================
+        if ($this->sortByRackDesc) {
+            usort($entries, function ($a, $b) {
+                if ($a['source_index'] !== $b['source_index']) {
+                    return $a['source_index'] <=> $b['source_index'];
+                }
+
+                $aHas = $a['rack_no'] !== null && $a['rack_no'] !== '';
+                $bHas = $b['rack_no'] !== null && $b['rack_no'] !== '';
+
+                if ($aHas && !$bHas) return -1;
+                if (!$aHas && $bHas) return 1;
+
+                if ($aHas && $bHas) {
+                    $cmp = strnatcasecmp($b['rack_no'], $a['rack_no']); // descending
+                    if ($cmp !== 0) return $cmp;
+                }
+
+                return $a['sequence'] <=> $b['sequence'];
+            });
+        }
+
+        // ============================================================
+        // TAHAP 3: CETAK sesuai urutan
+        // ============================================================
+        $labels = [];
+        $outputIndex = 0;
+
+        foreach ($entries as $entry) {
+            $orientation = $entry['output_width'] >= $entry['output_height'] ? 'L' : 'P';
+
+            $pdf->AddPage($orientation, [$entry['output_width'], $entry['output_height']]);
+            $pdf->useTemplate(
+                $entry['template_id'],
+                0,
+                $entry['y_offset'],
+                $entry['template_width'],
+                $entry['template_height']
+            );
+
+            if ($entry['rack_no']) {
+                $this->drawOverlay(
+                    $pdf,
+                    $entry['rack_no'],
+                    $entry['output_width'],
+                    $entry['output_height'],
+                    $entry['label_index']
+                );
             }
+
+            $outputIndex++;
+
+            $labels[] = [
+                'output_page' => $outputIndex,
+                'source_filename' => $entry['source_filename'],
+                'source_page' => $entry['source_page'],
+                'delivery_note' => $entry['delivery_note'],
+                'rack_no' => $entry['rack_no'],
+                'part_no' => $entry['part_no'],
+                'part_no_raw' => $entry['part_no_raw'],
+                'plant' => $entry['rack_no'] === null ? null : (stripos($entry['rack_no'], 'K') === 0 ? 'Plant 2' : 'Plant 1'),
+                'matched' => (bool) $entry['rack_no'],
+            ];
         }
 
         $pdf->Output($outputPath, 'F');
+
+        // Baru hapus file normalize setelah PDF selesai ditulis
+        foreach ($tempFilesToDelete as $tmp) {
+            @unlink($tmp);
+        }
 
         $unmatched = $unmatchedNoText + $unmatchedNoExtract + $unmatchedNoMaster + $unmatchedNoRack;
 
@@ -319,24 +389,19 @@ class KanbanHinoRackSplitter
     }
 
     /**
-     * Cocokin part no ke master. Part No di PDF Hino 3 segmen (mis.
-     * "16592-0W010-F0"), master addresshino cuma nyimpen 2 segmen
-     * pertama (mis. "16592-0W010").
+     * Cocokin BASE part no (2 segmen, mis. "S6911-E0020") ke master.
+     * 3 digit terakhir di PDF (mis. "-00") udah dibuang pas extract.
      */
-    protected function matchAddress(string $partNo): ?AddressHino
+    protected function matchAddress(string $basePartNo): ?AddressHino
     {
-        $address = AddressHino::where('part_no', $partNo)->first();
+        $basePartNo = strtoupper(trim($basePartNo));
+
+        $address = AddressHino::whereRaw('UPPER(TRIM(part_no)) = ?', [$basePartNo])->first();
         if ($address) {
             return $address;
         }
 
-        $segments = explode('-', $partNo);
-        if (count($segments) >= 3) {
-            $stripped = $segments[0] . '-' . $segments[1];
-            return AddressHino::where('part_no', $stripped)->first();
-        }
-
-        return null;
+        return AddressHino::whereRaw('UPPER(TRIM(part_no)) LIKE ?', [$basePartNo . '-%'])->first();
     }
 
     protected function ensureReadable(string $sourcePath): string
@@ -355,11 +420,6 @@ class KanbanHinoRackSplitter
         }
     }
 
-    /**
-     * Tulis "STP RACK : <rack_no>" di kotak "STP002" (kolom part
-     * no/description). Gak ada background — teks ditulis langsung
-     * di atas konten asli.
-     */
     protected function drawOverlay(Fpdi $pdf, string $rackNo, float $labelWidthPt, float $labelHeightPt, int $labelIndex): void
     {
         $xFraction = $this->overlayXFractionByIndex[$labelIndex] ?? 0.49;
@@ -387,26 +447,72 @@ class KanbanHinoRackSplitter
         $pdf->Cell($w, $h, $this->overlayLabel . $rackNo, 0, 0, $this->overlayAlign);
     }
 
-    protected function extractLabelTexts(string $sourcePath, int $pageCount): array
+    /** Parse PDF sekali, balikin array Page smalot (index 0-based). */
+    protected function parsePages(string $sourcePath): array
     {
-        $textParser = new PdfTextParser();
-        $document = $textParser->parseFile($sourcePath);
-        $pages = $document->getPages();
+        try {
+            $textParser = new PdfTextParser();
+            $document = $textParser->parseFile($sourcePath);
+            return array_values($document->getPages());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('KANBAN HINO GAGAL PARSE TEKS', [
+                'source' => $sourcePath,
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
 
-        $result = [];
+    /**
+     * Bagi teks 1 halaman ke tiap label berdasarkan POSISI Y (bukan urutan teks).
+     * Koordinat PDF: origin kiri-bawah, jadi jarak dari atas = tinggi halaman - y.
+     *
+     * @return array<int, string>
+     */
+    protected function extractLabelTextsByPosition(
+        $page,
+        float $pageHeightPt,
+        float $topOffsetPt,
+        float $labelHeightPt,
+        int $pageNo
+    ): array {
+        $buckets = array_fill(0, $this->labelsPerPage, '');
 
-        foreach ($pages as $pageIndex => $page) {
-            $fullText = $page->getText();
-
-            $parts = preg_split('/(?=' . preg_quote($this->labelAnchorText, '/') . ')/', $fullText);
-
-            $parts = array_values(array_filter($parts, function ($p) {
-                return str_starts_with(ltrim($p), $this->labelAnchorText);
-            }));
-
-            $result[$pageIndex] = $parts;
+        try {
+            $items = $page->getDataTm();
+        } catch (\Throwable $e) {
+            return $buckets;
         }
 
-        return $result;
+        $debugRows = [];
+
+        foreach ($items as $item) {
+            $text = $item[1] ?? '';
+            if (trim($text) === '') {
+                continue;
+            }
+
+            $y = (float) ($item[0][5] ?? 0);
+            $fromTop = $pageHeightPt - $y;
+
+            $idx = (int) floor(($fromTop - $topOffsetPt) / $labelHeightPt);
+            $idx = max(0, min($this->labelsPerPage - 1, $idx));
+
+            $buckets[$idx] .= ' ' . $text;
+
+            if ($this->debugCoordinates && $pageNo === 1) {
+                $debugRows[] = sprintf('y=%.1f fromTop=%.1f idx=%d text=%s', $y, $fromTop, $idx, trim($text));
+            }
+        }
+
+        if ($this->debugCoordinates && $pageNo === 1) {
+            \Illuminate\Support\Facades\Log::info('KANBAN HINO DEBUG KOORDINAT PAGE 1', [
+                'page_height' => $pageHeightPt,
+                'label_height' => $labelHeightPt,
+                'rows' => $debugRows,
+            ]);
+        }
+
+        return $buckets;
     }
 }

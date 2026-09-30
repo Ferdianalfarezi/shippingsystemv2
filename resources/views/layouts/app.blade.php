@@ -607,6 +607,12 @@
                                 HINO
                             </a>
                         </li>
+
+                        <li>
+                            <a class="dropdown-item" href="{{ route('kanban-tgi-split.index') }}">
+                                TGI
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 @if(auth()->user()->role === 'superadmin')
@@ -653,6 +659,14 @@
 
                             <a href="{{ route('addresshino.index') }}" class="fs-6">
                                 <i class="fas fa-address-book"></i> Hino Address
+                            </a>
+
+                            <a href="{{ route('addresstgi.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> TGI Address
+                            </a>
+
+                            <a href="{{ route('kanbanbanktgi.index') }}" class="fs-6">
+                                <i class="fas fa-address-book"></i> Master PDF TGI
                             </a>
 
                             <a href="{{ route('arsadms.index') }}" class="fs-6">
