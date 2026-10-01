@@ -48,7 +48,7 @@ class KanbanTgiComposer
      * RACK ADDRESS — kotak kosong di bawah "SUPPLIER NO".
      */
     protected float $addressXMm = 10;
-    protected float $addressYMm = 50;
+    protected float $addressYMm = 69;
     protected float $addressWidthMm = 30;
     protected float $addressHeightMm = 12;
     protected float $addressFontSize = 11;
@@ -201,7 +201,7 @@ class KanbanTgiComposer
                 $pdf->AddPage($rec['orientation'], [$rec['fullWidth'], $rec['labelHeight']]);
                 $pdf->useTemplate($rec['templateId'], 0, $rec['yOffset'], $rec['fullWidth'], $rec['fullHeight']);
 
-                $this->drawQrCode($pdf, $rec['part_no']);
+                // $this->drawQrCode($pdf, $rec['part_no']);
 
                 if ($rec['rack_no']) {
                     $this->drawAddress($pdf, $rec['rack_no']);

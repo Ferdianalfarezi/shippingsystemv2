@@ -34,6 +34,14 @@ class KanbanFutabaRackSplitter
      */
     protected string $storeAddressPattern = '/STORE ADDRESS\s*\r?\n?\s*([^\r\n]+)/i';
 
+    /**
+     * Urutan output: true = dikelompokin PER PDF (urutan upload), lalu
+     * di dalam tiap PDF diurutkan berdasarkan rack_no DESCENDING
+     * (Z -> K -> A, natural sort). Label tanpa rack_no ditaruh paling
+     * belakang di kelompok PDF-nya. false = urutan asli file/halaman.
+     */
+    protected bool $sortByRackDesc = true;
+
     // ============================================================
     // OVERLAY RACK NO — ditaro di kotak "Supplier Free Area 1" (kiri
     // bawah, di bawah PDS No./SERIAL) yang emang kosong. Diukur dari
@@ -126,14 +134,24 @@ class KanbanFutabaRackSplitter
         $unmatchedNoMaster = 0;
         $unmatchedNoRack = 0;
         $unmatchedDetails = [];
-        $labels = [];
-        $outputIndex = 0;
+        $tempFiles = [];
+
+        /**
+         * Tahap 1: kumpulin semua label (import template + extract data)
+         * tanpa render. Render dilakukan setelah diurutkan.
+         */
+        $entries = [];
+        $seq = 0;
+        $sourceSeq = 0;
 
         foreach ($sources as $source) {
             $originalSourcePath = $source['path'];
             $originalFilename = $source['original_filename'] ?? basename($originalSourcePath);
 
             $resolvedSourcePath = $this->ensureReadable($originalSourcePath);
+            if ($resolvedSourcePath !== $originalSourcePath) {
+                $tempFiles[] = $resolvedSourcePath;
+            }
 
             $sourcePageCount = $pdf->setSourceFile($resolvedSourcePath);
             $labelTextsPerPage = $this->extractLabelTexts($resolvedSourcePath, $sourcePageCount);
@@ -223,42 +241,109 @@ class KanbanFutabaRackSplitter
                         }
                     }
 
-                    $pdf->AddPage($orientation, [$outputWidthPt, $outputHeightPt]);
-
-                    $scaledTemplateWidth  = $fullWidth * $scaleX;
-                    $scaledTemplateHeight = $fullHeight * $scaleY;
                     $yOffset = -(($topOffset + $i * $rawLabelHeight) * $scaleY);
-
                     $topExtraMm = $this->topExtraMarginMmByIndex[$i] ?? 0;
                     $yOffset += $topExtraMm * self::MM_TO_PT;
 
-                    $pdf->useTemplate($templateId, 0, $yOffset, $scaledTemplateWidth, $scaledTemplateHeight);
-
-                    if ($rackNo) {
-                        $this->drawOverlay($pdf, $rackNo, $outputWidthPt, $outputHeightPt, $i);
-                    }
-
-                    $outputIndex++;
-
-                    $labels[] = [
-                        'output_page' => $outputIndex,
+                    $entries[] = [
+                        'seq' => $seq++,
+                        'source_seq' => $sourceSeq,
+                        'template_id' => $templateId,
+                        'orientation' => $orientation,
+                        'output_width_pt' => $outputWidthPt,
+                        'output_height_pt' => $outputHeightPt,
+                        'scaled_template_width' => $fullWidth * $scaleX,
+                        'scaled_template_height' => $fullHeight * $scaleY,
+                        'y_offset' => $yOffset,
+                        'label_index' => $i,
                         'source_filename' => $originalFilename,
                         'store_address' => $storeAddress,
                         'rack_no' => $rackNo,
                         'part_no' => $partNoMatched,
                         'part_no_raw' => $partNo,
-                        'plant' => $rackNo === null ? null : (stripos($rackNo, 'K') === 0 ? 'Plant 2' : 'Plant 1'),
-                        'matched' => (bool) $rackNo,
                     ];
                 }
             }
 
-            if ($resolvedSourcePath !== $originalSourcePath) {
-                @unlink($resolvedSourcePath);
+            $sourceSeq++;
+        }
+
+        /**
+         * Tahap 2: kelompokin per PDF (urutan upload), lalu di dalam
+         * tiap PDF urutkan rack_no descending (Z -> A). Yang gak punya
+         * rack_no taruh paling belakang di kelompok PDF-nya.
+         */
+        if ($this->sortByRackDesc) {
+            usort($entries, function ($a, $b) {
+                if ($a['source_seq'] !== $b['source_seq']) {
+                    return $a['source_seq'] <=> $b['source_seq'];
+                }
+
+                $aHas = $a['rack_no'] !== null && $a['rack_no'] !== '';
+                $bHas = $b['rack_no'] !== null && $b['rack_no'] !== '';
+
+                if ($aHas && !$bHas) return -1;
+                if (!$aHas && $bHas) return 1;
+
+                if ($aHas && $bHas) {
+                    $cmp = strnatcasecmp(trim($b['rack_no']), trim($a['rack_no']));
+                    if ($cmp !== 0) return $cmp;
+                }
+
+                return $a['seq'] <=> $b['seq'];
+            });
+        }
+
+        /**
+         * Tahap 3: render sesuai urutan.
+         */
+        $labels = [];
+        $outputIndex = 0;
+
+        foreach ($entries as $entry) {
+            $pdf->AddPage($entry['orientation'], [$entry['output_width_pt'], $entry['output_height_pt']]);
+
+            $pdf->useTemplate(
+                $entry['template_id'],
+                0,
+                $entry['y_offset'],
+                $entry['scaled_template_width'],
+                $entry['scaled_template_height']
+            );
+
+            if ($entry['rack_no']) {
+                $this->drawOverlay(
+                    $pdf,
+                    $entry['rack_no'],
+                    $entry['output_width_pt'],
+                    $entry['output_height_pt'],
+                    $entry['label_index']
+                );
             }
+
+            $outputIndex++;
+
+            $rackNo = $entry['rack_no'];
+
+            $labels[] = [
+                'output_page' => $outputIndex,
+                'source_filename' => $entry['source_filename'],
+                'store_address' => $entry['store_address'],
+                'rack_no' => $rackNo,
+                'part_no' => $entry['part_no'],
+                'part_no_raw' => $entry['part_no_raw'],
+                'plant' => $rackNo === null ? null : (stripos($rackNo, 'K') === 0 ? 'Plant 2' : 'Plant 1'),
+                'matched' => (bool) $rackNo,
+            ];
         }
 
         $pdf->Output($outputPath, 'F');
+
+        // Hapus file hasil normalize SETELAH output (FPDI baru nulis
+        // imported page pas Output).
+        foreach ($tempFiles as $tmp) {
+            @unlink($tmp);
+        }
 
         $unmatched = $unmatchedNoText + $unmatchedNoExtract + $unmatchedNoMaster + $unmatchedNoRack;
 
@@ -285,6 +370,7 @@ class KanbanFutabaRackSplitter
             'unmatched_no_extract' => $unmatchedNoExtract,
             'unmatched_no_master' => $unmatchedNoMaster,
             'unmatched_no_rack' => $unmatchedNoRack,
+            'sorted_by_rack_desc' => $this->sortByRackDesc,
         ]);
 
         if (!empty($noExtractPreviews)) {
